@@ -1,9 +1,9 @@
 import Testing
 @testable import SessionDeckCore
 
-@Test("app shell launches with a safe placeholder view model")
-func appShellUsesSafePlaceholderState() {
-    let viewModel = AppBootstrap.makeShellViewModel()
+@Test("composition root preserves the safe placeholder app shell")
+func compositionRootUsesSafePlaceholderState() {
+    let viewModel = SessionDeckCompositionRoot.makeAppShellViewModel()
 
     #expect(viewModel.title == "SessionDeck")
     #expect(viewModel.subtitle == "Local-first session viewer scaffold")
