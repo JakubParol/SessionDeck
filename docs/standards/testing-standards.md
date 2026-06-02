@@ -28,6 +28,9 @@ SessionDeck should test behavior at the lowest useful layer.
 - Never test against Kuba’s real `~/.codex`, `~/.hermes`, or project workspaces.
 - Use checked-in minimal fixture transcripts for known formats.
 - Use generated temporary directories for large-file, append, malformed-line, and watcher tests.
+- Construct fixture roots through the explicit test-support helpers, not by reading process `HOME` implicitly.
+- Guard fixture roots with `FixturePathGuard` before a test creates or reads a source directory.
+- Reject real `.codex` and `.hermes` roots, including descendants and equivalent expanded paths.
 - Fixtures must include malformed and unknown events to enforce defensive parsing.
 - Redact or synthesize all fixture content. Do not commit private transcripts.
 
