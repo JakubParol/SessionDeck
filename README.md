@@ -25,6 +25,15 @@ Target experience:
 
 See `docs/INDEX.md`.
 
+Key standards:
+
+- `docs/standards/index.md`
+- `docs/standards/coding-standards.md`
+- `docs/standards/macos-app-standards.md`
+- `docs/standards/testing-standards.md`
+- `docs/standards/planning-standards.md`
+- `docs/standards/documentation.md`
+
 ## Agent coordination
 
 See `AGENTS.md` for the James/Hermes ↔ Codex communication protocol and project operating rules.
