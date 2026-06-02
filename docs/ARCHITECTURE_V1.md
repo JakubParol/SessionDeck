@@ -34,18 +34,24 @@ Sources/
     │   ├── AppShellUseCase.swift
     │   ├── AppShellViewModel.swift
     │   ├── LaunchConfigurationProviding.swift
+    │   ├── SessionDeckApplicationComposition.swift
     │   ├── SourceDiscovery/              # source discovery port, DTOs, use case
     │   ├── SessionCatalog/               # session catalog port, DTOs, use case
     │   └── TranscriptLoading/            # transcript preview port, DTOs, use case
     ├── Infrastructure/
-    │   └── PlaceholderLaunchConfigurationProvider.swift
+    │   ├── PlaceholderLaunchConfigurationProvider.swift
+    │   ├── PlaceholderSourceDiscoveryAdapter.swift
+    │   ├── PlaceholderSessionCatalogAdapter.swift
+    │   └── PlaceholderTranscriptLoadingAdapter.swift
     └── CompositionRoot/
         └── SessionDeckCompositionRoot.swift
 ```
 
-The initial placeholder launch behavior is intentionally minimal. `AppShellUseCase` builds the shell view model from the Application-owned `LaunchConfigurationProviding` port. `PlaceholderLaunchConfigurationProvider` is an Infrastructure adapter that returns zero configured session sources and a placeholder-safe policy. `SessionDeckCompositionRoot` wires that adapter into the use case for the app shell.
+The initial placeholder launch behavior is intentionally minimal. `SessionDeckCompositionRoot` is the startup composition boundary: it creates concrete placeholder adapters, injects them into Application use cases, and returns `SessionDeckApplicationComposition` to the macOS app. `SessionDeckApp` passes the already-composed `AppShellViewModel` into SwiftUI instead of constructing adapters in Presentation.
 
-Future source discovery, catalog, and transcript slices start from Application-owned ports and DTOs: `SourceDiscoveryPort`, `SessionCatalogPort`, and `TranscriptLoadingPort`. Infrastructure will implement those ports later; current tests use in-memory fakes so Application behavior stays independent of real Codex/Hermes HOME data and direct IO.
+`PlaceholderLaunchConfigurationProvider`, `PlaceholderSourceDiscoveryAdapter`, `PlaceholderSessionCatalogAdapter`, and `PlaceholderTranscriptLoadingAdapter` are placeholder-safe Infrastructure adapters. They configure zero sources/sessions and never read local Codex/Hermes stores, call the network, execute commands, or mutate sessions.
+
+Future source discovery, catalog, and transcript slices start from Application-owned ports and DTOs: `SourceDiscoveryPort`, `SessionCatalogPort`, and `TranscriptLoadingPort`. Infrastructure will implement those ports later; current tests use in-memory fakes so Application behavior stays independent of real Codex/Hermes HOME data and direct IO. Future real adapters should be introduced by changing `SessionDeckCompositionRoot` wiring, not by rewriting SwiftUI views.
 
 ## Boundary verification
 
@@ -53,7 +59,8 @@ The test suite includes focused architecture checks in `Tests/SessionDeckCoreTes
 
 - Domain source files are scanned for banned framework and layer imports.
 - Presentation source files are scanned to catch direct infrastructure construction and direct IO/process usage.
-- Application behavior is tested with an injected fake launch configuration provider, proving the use case can run without real local stores.
+- Concrete placeholder adapter construction is scanned to ensure wiring stays centralized in `SessionDeckCompositionRoot`.
+- Application behavior is tested with injected fake and placeholder adapters, proving use cases can run without real local stores.
 
 Run the documented gate before committing architecture changes:
 

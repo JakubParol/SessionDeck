@@ -30,12 +30,15 @@ func domainSourceFilesStayPure() throws {
 
 @Test("Presentation target consumes application DTOs without constructing infrastructure")
 func presentationDoesNotConstructInfrastructure() throws {
-    let appDirectory = repositoryRoot().appending(path: "Sources/SessionDeckApp")
-    let sourceFiles = try swiftFiles(in: appDirectory)
+    let presentationDirectory = repositoryRoot().appending(path: "Sources/SessionDeckApp/Presentation")
+    let sourceFiles = try swiftFiles(in: presentationDirectory)
     #expect(sourceFiles.isEmpty == false)
 
     let bannedTokens = [
         "PlaceholderLaunchConfigurationProvider(",
+        "PlaceholderSourceDiscoveryAdapter(",
+        "PlaceholderSessionCatalogAdapter(",
+        "PlaceholderTranscriptLoadingAdapter(",
         "Infrastructure",
         "FileManager.default",
         "Process(",
@@ -47,6 +50,34 @@ func presentationDoesNotConstructInfrastructure() throws {
             #expect(
                 contents.contains(token) == false,
                 "\(file.lastPathComponent) should not construct infrastructure or perform direct IO"
+            )
+        }
+    }
+}
+
+@Test("concrete placeholder adapters are only constructed in the composition root")
+func concretePlaceholderAdaptersAreOnlyConstructedInCompositionRoot() throws {
+    let sourcesDirectory = repositoryRoot().appending(path: "Sources")
+    let sourceFiles = try swiftFiles(in: sourcesDirectory)
+    #expect(sourceFiles.isEmpty == false)
+
+    let compositionRootPathSuffix = "Sources/SessionDeckCore/CompositionRoot/SessionDeckCompositionRoot.swift"
+    let adapterInitializers = [
+        "PlaceholderLaunchConfigurationProvider(",
+        "PlaceholderSourceDiscoveryAdapter(",
+        "PlaceholderSessionCatalogAdapter(",
+        "PlaceholderTranscriptLoadingAdapter(",
+    ]
+
+    for file in sourceFiles {
+        let path = file.path(percentEncoded: false)
+        let isCompositionRoot = path.hasSuffix(compositionRootPathSuffix)
+        let contents = try String(contentsOf: file, encoding: .utf8)
+
+        for initializer in adapterInitializers where contents.contains(initializer) {
+            #expect(
+                isCompositionRoot,
+                "\(file.lastPathComponent) must not construct \(initializer); centralize adapter wiring in SessionDeckCompositionRoot"
             )
         }
     }
