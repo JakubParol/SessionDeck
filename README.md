@@ -21,6 +21,46 @@ Target experience:
 - GitHub repository: https://github.com/JakubParol/SessionDeck
 - Local path: `/Users/jakubparol/Repos/SessionDeck`
 
+## Native macOS scaffold
+
+SessionDeck currently contains a Swift Package Manager native macOS scaffold:
+
+- `SessionDeckApp` — SwiftUI executable target with a placeholder launch screen.
+- `SessionDeckCore` — initial core module for testable app-shell state and future Domain/Application boundaries.
+- `SessionDeckCoreTests` — smoke tests for the placeholder launch state and safety policy.
+
+The placeholder app shell intentionally has no session catalog implementation yet. It configures zero session sources and performs no local agent-store reads, network activity, command execution, telemetry, uploads, or session mutation.
+
+## Developer quality gate
+
+Fresh checkout requirements:
+
+```bash
+./scripts/build.sh
+./scripts/test.sh
+```
+
+The scripts are CI-suitable wrappers around the native SwiftPM commands:
+
+```bash
+swift build
+swift test
+```
+
+Run the combined local quality gate before committing production code:
+
+```bash
+./scripts/quality-gate.sh
+```
+
+Warnings are treated as quality-gate failures by project standard; fix root causes instead of suppressing warnings. No separate Swift lint/format tool has been selected yet.
+
+To manually launch the placeholder app from the package during development:
+
+```bash
+swift run SessionDeck
+```
+
 ## Documentation
 
 See `docs/INDEX.md`.
