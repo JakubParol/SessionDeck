@@ -25,11 +25,19 @@ Target experience:
 
 SessionDeck currently contains a Swift Package Manager native macOS scaffold:
 
-- `SessionDeckApp` — SwiftUI executable target with a placeholder launch screen.
-- `SessionDeckCore` — initial core module for testable app-shell state and future Domain/Application boundaries.
-- `SessionDeckCoreTests` — smoke tests for the placeholder launch state and safety policy.
+- `SessionDeckApp` — SwiftUI executable target with Presentation code for the placeholder launch screen.
+- `SessionDeckCore` — core module with explicit Domain, Application, Infrastructure, and composition-root folders.
+- `SessionDeckCoreTests` — smoke, use-case, and architecture-boundary tests for the placeholder launch state and safety policy.
 
 The placeholder app shell intentionally has no session catalog implementation yet. It configures zero session sources and performs no local agent-store reads, network activity, command execution, telemetry, uploads, or session mutation.
+
+Architecture dependency direction is documented in `docs/ARCHITECTURE_V1.md`:
+
+```text
+Presentation → Application → Domain
+Infrastructure → Application / Domain
+Composition Root → Application + Infrastructure
+```
 
 ## Developer quality gate
 

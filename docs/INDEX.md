@@ -8,6 +8,7 @@ SessionDeck is a local-first macOS project for browsing and live-monitoring loca
 |---|---|
 | [../README.md](../README.md) | Human-facing project overview |
 | [../AGENTS.md](../AGENTS.md) | Agent operating context, required reading, and project rules |
+| [ARCHITECTURE_V1.md](ARCHITECTURE_V1.md) | Clean Architecture layer boundaries, dependency direction, and current SwiftPM layout |
 
 ## Standards
 
