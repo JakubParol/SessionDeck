@@ -33,7 +33,10 @@ Sources/
     │   ├── AppShellLaunchConfiguration.swift
     │   ├── AppShellUseCase.swift
     │   ├── AppShellViewModel.swift
-    │   └── LaunchConfigurationProviding.swift
+    │   ├── LaunchConfigurationProviding.swift
+    │   ├── SourceDiscovery/              # source discovery port, DTOs, use case
+    │   ├── SessionCatalog/               # session catalog port, DTOs, use case
+    │   └── TranscriptLoading/            # transcript preview port, DTOs, use case
     ├── Infrastructure/
     │   └── PlaceholderLaunchConfigurationProvider.swift
     └── CompositionRoot/
@@ -41,6 +44,8 @@ Sources/
 ```
 
 The initial placeholder launch behavior is intentionally minimal. `AppShellUseCase` builds the shell view model from the Application-owned `LaunchConfigurationProviding` port. `PlaceholderLaunchConfigurationProvider` is an Infrastructure adapter that returns zero configured session sources and a placeholder-safe policy. `SessionDeckCompositionRoot` wires that adapter into the use case for the app shell.
+
+Future source discovery, catalog, and transcript slices start from Application-owned ports and DTOs: `SourceDiscoveryPort`, `SessionCatalogPort`, and `TranscriptLoadingPort`. Infrastructure will implement those ports later; current tests use in-memory fakes so Application behavior stays independent of real Codex/Hermes HOME data and direct IO.
 
 ## Boundary verification
 
