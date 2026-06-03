@@ -44,6 +44,43 @@ Required fixture categories once implementation starts:
 - non-project chat
 - profile/source path fixture
 
+## Synthetic Fixture Harness
+
+The SessionDeck test target owns a synthetic Codex fixture harness for parser,
+catalog, and application smoke tests. Use this harness instead of Kuba's real
+`~/.codex`, `~/.hermes`, or project workspaces.
+
+Harness building blocks:
+
+- Checked-in fixtures live under
+  `Tests/SessionDeckCoreTests/Fixtures/CodexTranscripts/` and are read through
+  `CodexTranscriptFixtureManifest`.
+- Temporary Codex-like stores are created with `TempCodexSessionStoreFactory`.
+  Generated stores may contain `.codex/sessions/...` layouts, but only inside a
+  validated temp root.
+- `GeneratedCodexTranscriptFixtures` creates deterministic large transcript and
+  large tool-output scenarios with small default sizes for normal gates.
+- `FixturePathGuard` and `FixtureTempRoot` must guard any fixture root that a
+  test reads or writes. Unsafe real HOME paths must fail with actionable errors.
+- Application-level smoke tests can compose fixture-backed fake ports instead of
+  introducing real source discovery, catalog indexing, transcript decoding, or
+  watcher behavior before those slices are implemented.
+
+Required harness coverage in the normal quality gate:
+
+- A checked-in synthetic fixture is read through the manifest.
+- A generated temp Codex-like store is created and cleaned up.
+- Real HOME `.codex` and `.hermes` roots, including descendants or equivalent
+  paths, are rejected.
+- Required categories remain represented: minimal rollout, tool calls/output,
+  malformed line, large output, missing metadata, non-project chat, and
+  source/profile path fixture.
+
+`./scripts/quality-gate.sh` runs `./scripts/test.sh`, and `./scripts/test.sh`
+runs `swift test`, so harness tests in `SessionDeckCoreTests` are part of the
+documented local gate. A fresh checkout must pass this gate without any real
+agent session stores present.
+
 ---
 
 ## Testing Rules
