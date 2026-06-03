@@ -13,6 +13,9 @@ struct AppShellView: View {
                 .font(.title3)
                 .foregroundStyle(.secondary)
 
+            Text("Test: To be deleted.")
+                .font(.body)
+
             Divider()
 
             VStack(alignment: .leading, spacing: 8) {
