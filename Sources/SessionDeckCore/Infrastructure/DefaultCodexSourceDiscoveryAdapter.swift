@@ -94,11 +94,11 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
                 continue
             }
 
-            let rootPath = rootURL.path
-            if seenRootPaths.contains(rootPath) {
+            let duplicateKey = duplicateDetectionKey(for: rootURL)
+            if seenRootPaths.contains(duplicateKey) {
                 summaries.append(duplicateSummary(definition: definition, rootURL: rootURL))
             } else {
-                seenRootPaths.insert(rootPath)
+                seenRootPaths.insert(duplicateKey)
                 summaries.append(try discoverSource(definition: definition, rootURL: rootURL))
             }
         }
@@ -151,6 +151,10 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
 
     private func rootURL(for definition: LocalSessionSourceDefinition) -> URL {
         URL(fileURLWithPath: definition.rootPath, isDirectory: true).standardizedFileURL
+    }
+
+    private func duplicateDetectionKey(for rootURL: URL) -> String {
+        rootURL.standardizedFileURL.resolvingSymlinksInPath().path.lowercased()
     }
 
     private func defaultSourceDefinition() -> LocalSessionSourceDefinition {

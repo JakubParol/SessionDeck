@@ -98,6 +98,54 @@ func configuredSourceDiscoveryReportsDuplicateEquivalentPaths() throws {
     #expect(duplicate.counts == .empty)
 }
 
+@Test("configured source discovery reports symlink-equivalent paths as duplicates")
+func configuredSourceDiscoveryReportsSymlinkEquivalentPathsAsDuplicates() throws {
+    let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "symlink-duplicates")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let sessionsRoot = fixtureRoot.url
+        .appending(path: "sources/primary/.codex/sessions", directoryHint: .isDirectory)
+    let symlinkRoot = fixtureRoot.url
+        .appending(path: "sources/symlink-sessions", directoryHint: .isDirectory)
+    try installTranscript(at: sessionsRoot, day: "08", name: "symlink")
+    try FileManager.default.createDirectory(
+        at: symlinkRoot.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try FileManager.default.createSymbolicLink(
+        atPath: symlinkRoot.path,
+        withDestinationPath: sessionsRoot.path
+    )
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-primary"),
+                displayName: "Codex primary",
+                kind: .codex,
+                rootPath: sessionsRoot.path,
+                isEnabled: true
+            ),
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-symlink"),
+                displayName: "Codex symlink",
+                kind: .codex,
+                rootPath: symlinkRoot.path,
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let sources = try adapter.discoverSources()
+
+    let duplicate = try #require(sources.last)
+    #expect(duplicate.availability == .duplicate)
+    #expect(duplicate.diagnostic?.code == "source_root_duplicate")
+    #expect(duplicate.locationDescription == symlinkRoot.standardizedFileURL.path)
+}
+
 @Test("configured source discovery reports unsupported kinds and continues with supported sources")
 func configuredSourceDiscoveryReportsUnsupportedKindsAndContinues() throws {
     let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "unsupported")
