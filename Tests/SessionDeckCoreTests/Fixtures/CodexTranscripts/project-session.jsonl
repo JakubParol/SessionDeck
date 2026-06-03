@@ -1,0 +1,5 @@
+{"timestamp":"2026-01-01T00:00:00Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000001","title":"Synthetic Project Session","cwd":"<synthetic-project-root>","project":"SyntheticProject","source":"codex-cli"}}
+{"timestamp":"2026-01-01T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Review the synthetic fixture state."}]}}
+{"timestamp":"2026-01-01T00:00:02Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The synthetic fixture state is ready for parser tests."}]}}
+{"timestamp":"2026-01-01T00:00:03Z","type":"response_item","payload":{"type":"function_call","name":"synthetic_fixture_probe","call_id":"call_synthetic_001","arguments":"{\"target\":\"fixture\"}"}}
+{"timestamp":"2026-01-01T00:00:04Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_synthetic_001","output":"synthetic tool output"}}
