@@ -70,59 +70,167 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
 
     private let homeDirectoryProvider: any HomeDirectoryProviding
     private let fileSystem: any CodexSourceFileSystemChecking
+    private let sourceDefinitions: [LocalSessionSourceDefinition]?
 
     public init(
         homeDirectoryProvider: any HomeDirectoryProviding = EnvironmentHomeDirectoryProvider(),
-        fileSystem: any CodexSourceFileSystemChecking = FoundationCodexSourceFileSystem()
+        fileSystem: any CodexSourceFileSystemChecking = FoundationCodexSourceFileSystem(),
+        sourceDefinitions: [LocalSessionSourceDefinition]? = nil
     ) {
         self.homeDirectoryProvider = homeDirectoryProvider
         self.fileSystem = fileSystem
+        self.sourceDefinitions = sourceDefinitions
     }
 
     public func discoverSources() throws -> [SessionSourceSummary] {
+        let definitions = sourceDefinitions ?? [defaultSourceDefinition()]
+
+        var seenRootPaths: Set<String> = []
+        var summaries: [SessionSourceSummary] = []
+        for definition in definitions {
+            let rootURL = rootURL(for: definition)
+            if !definition.isEnabled {
+                summaries.append(disabledSummary(definition: definition, rootURL: rootURL))
+                continue
+            }
+
+            let duplicateKey = duplicateDetectionKey(for: rootURL)
+            if seenRootPaths.contains(duplicateKey) {
+                summaries.append(duplicateSummary(definition: definition, rootURL: rootURL))
+            } else {
+                seenRootPaths.insert(duplicateKey)
+                summaries.append(try discoverSource(definition: definition, rootURL: rootURL))
+            }
+        }
+
+        return summaries
+    }
+
+    private func discoverSource(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) throws -> SessionSourceSummary {
+        guard definition.kind == .codex else {
+            return unsupportedSummary(definition: definition, rootURL: rootURL)
+        }
+
+        guard fileSystem.directoryExists(at: rootURL) else {
+            return summary(
+                definition: definition,
+                rootURL: rootURL,
+                availability: .missing,
+                diagnostic: SessionSourceDiagnostic(
+                    code: "codex.sessions_root_missing",
+                    message: "Configured Codex sessions root was not found."
+                ),
+                counts: .empty
+            )
+        }
+
+        do {
+            let counts = try fileSystem.sourceCounts(at: rootURL)
+            return summary(
+                definition: definition,
+                rootURL: rootURL,
+                availability: .available,
+                counts: counts
+            )
+        } catch {
+            return summary(
+                definition: definition,
+                rootURL: rootURL,
+                availability: .inaccessible,
+                diagnostic: SessionSourceDiagnostic(
+                    code: "codex.sessions_root_inaccessible",
+                    message: "Configured Codex sessions root exists but could not be inspected."
+                ),
+                counts: .empty
+            )
+        }
+    }
+
+    private func rootURL(for definition: LocalSessionSourceDefinition) -> URL {
+        URL(fileURLWithPath: definition.rootPath, isDirectory: true).standardizedFileURL
+    }
+
+    private func duplicateDetectionKey(for rootURL: URL) -> String {
+        rootURL.standardizedFileURL.resolvingSymlinksInPath().path.lowercased()
+    }
+
+    private func defaultSourceDefinition() -> LocalSessionSourceDefinition {
         let sessionsRoot = homeDirectoryProvider.homeDirectory()
             .appendingPathComponent(".codex", isDirectory: true)
             .appendingPathComponent("sessions", isDirectory: true)
 
-        guard fileSystem.directoryExists(at: sessionsRoot) else {
-            return [summary(
-                sessionsRoot: sessionsRoot,
-                availability: .missing,
-                diagnostic: SessionSourceDiagnostic(
-                    code: "codex.sessions_root_missing",
-                    message: "Default Codex sessions root was not found."
-                ),
-                counts: .empty
-            )]
-        }
+        return LocalSessionSourceDefinition(
+            id: Self.sourceID,
+            displayName: "Codex default",
+            kind: .codex,
+            rootPath: sessionsRoot.path,
+            isEnabled: true
+        )
+    }
 
-        do {
-            let counts = try fileSystem.sourceCounts(at: sessionsRoot)
-            return [summary(sessionsRoot: sessionsRoot, availability: .available, counts: counts)]
-        } catch {
-            return [summary(
-                sessionsRoot: sessionsRoot,
-                availability: .inaccessible,
-                diagnostic: SessionSourceDiagnostic(
-                    code: "codex.sessions_root_inaccessible",
-                    message: "Default Codex sessions root exists but could not be inspected."
-                ),
-                counts: .empty
-            )]
-        }
+    private func duplicateSummary(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) -> SessionSourceSummary {
+        summary(
+            definition: definition,
+            rootURL: rootURL,
+            availability: .duplicate,
+            diagnostic: SessionSourceDiagnostic(
+                code: "source_root_duplicate",
+                message: "Configured source root duplicates an earlier source root."
+            ),
+            counts: .empty
+        )
+    }
+
+    private func disabledSummary(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) -> SessionSourceSummary {
+        summary(
+            definition: definition,
+            rootURL: rootURL,
+            availability: .disabled,
+            diagnostic: SessionSourceDiagnostic(
+                code: "source_root_disabled",
+                message: "Configured source root is disabled."
+            ),
+            counts: .empty
+        )
+    }
+
+    private func unsupportedSummary(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) -> SessionSourceSummary {
+        summary(
+            definition: definition,
+            rootURL: rootURL,
+            availability: .unsupported,
+            diagnostic: SessionSourceDiagnostic(
+                code: "source_kind_unsupported",
+                message: "Configured source kind is not supported by this discovery adapter."
+            ),
+            counts: .empty
+        )
     }
 
     private func summary(
-        sessionsRoot: URL,
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL,
         availability: SourceAvailability,
         diagnostic: SessionSourceDiagnostic? = nil,
         counts: SessionSourceCounts
     ) -> SessionSourceSummary {
         SessionSourceSummary(
-            id: Self.sourceID,
-            displayName: "Codex default",
-            kind: .codex,
-            locationDescription: sessionsRoot.standardizedFileURL.path,
+            id: definition.id,
+            displayName: definition.displayName,
+            kind: definition.kind,
+            locationDescription: rootURL.standardizedFileURL.path,
             isEnabled: availability == .available,
             availability: availability,
             diagnostic: diagnostic,
