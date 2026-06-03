@@ -40,18 +40,18 @@ Sources/
     │   └── TranscriptLoading/            # transcript preview port, DTOs, use case
     ├── Infrastructure/
     │   ├── PlaceholderLaunchConfigurationProvider.swift
-    │   ├── PlaceholderSourceDiscoveryAdapter.swift
+    │   ├── DefaultCodexSourceDiscoveryAdapter.swift
     │   ├── PlaceholderSessionCatalogAdapter.swift
     │   └── PlaceholderTranscriptLoadingAdapter.swift
     └── CompositionRoot/
         └── SessionDeckCompositionRoot.swift
 ```
 
-The initial placeholder launch behavior is intentionally minimal. `SessionDeckCompositionRoot` is the startup composition boundary: it creates concrete placeholder adapters, injects them into Application use cases, and returns `SessionDeckApplicationComposition` to the macOS app. `SessionDeckApp` passes the already-composed `AppShellViewModel` into SwiftUI instead of constructing adapters in Presentation.
+The initial launch behavior is intentionally minimal. `SessionDeckCompositionRoot` is the startup composition boundary: it creates the default Codex source discovery adapter plus placeholder-safe catalog/transcript adapters, injects them into Application use cases, and returns `SessionDeckApplicationComposition` to the macOS app. `SessionDeckApp` passes the already-composed `AppShellViewModel` into SwiftUI instead of constructing adapters in Presentation.
 
-`PlaceholderLaunchConfigurationProvider`, `PlaceholderSourceDiscoveryAdapter`, `PlaceholderSessionCatalogAdapter`, and `PlaceholderTranscriptLoadingAdapter` are placeholder-safe Infrastructure adapters. They configure zero sources/sessions and never read local Codex/Hermes stores, call the network, execute commands, or mutate sessions.
+`DefaultCodexSourceDiscoveryAdapter` performs bounded read-only detection of the default Codex sessions root at `~/.codex/sessions` through injected HOME and filesystem abstractions. It reports available, missing, or inaccessible source diagnostics and basic transcript/source bucket counts without decoding transcripts or mutating the source store. `PlaceholderLaunchConfigurationProvider`, `PlaceholderSessionCatalogAdapter`, and `PlaceholderTranscriptLoadingAdapter` remain placeholder-safe adapters. They do not call the network, execute commands, upload telemetry, or mutate sessions.
 
-Future source discovery, catalog, and transcript slices start from Application-owned ports and DTOs: `SourceDiscoveryPort`, `SessionCatalogPort`, and `TranscriptLoadingPort`. Infrastructure will implement those ports later; current tests use in-memory fakes so Application behavior stays independent of real Codex/Hermes HOME data and direct IO. Future real adapters should be introduced by changing `SessionDeckCompositionRoot` wiring, not by rewriting SwiftUI views.
+Future catalog and transcript slices start from Application-owned ports and DTOs: `SessionCatalogPort` and `TranscriptLoadingPort`. Infrastructure will implement those ports later; current tests use in-memory fakes and temp HOME/source fixtures so Application behavior stays independent of real Codex/Hermes HOME data and direct IO. Future real adapters should be introduced by changing `SessionDeckCompositionRoot` wiring, not by rewriting SwiftUI views.
 
 ## Boundary verification
 

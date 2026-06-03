@@ -37,6 +37,7 @@ func presentationDoesNotConstructInfrastructure() throws {
     let bannedTokens = [
         "PlaceholderLaunchConfigurationProvider(",
         "PlaceholderSourceDiscoveryAdapter(",
+        "DefaultCodexSourceDiscoveryAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
         "Infrastructure",
@@ -55,8 +56,8 @@ func presentationDoesNotConstructInfrastructure() throws {
     }
 }
 
-@Test("concrete placeholder adapters are only constructed in the composition root")
-func concretePlaceholderAdaptersAreOnlyConstructedInCompositionRoot() throws {
+@Test("concrete adapters are only constructed in the composition root")
+func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
     let sourcesDirectory = repositoryRoot().appending(path: "Sources")
     let sourceFiles = try swiftFiles(in: sourcesDirectory)
     #expect(sourceFiles.isEmpty == false)
@@ -65,6 +66,7 @@ func concretePlaceholderAdaptersAreOnlyConstructedInCompositionRoot() throws {
     let adapterInitializers = [
         "PlaceholderLaunchConfigurationProvider(",
         "PlaceholderSourceDiscoveryAdapter(",
+        "DefaultCodexSourceDiscoveryAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
     ]

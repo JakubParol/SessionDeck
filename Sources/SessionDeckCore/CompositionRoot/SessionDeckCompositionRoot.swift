@@ -1,10 +1,12 @@
 public enum SessionDeckCompositionRoot {
-    public static func makeApplicationComposition() -> SessionDeckApplicationComposition {
+    public static func makeApplicationComposition(
+        homeDirectoryProvider: any HomeDirectoryProviding = EnvironmentHomeDirectoryProvider()
+    ) -> SessionDeckApplicationComposition {
         let appShellUseCase = AppShellUseCase(
             launchConfigurationProvider: PlaceholderLaunchConfigurationProvider()
         )
         let discoverSessionSources = DiscoverSessionSourcesUseCase(
-            sourceDiscovery: PlaceholderSourceDiscoveryAdapter()
+            sourceDiscovery: DefaultCodexSourceDiscoveryAdapter(homeDirectoryProvider: homeDirectoryProvider)
         )
         let listSessions = ListSessionsUseCase(
             sessionCatalog: PlaceholderSessionCatalogAdapter()
