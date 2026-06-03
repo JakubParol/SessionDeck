@@ -98,6 +98,53 @@ func configuredSourceDiscoveryReportsDuplicateEquivalentPaths() throws {
     #expect(duplicate.counts == .empty)
 }
 
+@Test("configured source discovery reports unsupported kinds and continues with supported sources")
+func configuredSourceDiscoveryReportsUnsupportedKindsAndContinues() throws {
+    let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "unsupported")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let unsupportedRoot = fixtureRoot.url
+        .appending(path: "sources/unsupported", directoryHint: .isDirectory)
+    let codexRoot = fixtureRoot.url
+        .appending(path: "sources/codex/.codex/sessions", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: unsupportedRoot, withIntermediateDirectories: true)
+    try installTranscript(at: codexRoot, day: "06", name: "supported")
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "generic-local"),
+                displayName: "Generic local root",
+                kind: .other("generic-local"),
+                rootPath: unsupportedRoot.path,
+                isEnabled: true
+            ),
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-supported"),
+                displayName: "Codex supported",
+                kind: .codex,
+                rootPath: codexRoot.path,
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let sources = try adapter.discoverSources()
+
+    #expect(sources.count == 2)
+    let unsupported = try #require(sources.first)
+    let supported = try #require(sources.last)
+    #expect(unsupported.availability == .unsupported)
+    #expect(unsupported.isEnabled == false)
+    #expect(unsupported.diagnostic?.code == "source_kind_unsupported")
+    #expect(unsupported.counts == .empty)
+    #expect(supported.id.rawValue == "codex-supported")
+    #expect(supported.availability == .available)
+    #expect(supported.counts == SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 1))
+}
+
 private func makeConfiguredDiscoveryFixtureRoot(name: String) throws -> FixtureTempRoot {
     try FixtureTempRoot(
         parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),

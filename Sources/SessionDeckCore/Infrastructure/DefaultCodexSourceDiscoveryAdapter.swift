@@ -105,6 +105,10 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
         definition: LocalSessionSourceDefinition,
         rootURL: URL
     ) throws -> SessionSourceSummary {
+        guard definition.kind == .codex else {
+            return unsupportedSummary(definition: definition, rootURL: rootURL)
+        }
+
         guard fileSystem.directoryExists(at: rootURL) else {
             return summary(
                 definition: definition,
@@ -169,6 +173,22 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
             diagnostic: SessionSourceDiagnostic(
                 code: "source_root_duplicate",
                 message: "Configured source root duplicates an earlier source root."
+            ),
+            counts: .empty
+        )
+    }
+
+    private func unsupportedSummary(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) -> SessionSourceSummary {
+        summary(
+            definition: definition,
+            rootURL: rootURL,
+            availability: .unsupported,
+            diagnostic: SessionSourceDiagnostic(
+                code: "source_kind_unsupported",
+                message: "Configured source kind is not supported by this discovery adapter."
             ),
             counts: .empty
         )
