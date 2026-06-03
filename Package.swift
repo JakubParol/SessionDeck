@@ -26,7 +26,7 @@ let package = Package(
             dependencies: ["SessionDeckCore"],
             path: "Tests/SessionDeckCoreTests",
             resources: [
-                .process("Fixtures"),
+                .copy("Fixtures"),
             ]
         ),
     ]
