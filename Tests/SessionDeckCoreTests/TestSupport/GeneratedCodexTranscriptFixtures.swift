@@ -48,13 +48,16 @@ extension TempCodexSessionStore {
     ) throws {
         try GeneratedCodexTranscriptFixtures.validatePath(sessionFile.url, isInside: rootURL)
         let lineContent = try GeneratedCodexTranscriptFixtures.lineContent(for: line)
-        let fileHandle = try FileHandle(forWritingTo: sessionFile.url)
+        let fileHandle = try FileHandle(forUpdating: sessionFile.url)
         defer {
             try? fileHandle.close()
         }
 
-        try fileHandle.seekToEnd()
-        if try GeneratedCodexTranscriptFixtures.fileNeedsLeadingNewline(at: sessionFile.url) {
+        let endOffset = try fileHandle.seekToEnd()
+        if try GeneratedCodexTranscriptFixtures.fileNeedsLeadingNewline(
+            fileHandle: fileHandle,
+            endOffset: endOffset
+        ) {
             try fileHandle.write(contentsOf: Data("\n".utf8))
         }
         try fileHandle.write(contentsOf: Data(lineContent.utf8))
@@ -155,11 +158,18 @@ enum GeneratedCodexTranscriptFixtures {
         }
     }
 
-    static func fileNeedsLeadingNewline(at url: URL) throws -> Bool {
-        let data = try Data(contentsOf: url)
-        guard let lastByte = data.last else {
+    static func fileNeedsLeadingNewline(fileHandle: FileHandle, endOffset: UInt64) throws -> Bool {
+        guard endOffset > 0 else {
             return false
         }
+
+        try fileHandle.seek(toOffset: endOffset - 1)
+        let finalByte = try fileHandle.read(upToCount: 1)?.first
+        try fileHandle.seek(toOffset: endOffset)
+        guard let lastByte = finalByte else {
+            return false
+        }
+
         return lastByte != 10
     }
 

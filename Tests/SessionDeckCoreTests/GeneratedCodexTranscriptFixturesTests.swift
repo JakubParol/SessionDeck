@@ -72,6 +72,10 @@ func largeTranscriptOptionsRejectNegativeSizeControls() throws {
 @Test("generated fixture cleanup removes generated large files")
 func generatedFixtureCleanupRemovesGeneratedLargeFiles() throws {
     let fixture = try makeGeneratedFixture(name: "cleanup")
+    defer {
+        try? fixture.store.cleanup()
+        try? fixture.cleanupParent()
+    }
     let source = try fixture.store.source(label: "codex-cli", profile: "cleanup")
     let sessionFile = try fixture.store.generateLargeProjectTranscript(
         source: source,
