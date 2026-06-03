@@ -85,18 +85,30 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
     public func discoverSources() throws -> [SessionSourceSummary] {
         let definitions = sourceDefinitions ?? [defaultSourceDefinition()]
 
-        return try definitions.map { definition in
-            try discoverSource(definition: definition)
+        var seenRootPaths: Set<String> = []
+        var summaries: [SessionSourceSummary] = []
+        for definition in definitions {
+            let rootURL = rootURL(for: definition)
+            let rootPath = rootURL.path
+            if seenRootPaths.contains(rootPath) {
+                summaries.append(duplicateSummary(definition: definition, rootURL: rootURL))
+            } else {
+                seenRootPaths.insert(rootPath)
+                summaries.append(try discoverSource(definition: definition, rootURL: rootURL))
+            }
         }
+
+        return summaries
     }
 
-    private func discoverSource(definition: LocalSessionSourceDefinition) throws -> SessionSourceSummary {
-        let sessionsRoot = URL(fileURLWithPath: definition.rootPath, isDirectory: true).standardizedFileURL
-
-        guard fileSystem.directoryExists(at: sessionsRoot) else {
+    private func discoverSource(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) throws -> SessionSourceSummary {
+        guard fileSystem.directoryExists(at: rootURL) else {
             return summary(
                 definition: definition,
-                rootURL: sessionsRoot,
+                rootURL: rootURL,
                 availability: .missing,
                 diagnostic: SessionSourceDiagnostic(
                     code: "codex.sessions_root_missing",
@@ -107,17 +119,17 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
         }
 
         do {
-            let counts = try fileSystem.sourceCounts(at: sessionsRoot)
+            let counts = try fileSystem.sourceCounts(at: rootURL)
             return summary(
                 definition: definition,
-                rootURL: sessionsRoot,
+                rootURL: rootURL,
                 availability: .available,
                 counts: counts
             )
         } catch {
             return summary(
                 definition: definition,
-                rootURL: sessionsRoot,
+                rootURL: rootURL,
                 availability: .inaccessible,
                 diagnostic: SessionSourceDiagnostic(
                     code: "codex.sessions_root_inaccessible",
@@ -126,6 +138,10 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
                 counts: .empty
             )
         }
+    }
+
+    private func rootURL(for definition: LocalSessionSourceDefinition) -> URL {
+        URL(fileURLWithPath: definition.rootPath, isDirectory: true).standardizedFileURL
     }
 
     private func defaultSourceDefinition() -> LocalSessionSourceDefinition {
@@ -139,6 +155,22 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
             kind: .codex,
             rootPath: sessionsRoot.path,
             isEnabled: true
+        )
+    }
+
+    private func duplicateSummary(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) -> SessionSourceSummary {
+        summary(
+            definition: definition,
+            rootURL: rootURL,
+            availability: .duplicate,
+            diagnostic: SessionSourceDiagnostic(
+                code: "source_root_duplicate",
+                message: "Configured source root duplicates an earlier source root."
+            ),
+            counts: .empty
         )
     }
 

@@ -52,6 +52,52 @@ func configuredSourceDiscoveryReturnsMetadataForEachEnabledTempRoot() throws {
     ])
 }
 
+@Test("configured source discovery reports duplicate equivalent paths as non-fatal diagnostics")
+func configuredSourceDiscoveryReportsDuplicateEquivalentPaths() throws {
+    let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "duplicates")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let sessionsRoot = fixtureRoot.url
+        .appending(path: "sources/primary/.codex/sessions", directoryHint: .isDirectory)
+    let equivalentRoot = URL(fileURLWithPath: "\(sessionsRoot.path)/../sessions", isDirectory: true)
+    try installTranscript(at: sessionsRoot, day: "05", name: "duplicate")
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-primary"),
+                displayName: "Codex primary",
+                kind: .codex,
+                rootPath: sessionsRoot.path,
+                isEnabled: true
+            ),
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-duplicate"),
+                displayName: "Codex duplicate",
+                kind: .codex,
+                rootPath: equivalentRoot.path,
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let sources = try adapter.discoverSources()
+
+    #expect(sources.count == 2)
+    let primary = try #require(sources.first)
+    let duplicate = try #require(sources.last)
+    #expect(primary.availability == .available)
+    #expect(primary.counts == SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 1))
+    #expect(duplicate.id.rawValue == "codex-duplicate")
+    #expect(duplicate.availability == .duplicate)
+    #expect(duplicate.isEnabled == false)
+    #expect(duplicate.locationDescription == sessionsRoot.standardizedFileURL.path)
+    #expect(duplicate.diagnostic?.code == "source_root_duplicate")
+    #expect(duplicate.counts == .empty)
+}
+
 private func makeConfiguredDiscoveryFixtureRoot(name: String) throws -> FixtureTempRoot {
     try FixtureTempRoot(
         parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
