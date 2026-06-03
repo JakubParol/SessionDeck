@@ -16,11 +16,19 @@ func defaultCodexSourceDiscoveryReportsAvailableTempHomeRoot() throws {
     let transcriptURL = sessionsRoot
         .appending(path: "2026/06/03", directoryHint: .isDirectory)
         .appending(path: "rollout-2026-06-03T06-00-00-test.jsonl")
+    let secondTranscriptURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T06-00-00-test.jsonl")
     try FileManager.default.createDirectory(
         at: transcriptURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
     )
+    try FileManager.default.createDirectory(
+        at: secondTranscriptURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
     try #"{"type":"session_meta"}"#.write(to: transcriptURL, atomically: true, encoding: .utf8)
+    try #"{"type":"session_meta"}"#.write(to: secondTranscriptURL, atomically: true, encoding: .utf8)
 
     let adapter = DefaultCodexSourceDiscoveryAdapter(
         homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
@@ -37,7 +45,7 @@ func defaultCodexSourceDiscoveryReportsAvailableTempHomeRoot() throws {
     #expect(source.availability == .available)
     #expect(source.isEnabled == true)
     #expect(source.diagnostic == nil)
-    #expect(source.counts == SessionSourceCounts(sessionDirectoryCount: 1, transcriptFileCount: 1))
+    #expect(source.counts == SessionSourceCounts(sessionBucketDirectoryCount: 2, transcriptFileCount: 2))
 }
 
 @Test("default Codex source discovery reports a missing diagnostic without crashing")

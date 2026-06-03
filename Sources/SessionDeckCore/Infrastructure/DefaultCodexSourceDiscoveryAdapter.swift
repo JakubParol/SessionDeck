@@ -37,42 +37,31 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
     }
 
     public func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts {
-        let topLevelContents = try fileManager.contentsOfDirectory(
-            at: sessionsRoot,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )
-        let sessionDirectoryCount = try topLevelContents.filter { url in
-            let values = try url.resourceValues(forKeys: [.isDirectoryKey])
-            return values.isDirectory == true
-        }.count
-
-        return SessionSourceCounts(
-            sessionDirectoryCount: sessionDirectoryCount,
-            transcriptFileCount: try transcriptFileCount(at: sessionsRoot)
-        )
-    }
-
-    private func transcriptFileCount(at sessionsRoot: URL) throws -> Int {
         guard let enumerator = fileManager.enumerator(
             at: sessionsRoot,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else {
-            return 0
+            return .empty
         }
 
-        var count = 0
+        var transcriptFileCount = 0
+        var sessionBucketDirectoryPaths: Set<String> = []
         for case let fileURL as URL in enumerator {
             let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
             if values.isRegularFile == true && fileURL.pathExtension == "jsonl" {
-                count += 1
+                transcriptFileCount += 1
+                sessionBucketDirectoryPaths.insert(fileURL.deletingLastPathComponent().standardizedFileURL.path)
             }
-            if count >= maximumTranscriptCount {
-                return count
+            if transcriptFileCount >= maximumTranscriptCount {
+                break
             }
         }
-        return count
+
+        return SessionSourceCounts(
+            sessionBucketDirectoryCount: sessionBucketDirectoryPaths.count,
+            transcriptFileCount: transcriptFileCount
+        )
     }
 }
 

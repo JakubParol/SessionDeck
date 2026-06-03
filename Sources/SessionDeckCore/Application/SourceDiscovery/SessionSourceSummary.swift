@@ -19,13 +19,13 @@ public struct SessionSourceID: Equatable, Hashable, RawRepresentable, Sendable {
 }
 
 public struct SessionSourceCounts: Equatable, Sendable {
-    public static let empty = SessionSourceCounts(sessionDirectoryCount: 0, transcriptFileCount: 0)
+    public static let empty = SessionSourceCounts(sessionBucketDirectoryCount: 0, transcriptFileCount: 0)
 
-    public let sessionDirectoryCount: Int
+    public let sessionBucketDirectoryCount: Int
     public let transcriptFileCount: Int
 
-    public init(sessionDirectoryCount: Int, transcriptFileCount: Int) {
-        self.sessionDirectoryCount = sessionDirectoryCount
+    public init(sessionBucketDirectoryCount: Int, transcriptFileCount: Int) {
+        self.sessionBucketDirectoryCount = sessionBucketDirectoryCount
         self.transcriptFileCount = transcriptFileCount
     }
 }
