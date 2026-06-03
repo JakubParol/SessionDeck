@@ -70,59 +70,90 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
 
     private let homeDirectoryProvider: any HomeDirectoryProviding
     private let fileSystem: any CodexSourceFileSystemChecking
+    private let sourceDefinitions: [LocalSessionSourceDefinition]?
 
     public init(
         homeDirectoryProvider: any HomeDirectoryProviding = EnvironmentHomeDirectoryProvider(),
-        fileSystem: any CodexSourceFileSystemChecking = FoundationCodexSourceFileSystem()
+        fileSystem: any CodexSourceFileSystemChecking = FoundationCodexSourceFileSystem(),
+        sourceDefinitions: [LocalSessionSourceDefinition]? = nil
     ) {
         self.homeDirectoryProvider = homeDirectoryProvider
         self.fileSystem = fileSystem
+        self.sourceDefinitions = sourceDefinitions
     }
 
     public func discoverSources() throws -> [SessionSourceSummary] {
-        let sessionsRoot = homeDirectoryProvider.homeDirectory()
-            .appendingPathComponent(".codex", isDirectory: true)
-            .appendingPathComponent("sessions", isDirectory: true)
+        let definitions = sourceDefinitions ?? [defaultSourceDefinition()]
+
+        return try definitions.map { definition in
+            try discoverSource(definition: definition)
+        }
+    }
+
+    private func discoverSource(definition: LocalSessionSourceDefinition) throws -> SessionSourceSummary {
+        let sessionsRoot = URL(fileURLWithPath: definition.rootPath, isDirectory: true).standardizedFileURL
 
         guard fileSystem.directoryExists(at: sessionsRoot) else {
-            return [summary(
-                sessionsRoot: sessionsRoot,
+            return summary(
+                definition: definition,
+                rootURL: sessionsRoot,
                 availability: .missing,
                 diagnostic: SessionSourceDiagnostic(
                     code: "codex.sessions_root_missing",
-                    message: "Default Codex sessions root was not found."
+                    message: "Configured Codex sessions root was not found."
                 ),
                 counts: .empty
-            )]
+            )
         }
 
         do {
             let counts = try fileSystem.sourceCounts(at: sessionsRoot)
-            return [summary(sessionsRoot: sessionsRoot, availability: .available, counts: counts)]
+            return summary(
+                definition: definition,
+                rootURL: sessionsRoot,
+                availability: .available,
+                counts: counts
+            )
         } catch {
-            return [summary(
-                sessionsRoot: sessionsRoot,
+            return summary(
+                definition: definition,
+                rootURL: sessionsRoot,
                 availability: .inaccessible,
                 diagnostic: SessionSourceDiagnostic(
                     code: "codex.sessions_root_inaccessible",
-                    message: "Default Codex sessions root exists but could not be inspected."
+                    message: "Configured Codex sessions root exists but could not be inspected."
                 ),
                 counts: .empty
-            )]
+            )
         }
     }
 
+    private func defaultSourceDefinition() -> LocalSessionSourceDefinition {
+        let sessionsRoot = homeDirectoryProvider.homeDirectory()
+            .appendingPathComponent(".codex", isDirectory: true)
+            .appendingPathComponent("sessions", isDirectory: true)
+
+        return LocalSessionSourceDefinition(
+            id: Self.sourceID,
+            displayName: "Codex default",
+            kind: .codex,
+            rootPath: sessionsRoot.path,
+            isEnabled: true
+        )
+    }
+
     private func summary(
-        sessionsRoot: URL,
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL,
         availability: SourceAvailability,
         diagnostic: SessionSourceDiagnostic? = nil,
         counts: SessionSourceCounts
     ) -> SessionSourceSummary {
         SessionSourceSummary(
-            id: Self.sourceID,
-            displayName: "Codex default",
-            kind: .codex,
-            locationDescription: sessionsRoot.standardizedFileURL.path,
+            id: definition.id,
+            displayName: definition.displayName,
+            kind: definition.kind,
+            locationDescription: rootURL.standardizedFileURL.path,
             isEnabled: availability == .available,
             availability: availability,
             diagnostic: diagnostic,
