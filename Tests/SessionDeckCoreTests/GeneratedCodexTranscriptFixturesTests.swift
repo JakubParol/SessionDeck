@@ -1,0 +1,172 @@
+import Foundation
+import Testing
+
+@Test("generated transcript fixture uses explicit event count and temp store path")
+func generatedTranscriptFixtureUsesExplicitEventCountAndTempStorePath() throws {
+    let fixture = try makeGeneratedFixture(name: "large-transcript")
+    defer {
+        try? fixture.store.cleanup()
+        try? fixture.cleanupParent()
+    }
+    let source = try fixture.store.source(label: "codex-cli", profile: "large")
+
+    let sessionFile = try fixture.store.generateLargeProjectTranscript(
+        source: source,
+        sessionID: "large-session",
+        projectName: "LargeProject",
+        options: GeneratedCodexTranscriptOptions(eventCount: 8, toolOutputByteCount: 128)
+    )
+
+    let content = try String(contentsOf: sessionFile.url, encoding: .utf8)
+    let lines = content.split(separator: "\n", omittingEmptySubsequences: true)
+    #expect(lines.count == 9)
+    #expect(sessionFile.url.path.hasPrefix(fixture.store.rootURL.path))
+    #expect(content.contains("\"project\":\"LargeProject\""))
+    #expect(content.contains("\"call_id\":\"call-large-output\""))
+}
+
+@Test("large tool output event is deterministic and byte sized")
+func largeToolOutputEventIsDeterministicAndByteSized() throws {
+    let first = try GeneratedCodexTranscriptFixtures.largeToolOutputEvent(outputByteCount: 4096)
+    let second = try GeneratedCodexTranscriptFixtures.largeToolOutputEvent(outputByteCount: 4096)
+
+    #expect(first == second)
+    let event = try jsonObject(from: first)
+    let payload = try #require(event["payload"] as? [String: Any])
+    let output = try #require(payload["output"] as? String)
+    #expect(output.utf8.count == 4096)
+    #expect(output.hasPrefix("0123456789abcdef"))
+}
+
+@Test("large transcript options reject negative size controls")
+func largeTranscriptOptionsRejectNegativeSizeControls() throws {
+    do {
+        _ = try GeneratedCodexTranscriptFixtures.largeProjectTranscript(
+            sessionID: "invalid-event-count",
+            projectName: "InvalidProject",
+            sourceLabel: "codex-cli",
+            cwd: "/tmp/invalid",
+            timestamp: "2026-01-01T00:00:00Z",
+            options: GeneratedCodexTranscriptOptions(eventCount: -1, toolOutputByteCount: 0)
+        )
+        Issue.record("Expected negative event count to be rejected")
+    } catch let error as GeneratedCodexTranscriptFixtures.Error {
+        #expect(error == .invalidEventCount(-1))
+    }
+
+    do {
+        _ = try GeneratedCodexTranscriptFixtures.largeProjectTranscript(
+            sessionID: "invalid-output-size",
+            projectName: "InvalidProject",
+            sourceLabel: "codex-cli",
+            cwd: "/tmp/invalid",
+            timestamp: "2026-01-01T00:00:00Z",
+            options: GeneratedCodexTranscriptOptions(eventCount: 0, toolOutputByteCount: -1)
+        )
+        Issue.record("Expected negative tool output byte count to be rejected")
+    } catch let error as GeneratedCodexTranscriptFixtures.Error {
+        #expect(error == .invalidOutputByteCount(-1))
+    }
+}
+
+@Test("generated fixture cleanup removes generated large files")
+func generatedFixtureCleanupRemovesGeneratedLargeFiles() throws {
+    let fixture = try makeGeneratedFixture(name: "cleanup")
+    defer {
+        try? fixture.store.cleanup()
+        try? fixture.cleanupParent()
+    }
+    let source = try fixture.store.source(label: "codex-cli", profile: "cleanup")
+    let sessionFile = try fixture.store.generateLargeProjectTranscript(
+        source: source,
+        sessionID: "cleanup-large-session",
+        projectName: "CleanupLargeProject",
+        options: GeneratedCodexTranscriptOptions(eventCount: 3, toolOutputByteCount: 2048)
+    )
+
+    #expect(FileManager.default.fileExists(atPath: sessionFile.url.path))
+    try fixture.store.cleanup()
+    #expect(!FileManager.default.fileExists(atPath: sessionFile.url.path))
+
+    try fixture.cleanupParent()
+}
+
+@Test("append helpers add valid malformed and unknown lines")
+func appendHelpersAddValidMalformedAndUnknownLines() throws {
+    let fixture = try makeGeneratedFixture(name: "append")
+    defer {
+        try? fixture.store.cleanup()
+        try? fixture.cleanupParent()
+    }
+    let source = try fixture.store.source(label: "codex-cli", profile: "append")
+    let sessionFile = try fixture.store.installProjectSession(
+        .projectSession,
+        source: source,
+        sessionID: "append-session",
+        projectName: "AppendProject"
+    )
+
+    try fixture.store.appendGeneratedLine(.assistantMessage(index: 101), to: sessionFile)
+    try fixture.store.appendGeneratedLine(.malformed, to: sessionFile)
+    try fixture.store.appendGeneratedLine(.unknownEvent(index: 102), to: sessionFile)
+
+    let content = try String(contentsOf: sessionFile.url, encoding: .utf8)
+    #expect(content.contains("Synthetic generated assistant event 101"))
+    #expect(content.contains("{\"type\":\"response_item\",\"payload\""))
+    #expect(content.contains("\"type\":\"synthetic_unknown_event\""))
+}
+
+@Test("generated fixture rejects appended files outside temp store root")
+func generatedFixtureRejectsAppendedFilesOutsideTempStoreRoot() throws {
+    let fixture = try makeGeneratedFixture(name: "append-unsafe")
+    defer {
+        try? fixture.store.cleanup()
+        try? fixture.cleanupParent()
+    }
+    let outsideFile = fixture.parentDirectory.appendingPathComponent("outside.jsonl", isDirectory: false)
+    try "{}\n".write(to: outsideFile, atomically: true, encoding: .utf8)
+    let source = try fixture.store.source(label: "codex-cli", profile: "append-unsafe")
+    let unsafeSession = TempCodexSessionFile(
+        source: source,
+        placement: .project("Unsafe"),
+        sessionID: "unsafe",
+        timestamp: "2026-01-01T00:00:00Z",
+        url: outsideFile
+    )
+
+    do {
+        try fixture.store.appendGeneratedLine(.assistantMessage(index: 1), to: unsafeSession)
+        Issue.record("Expected append outside the temp store root to be rejected")
+    } catch let error as GeneratedCodexTranscriptFixtures.Error {
+        #expect(error == .pathEscapesTempRoot(outsideFile.path))
+    }
+}
+
+private func makeGeneratedFixture(name: String) throws -> GeneratedCodexFixtureTestFixture {
+    let parentDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        .appendingPathComponent("SessionDeckGeneratedCodexTranscriptFixturesTests", isDirectory: true)
+        .appendingPathComponent("\(name)-\(UUID().uuidString)", isDirectory: true)
+    let pathGuard = FixturePathGuard(
+        forbiddenHomeDirectories: [URL(fileURLWithPath: "/Users/jakubparol", isDirectory: true)]
+    )
+    let factory = TempCodexSessionStoreFactory(parentDirectory: parentDirectory, pathGuard: pathGuard)
+    let store = try factory.makeStore(name: "store")
+
+    return GeneratedCodexFixtureTestFixture(parentDirectory: parentDirectory, store: store)
+}
+
+private struct GeneratedCodexFixtureTestFixture {
+    let parentDirectory: URL
+    let store: TempCodexSessionStore
+
+    func cleanupParent() throws {
+        if FileManager.default.fileExists(atPath: parentDirectory.path) {
+            try FileManager.default.removeItem(at: parentDirectory)
+        }
+    }
+}
+
+private func jsonObject(from line: String) throws -> [String: Any] {
+    let data = Data(line.utf8)
+    return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+}
