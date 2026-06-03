@@ -38,6 +38,37 @@ func largeToolOutputEventIsDeterministicAndByteSized() throws {
     #expect(output.hasPrefix("0123456789abcdef"))
 }
 
+@Test("large transcript options reject negative size controls")
+func largeTranscriptOptionsRejectNegativeSizeControls() throws {
+    do {
+        _ = try GeneratedCodexTranscriptFixtures.largeProjectTranscript(
+            sessionID: "invalid-event-count",
+            projectName: "InvalidProject",
+            sourceLabel: "codex-cli",
+            cwd: "/tmp/invalid",
+            timestamp: "2026-01-01T00:00:00Z",
+            options: GeneratedCodexTranscriptOptions(eventCount: -1, toolOutputByteCount: 0)
+        )
+        Issue.record("Expected negative event count to be rejected")
+    } catch let error as GeneratedCodexTranscriptFixtures.Error {
+        #expect(error == .invalidEventCount(-1))
+    }
+
+    do {
+        _ = try GeneratedCodexTranscriptFixtures.largeProjectTranscript(
+            sessionID: "invalid-output-size",
+            projectName: "InvalidProject",
+            sourceLabel: "codex-cli",
+            cwd: "/tmp/invalid",
+            timestamp: "2026-01-01T00:00:00Z",
+            options: GeneratedCodexTranscriptOptions(eventCount: 0, toolOutputByteCount: -1)
+        )
+        Issue.record("Expected negative tool output byte count to be rejected")
+    } catch let error as GeneratedCodexTranscriptFixtures.Error {
+        #expect(error == .invalidOutputByteCount(-1))
+    }
+}
+
 @Test("generated fixture cleanup removes generated large files")
 func generatedFixtureCleanupRemovesGeneratedLargeFiles() throws {
     let fixture = try makeGeneratedFixture(name: "cleanup")

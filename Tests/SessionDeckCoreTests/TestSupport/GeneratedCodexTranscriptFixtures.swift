@@ -100,6 +100,9 @@ enum GeneratedCodexTranscriptFixtures {
         guard options.eventCount >= 0 else {
             throw Error.invalidEventCount(options.eventCount)
         }
+        guard options.toolOutputByteCount >= 0 else {
+            throw Error.invalidOutputByteCount(options.toolOutputByteCount)
+        }
 
         var lines = [
             try jsonLine([
