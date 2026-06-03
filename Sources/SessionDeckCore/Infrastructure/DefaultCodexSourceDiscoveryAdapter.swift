@@ -89,6 +89,11 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
         var summaries: [SessionSourceSummary] = []
         for definition in definitions {
             let rootURL = rootURL(for: definition)
+            if !definition.isEnabled {
+                summaries.append(disabledSummary(definition: definition, rootURL: rootURL))
+                continue
+            }
+
             let rootPath = rootURL.path
             if seenRootPaths.contains(rootPath) {
                 summaries.append(duplicateSummary(definition: definition, rootURL: rootURL))
@@ -173,6 +178,22 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
             diagnostic: SessionSourceDiagnostic(
                 code: "source_root_duplicate",
                 message: "Configured source root duplicates an earlier source root."
+            ),
+            counts: .empty
+        )
+    }
+
+    private func disabledSummary(
+        definition: LocalSessionSourceDefinition,
+        rootURL: URL
+    ) -> SessionSourceSummary {
+        summary(
+            definition: definition,
+            rootURL: rootURL,
+            availability: .disabled,
+            diagnostic: SessionSourceDiagnostic(
+                code: "source_root_disabled",
+                message: "Configured source root is disabled."
             ),
             counts: .empty
         )

@@ -10,6 +10,7 @@ public enum SourceAvailability: Equatable, Sendable {
     case inaccessible
     case duplicate
     case unsupported
+    case disabled
 }
 
 public struct SessionSourceID: Equatable, Hashable, RawRepresentable, Sendable {

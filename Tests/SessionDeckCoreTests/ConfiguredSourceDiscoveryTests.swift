@@ -145,6 +145,39 @@ func configuredSourceDiscoveryReportsUnsupportedKindsAndContinues() throws {
     #expect(supported.counts == SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 1))
 }
 
+@Test("configured source discovery reports disabled roots without inspecting them")
+func configuredSourceDiscoveryReportsDisabledRootsWithoutInspectingThem() throws {
+    let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "disabled")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let disabledRoot = fixtureRoot.url
+        .appending(path: "sources/disabled/.codex/sessions", directoryHint: .isDirectory)
+    try installTranscript(at: disabledRoot, day: "07", name: "disabled")
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-disabled"),
+                displayName: "Codex disabled",
+                kind: .codex,
+                rootPath: disabledRoot.path,
+                isEnabled: false
+            ),
+        ]
+    )
+
+    let sources = try adapter.discoverSources()
+
+    let disabled = try #require(sources.first)
+    #expect(disabled.id.rawValue == "codex-disabled")
+    #expect(disabled.availability == .disabled)
+    #expect(disabled.isEnabled == false)
+    #expect(disabled.diagnostic?.code == "source_root_disabled")
+    #expect(disabled.counts == .empty)
+}
+
 private func makeConfiguredDiscoveryFixtureRoot(name: String) throws -> FixtureTempRoot {
     try FixtureTempRoot(
         parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
