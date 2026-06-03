@@ -78,7 +78,11 @@ enum CodexTranscriptFixtureManifest {
     }
 
     static var rootDirectory: URL {
-        testDirectory.appendingPathComponent("Fixtures/CodexTranscripts", isDirectory: true)
+        if let resourceURL = Bundle.module.resourceURL {
+            return resourceURL.appendingPathComponent("Fixtures/CodexTranscripts", isDirectory: true)
+        }
+
+        return testDirectory.appendingPathComponent("Fixtures/CodexTranscripts", isDirectory: true)
     }
 
     private static var testDirectory: URL {

@@ -24,7 +24,10 @@ let package = Package(
         .testTarget(
             name: "SessionDeckCoreTests",
             dependencies: ["SessionDeckCore"],
-            path: "Tests/SessionDeckCoreTests"
+            path: "Tests/SessionDeckCoreTests",
+            resources: [
+                .process("Fixtures"),
+            ]
         ),
     ]
 )

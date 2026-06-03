@@ -1,0 +1,4 @@
+{"timestamp":"2026-01-01T00:02:00Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000003","title":"Synthetic Unknown Event Session","cwd":"<synthetic-project-root>","project":"SyntheticProject","source":"codex-cli"}}
+{"timestamp":"2026-01-01T00:02:01Z","type":"event_msg","payload":{"role":"user","content":"Exercise unknown-event handling."}}
+{"timestamp":"2026-01-01T00:02:02Z","type":"future_codex_event","payload":{"schema_version":"synthetic-vNext","opaque":{"kind":"unrecognized","value":"preserve-or-diagnose"}}}
+{"timestamp":"2026-01-01T00:02:03Z","type":"response_item","payload":{"role":"assistant","content":[{"type":"output_text","text":"Unknown events should remain observable to diagnostics."}]}}

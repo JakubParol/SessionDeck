@@ -1,0 +1,4 @@
+{"timestamp":"2026-01-01T00:01:00Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000002","title":"Synthetic Malformed Line Session","cwd":"<synthetic-project-root>","project":"SyntheticProject","source":"codex-cli"}}
+{"timestamp":"2026-01-01T00:01:01Z","type":"event_msg","payload":{"role":"user","content":"Exercise malformed-line handling."}}
+{this line is intentionally malformed jsonl for parser fallback tests
+{"timestamp":"2026-01-01T00:01:02Z","type":"response_item","payload":{"role":"assistant","content":[{"type":"output_text","text":"Parsing should continue after the malformed line."}]}}
