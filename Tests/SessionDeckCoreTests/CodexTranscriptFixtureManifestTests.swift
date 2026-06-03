@@ -38,6 +38,10 @@ func codexTranscriptFixturesAreReadableThroughManifestHelper() throws {
 
 @Test("Codex transcript fixtures preserve degraded input examples")
 func codexTranscriptFixturesPreserveDegradedInputExamples() throws {
+    let projectSession = try CodexTranscriptFixtureManifest.readFixture(.projectSession)
+    #expect(projectSession.contains("\"type\":\"user_message\""))
+    #expect(projectSession.contains("\"type\":\"message\",\"role\":\"assistant\""))
+
     let malformedLines = try fixtureLines(.malformedLine)
     #expect(malformedLines.count == 4)
     #expect(validJSONLineCount(in: malformedLines) == 3)
