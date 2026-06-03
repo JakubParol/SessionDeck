@@ -38,9 +38,17 @@ func codexTranscriptFixturesAreReadableThroughManifestHelper() throws {
 
 @Test("Codex transcript fixtures preserve degraded input examples")
 func codexTranscriptFixturesPreserveDegradedInputExamples() throws {
-    let projectSession = try CodexTranscriptFixtureManifest.readFixture(.projectSession)
-    #expect(projectSession.contains("\"type\":\"user_message\""))
-    #expect(projectSession.contains("\"type\":\"message\",\"role\":\"assistant\""))
+    let projectSessionLines = try fixtureLines(.projectSession)
+    let userTurn = try jsonObject(from: projectSessionLines[1])
+    let assistantTurn = try jsonObject(from: projectSessionLines[2])
+    #expect(userTurn["type"] as? String == "response_item")
+    #expect(payloadString("type", in: userTurn) == "message")
+    #expect(payloadString("role", in: userTurn) == "user")
+    #expect(firstContentType(in: userTurn) == "input_text")
+    #expect(assistantTurn["type"] as? String == "response_item")
+    #expect(payloadString("type", in: assistantTurn) == "message")
+    #expect(payloadString("role", in: assistantTurn) == "assistant")
+    #expect(firstContentType(in: assistantTurn) == "output_text")
 
     let malformedLines = try fixtureLines(.malformedLine)
     #expect(malformedLines.count == 4)
@@ -108,4 +116,29 @@ private func validJSONLineCount(in lines: [String]) -> Int {
 
         return (try? JSONSerialization.jsonObject(with: data)) != nil
     }.count
+}
+
+private func jsonObject(from line: String) throws -> [String: Any] {
+    let data = Data(line.utf8)
+    return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+}
+
+private func payloadString(_ key: String, in object: [String: Any]) -> String? {
+    guard let payload = object["payload"] as? [String: Any] else {
+        return nil
+    }
+
+    return payload[key] as? String
+}
+
+private func firstContentType(in object: [String: Any]) -> String? {
+    guard
+        let payload = object["payload"] as? [String: Any],
+        let content = payload["content"] as? [[String: Any]],
+        let firstContent = content.first
+    else {
+        return nil
+    }
+
+    return firstContent["type"] as? String
 }
