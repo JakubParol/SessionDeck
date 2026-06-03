@@ -10,6 +10,12 @@ struct GeneratedCodexTranscriptOptions: Equatable {
     }
 }
 
+enum GeneratedCodexTranscriptAppendLine: Equatable {
+    case assistantMessage(index: Int)
+    case malformed
+    case unknownEvent(index: Int)
+}
+
 extension TempCodexSessionStore {
     @discardableResult
     func generateLargeProjectTranscript(
@@ -36,6 +42,24 @@ extension TempCodexSessionStore {
         )
     }
 
+    func appendGeneratedLine(
+        _ line: GeneratedCodexTranscriptAppendLine,
+        to sessionFile: TempCodexSessionFile
+    ) throws {
+        try GeneratedCodexTranscriptFixtures.validatePath(sessionFile.url, isInside: rootURL)
+        let lineContent = try GeneratedCodexTranscriptFixtures.lineContent(for: line)
+        let fileHandle = try FileHandle(forWritingTo: sessionFile.url)
+        defer {
+            try? fileHandle.close()
+        }
+
+        try fileHandle.seekToEnd()
+        if try GeneratedCodexTranscriptFixtures.fileNeedsLeadingNewline(at: sessionFile.url) {
+            try fileHandle.write(contentsOf: Data("\n".utf8))
+        }
+        try fileHandle.write(contentsOf: Data(lineContent.utf8))
+        try fileHandle.write(contentsOf: Data("\n".utf8))
+    }
 }
 
 enum GeneratedCodexTranscriptFixtures {
@@ -108,6 +132,32 @@ enum GeneratedCodexTranscriptFixtures {
         guard candidatePath == rootPath || candidatePath.hasPrefix("\(rootPath)/") else {
             throw Error.pathEscapesTempRoot(candidate.standardizedFileURL.path)
         }
+    }
+
+    static func lineContent(for line: GeneratedCodexTranscriptAppendLine) throws -> String {
+        switch line {
+        case .assistantMessage(let index):
+            return try assistantMessageLine(index: index)
+        case .malformed:
+            return "{\"type\":\"response_item\",\"payload\""
+        case .unknownEvent(let index):
+            return try jsonLine([
+                "timestamp": "2026-01-01T00:00:02Z",
+                "type": "synthetic_unknown_event",
+                "payload": [
+                    "sequence": index,
+                    "note": "unknown append event",
+                ],
+            ])
+        }
+    }
+
+    static func fileNeedsLeadingNewline(at url: URL) throws -> Bool {
+        let data = try Data(contentsOf: url)
+        guard let lastByte = data.last else {
+            return false
+        }
+        return lastByte != 10
     }
 
     static func assistantMessageLine(index: Int) throws -> String {

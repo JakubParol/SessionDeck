@@ -56,6 +56,57 @@ func generatedFixtureCleanupRemovesGeneratedLargeFiles() throws {
     try fixture.cleanupParent()
 }
 
+@Test("append helpers add valid malformed and unknown lines")
+func appendHelpersAddValidMalformedAndUnknownLines() throws {
+    let fixture = try makeGeneratedFixture(name: "append")
+    defer {
+        try? fixture.store.cleanup()
+        try? fixture.cleanupParent()
+    }
+    let source = try fixture.store.source(label: "codex-cli", profile: "append")
+    let sessionFile = try fixture.store.installProjectSession(
+        .projectSession,
+        source: source,
+        sessionID: "append-session",
+        projectName: "AppendProject"
+    )
+
+    try fixture.store.appendGeneratedLine(.assistantMessage(index: 101), to: sessionFile)
+    try fixture.store.appendGeneratedLine(.malformed, to: sessionFile)
+    try fixture.store.appendGeneratedLine(.unknownEvent(index: 102), to: sessionFile)
+
+    let content = try String(contentsOf: sessionFile.url, encoding: .utf8)
+    #expect(content.contains("Synthetic generated assistant event 101"))
+    #expect(content.contains("{\"type\":\"response_item\",\"payload\""))
+    #expect(content.contains("\"type\":\"synthetic_unknown_event\""))
+}
+
+@Test("generated fixture rejects appended files outside temp store root")
+func generatedFixtureRejectsAppendedFilesOutsideTempStoreRoot() throws {
+    let fixture = try makeGeneratedFixture(name: "append-unsafe")
+    defer {
+        try? fixture.store.cleanup()
+        try? fixture.cleanupParent()
+    }
+    let outsideFile = fixture.parentDirectory.appendingPathComponent("outside.jsonl", isDirectory: false)
+    try "{}\n".write(to: outsideFile, atomically: true, encoding: .utf8)
+    let source = try fixture.store.source(label: "codex-cli", profile: "append-unsafe")
+    let unsafeSession = TempCodexSessionFile(
+        source: source,
+        placement: .project("Unsafe"),
+        sessionID: "unsafe",
+        timestamp: "2026-01-01T00:00:00Z",
+        url: outsideFile
+    )
+
+    do {
+        try fixture.store.appendGeneratedLine(.assistantMessage(index: 1), to: unsafeSession)
+        Issue.record("Expected append outside the temp store root to be rejected")
+    } catch let error as GeneratedCodexTranscriptFixtures.Error {
+        #expect(error == .pathEscapesTempRoot(outsideFile.path))
+    }
+}
+
 private func makeGeneratedFixture(name: String) throws -> GeneratedCodexFixtureTestFixture {
     let parentDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("SessionDeckGeneratedCodexTranscriptFixturesTests", isDirectory: true)
