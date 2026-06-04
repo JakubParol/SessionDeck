@@ -146,13 +146,20 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
         let year = relativeComponents[0]
         let month = relativeComponents[1]
         let day = relativeComponents[2]
+        let fileName = relativeComponents[3]
         return year.count == 4 && year.allSatisfy(\.isNumber)
             && month.count == 2 && month.allSatisfy(\.isNumber)
             && day.count == 2 && day.allSatisfy(\.isNumber)
+            && fileName.hasPrefix("rollout-\(year)-\(month)-\(day)T")
     }
 
     private func relativePath(absolutePath: String, rootPath: String) -> String {
-        absolutePath.replacingOccurrences(of: "\(rootPath)/", with: "")
+        let rootPrefix = "\(rootPath)/"
+        guard absolutePath.hasPrefix(rootPrefix) else {
+            return absolutePath
+        }
+
+        return String(absolutePath.dropFirst(rootPrefix.count))
     }
 
     private func isContainedAfterResolvingSymlinks(fileURL: URL, sessionsRoot: URL) -> Bool {
@@ -209,19 +216,20 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
         var seenRootPaths: Set<String> = []
         var files: [CandidateSessionFile] = []
         for definition in definitions {
+            let rootURL = rootURL(for: definition)
+            let isCandidateSource = definition.isEnabled && definition.kind == .codex
+            let duplicateKey = duplicateDetectionKey(for: rootURL)
+            let isDuplicate = isCandidateSource && seenRootPaths.contains(duplicateKey)
+            if isCandidateSource && !isDuplicate {
+                seenRootPaths.insert(duplicateKey)
+            }
+
             guard sourceID == nil || definition.id == sourceID else {
                 continue
             }
-            guard definition.isEnabled && definition.kind == .codex else {
+            guard isCandidateSource && !isDuplicate else {
                 continue
             }
-
-            let rootURL = rootURL(for: definition)
-            let duplicateKey = duplicateDetectionKey(for: rootURL)
-            guard !seenRootPaths.contains(duplicateKey) else {
-                continue
-            }
-            seenRootPaths.insert(duplicateKey)
 
             guard fileSystem.directoryExists(at: rootURL) else {
                 continue

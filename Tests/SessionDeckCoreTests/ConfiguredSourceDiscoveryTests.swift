@@ -98,6 +98,42 @@ func configuredSourceDiscoveryReportsDuplicateEquivalentPaths() throws {
     #expect(duplicate.counts == .empty)
 }
 
+@Test("configured source discovery suppresses candidate files when duplicate source is requested directly")
+func configuredSourceDiscoverySuppressesCandidateFilesWhenDuplicateSourceIsRequestedDirectly() throws {
+    let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "duplicate-candidate-filter")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let sessionsRoot = fixtureRoot.url
+        .appending(path: "sources/primary/.codex/sessions", directoryHint: .isDirectory)
+    let equivalentRoot = URL(fileURLWithPath: "\(sessionsRoot.path)/../sessions", isDirectory: true)
+    try installTranscript(at: sessionsRoot, day: "11", name: "duplicate-filter")
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-primary"),
+                displayName: "Codex primary",
+                kind: .codex,
+                rootPath: sessionsRoot.path,
+                isEnabled: true
+            ),
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-duplicate"),
+                displayName: "Codex duplicate",
+                kind: .codex,
+                rootPath: equivalentRoot.path,
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: SessionSourceID(rawValue: "codex-duplicate"))
+
+    #expect(files.isEmpty)
+}
+
 @Test("configured source discovery reports symlink-equivalent paths as duplicates")
 func configuredSourceDiscoveryReportsSymlinkEquivalentPathsAsDuplicates() throws {
     let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "symlink-duplicates")

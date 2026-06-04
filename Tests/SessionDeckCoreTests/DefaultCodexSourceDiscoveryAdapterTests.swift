@@ -118,6 +118,9 @@ func defaultCodexSourceDiscoveryEnumeratesCandidateFiles() throws {
         .appending(path: "2026/06/04", directoryHint: .isDirectory)
         .appending(path: "rollout-2026-06-04T10-00-00-test.jsonl")
     let unrelatedJSONL = sessionsRoot.appending(path: "scratch.jsonl")
+    let unrelatedDateBucketJSONL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "not-a-codex-rollout.jsonl")
     let unrelatedText = sessionsRoot
         .appending(path: "2026/06/04", directoryHint: .isDirectory)
         .appending(path: "notes.txt")
@@ -127,6 +130,7 @@ func defaultCodexSourceDiscoveryEnumeratesCandidateFiles() throws {
     )
     try #"{"type":"session_meta"}"#.write(to: candidateURL, atomically: true, encoding: .utf8)
     try #"{"not":"a-codex-session"}"#.write(to: unrelatedJSONL, atomically: true, encoding: .utf8)
+    try #"{"not":"a-codex-rollout"}"#.write(to: unrelatedDateBucketJSONL, atomically: true, encoding: .utf8)
     try "notes".write(to: unrelatedText, atomically: true, encoding: .utf8)
 
     let adapter = DefaultCodexSourceDiscoveryAdapter(
