@@ -107,18 +107,20 @@ final class FixtureHarnessApplicationSmoke {
         let sessionFiles = store.sessionFiles
         let sessionSummaries = try sessionFiles.map(sessionSummary)
         let transcriptPreviews = try sessionFiles.map(transcriptPreview)
+        let discoverSessionSources = DiscoverSessionSourcesUseCase(
+            sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries)
+        )
+        let appShellUseCase = AppShellUseCase(
+            launchConfigurationProvider: FixtureHarnessLaunchConfigurationProvider(
+                configuredSourceCount: sourceSummaries.count
+            ),
+            discoverSessionSources: discoverSessionSources
+        )
 
         return SessionDeckApplicationComposition(
-            appShellViewModel: AppShellViewModel(
-                title: "SessionDeck",
-                subtitle: "Synthetic fixture application smoke",
-                statusMessage: "Fixture-backed application composition.",
-                configuredSourceCount: sourceSummaries.count,
-                safetyPolicy: .placeholderSafe
-            ),
-            discoverSessionSources: DiscoverSessionSourcesUseCase(
-                sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries)
-            ),
+            appShellUseCase: appShellUseCase,
+            appShellViewModel: appShellUseCase.makeViewModel(),
+            discoverSessionSources: discoverSessionSources,
             enumerateCandidateSessionFiles: EnumerateCandidateSessionFilesUseCase(
                 candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(files: [])
             ),
@@ -239,6 +241,20 @@ final class FixtureHarnessApplicationSmoke {
         default:
             return .diagnostic
         }
+    }
+}
+
+private struct FixtureHarnessLaunchConfigurationProvider: LaunchConfigurationProviding {
+    let configuredSourceCount: Int
+
+    func loadConfiguration() -> AppShellLaunchConfiguration {
+        AppShellLaunchConfiguration(
+            title: "SessionDeck",
+            subtitle: "Synthetic fixture application smoke",
+            statusMessage: "Fixture-backed application composition.",
+            configuredSourceCount: configuredSourceCount,
+            safetyPolicy: .placeholderSafe
+        )
     }
 }
 

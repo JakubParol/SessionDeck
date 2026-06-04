@@ -5,9 +5,14 @@ public struct PlaceholderLaunchConfigurationProvider: LaunchConfigurationProvidi
         AppShellLaunchConfiguration(
             title: "SessionDeck",
             subtitle: "Local-first session viewer scaffold",
-            statusMessage: "Placeholder app shell only. Session catalog is not implemented yet.",
+            statusMessage: "Read-only source discovery is active. Session catalog is not implemented yet.",
             configuredSourceCount: 0,
-            safetyPolicy: .placeholderSafe
+            safetyPolicy: LaunchSafetyPolicy(
+                readsRealAgentStores: true,
+                permitsNetworkCalls: false,
+                permitsCommandExecution: false,
+                permitsSessionMutation: false
+            )
         )
     }
 }

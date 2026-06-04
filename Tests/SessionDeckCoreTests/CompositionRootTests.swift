@@ -18,8 +18,11 @@ func compositionRootWiresDefaultSourceDiscoveryWithoutPresentationIO() throws {
     )
 
     #expect(composition.appShellViewModel.title == "SessionDeck")
-    #expect(composition.appShellViewModel.configuredSourceCount == 0)
-    #expect(composition.appShellViewModel.safetyPolicy == .placeholderSafe)
+    #expect(composition.appShellViewModel.configuredSourceCount == 1)
+    #expect(composition.appShellViewModel.safetyPolicy.readsRealAgentStores == true)
+    #expect(composition.appShellViewModel.safetyPolicy.permitsNetworkCalls == false)
+    #expect(composition.appShellViewModel.safetyPolicy.permitsCommandExecution == false)
+    #expect(composition.appShellViewModel.safetyPolicy.permitsSessionMutation == false)
 
     let sources = try composition.discoverSessionSources.discoverSources()
     #expect(sources.map(\.id) == [DefaultCodexSourceDiscoveryAdapter.sourceID])
