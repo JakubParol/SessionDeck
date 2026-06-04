@@ -19,6 +19,7 @@ public struct EnvironmentHomeDirectoryProvider: HomeDirectoryProviding, Sendable
 public protocol CodexSourceFileSystemChecking: Sendable {
     func directoryExists(at url: URL) -> Bool
     func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts
+    func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile]
 }
 
 public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @unchecked Sendable {
@@ -63,9 +64,80 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
             transcriptFileCount: transcriptFileCount
         )
     }
+
+    public func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile] {
+        guard let enumerator = fileManager.enumerator(
+            at: sessionsRoot,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        let rootPath = sessionsRoot.standardizedFileURL.path
+        var files: [CandidateSessionFile] = []
+        for case let fileURL as URL in enumerator {
+            guard isConservativeCodexTranscriptCandidate(fileURL: fileURL, sessionsRoot: sessionsRoot) else {
+                continue
+            }
+
+            let values = try fileURL.resourceValues(forKeys: [
+                .isRegularFileKey,
+                .fileSizeKey,
+                .contentModificationDateKey,
+            ])
+            guard values.isRegularFile == true else {
+                continue
+            }
+
+            let absolutePath = fileURL.standardizedFileURL.path
+            files.append(
+                CandidateSessionFile(
+                    sourceID: sourceID,
+                    relativePath: relativePath(absolutePath: absolutePath, rootPath: rootPath),
+                    absolutePath: absolutePath,
+                    byteSize: Int64(values.fileSize ?? 0),
+                    modifiedAt: values.contentModificationDate,
+                    confidence: .high,
+                    reason: "codex.sessions.date-bucket-jsonl",
+                    diagnostic: nil
+                )
+            )
+
+            if files.count >= maximumTranscriptCount {
+                break
+            }
+        }
+
+        return files.sorted { $0.relativePath < $1.relativePath }
+    }
+
+    private func isConservativeCodexTranscriptCandidate(fileURL: URL, sessionsRoot: URL) -> Bool {
+        guard fileURL.pathExtension == "jsonl" else {
+            return false
+        }
+
+        let relativeComponents = Array(fileURL.standardizedFileURL.pathComponents.dropFirst(
+            sessionsRoot.standardizedFileURL.pathComponents.count
+        ))
+        guard relativeComponents.count == 4 else {
+            return false
+        }
+
+        let year = relativeComponents[0]
+        let month = relativeComponents[1]
+        let day = relativeComponents[2]
+        return year.count == 4 && year.allSatisfy(\.isNumber)
+            && month.count == 2 && month.allSatisfy(\.isNumber)
+            && day.count == 2 && day.allSatisfy(\.isNumber)
+    }
+
+    private func relativePath(absolutePath: String, rootPath: String) -> String {
+        absolutePath.replacingOccurrences(of: "\(rootPath)/", with: "")
+    }
 }
 
-public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable {
+public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, CandidateSessionFileEnumerationPort, Sendable {
     public static let sourceID = SessionSourceID(rawValue: "codex-default")
 
     private let homeDirectoryProvider: any HomeDirectoryProviding
@@ -104,6 +176,36 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
         }
 
         return summaries
+    }
+
+    public func enumerateCandidateFiles(sourceID: SessionSourceID? = nil) throws -> [CandidateSessionFile] {
+        let definitions = sourceDefinitions ?? [defaultSourceDefinition()]
+
+        var seenRootPaths: Set<String> = []
+        var files: [CandidateSessionFile] = []
+        for definition in definitions {
+            guard sourceID == nil || definition.id == sourceID else {
+                continue
+            }
+            guard definition.isEnabled && definition.kind == .codex else {
+                continue
+            }
+
+            let rootURL = rootURL(for: definition)
+            let duplicateKey = duplicateDetectionKey(for: rootURL)
+            guard !seenRootPaths.contains(duplicateKey) else {
+                continue
+            }
+            seenRootPaths.insert(duplicateKey)
+
+            guard fileSystem.directoryExists(at: rootURL) else {
+                continue
+            }
+
+            files.append(contentsOf: try fileSystem.candidateFiles(at: rootURL, sourceID: definition.id))
+        }
+
+        return files.sorted { $0.absolutePath < $1.absolutePath }
     }
 
     private func discoverSource(

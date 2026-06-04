@@ -6,11 +6,15 @@ public enum SessionDeckCompositionRoot {
         let appShellUseCase = AppShellUseCase(
             launchConfigurationProvider: PlaceholderLaunchConfigurationProvider()
         )
+        let sourceDiscoveryAdapter = DefaultCodexSourceDiscoveryAdapter(
+            homeDirectoryProvider: homeDirectoryProvider,
+            sourceDefinitions: sourceDefinitions
+        )
         let discoverSessionSources = DiscoverSessionSourcesUseCase(
-            sourceDiscovery: DefaultCodexSourceDiscoveryAdapter(
-                homeDirectoryProvider: homeDirectoryProvider,
-                sourceDefinitions: sourceDefinitions
-            )
+            sourceDiscovery: sourceDiscoveryAdapter
+        )
+        let enumerateCandidateSessionFiles = EnumerateCandidateSessionFilesUseCase(
+            candidateFileEnumeration: sourceDiscoveryAdapter
         )
         let listSessions = ListSessionsUseCase(
             sessionCatalog: PlaceholderSessionCatalogAdapter()
@@ -22,6 +26,7 @@ public enum SessionDeckCompositionRoot {
         return SessionDeckApplicationComposition(
             appShellViewModel: appShellUseCase.makeViewModel(),
             discoverSessionSources: discoverSessionSources,
+            enumerateCandidateSessionFiles: enumerateCandidateSessionFiles,
             listSessions: listSessions,
             loadTranscriptPreview: loadTranscriptPreview
         )

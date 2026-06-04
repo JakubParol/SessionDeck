@@ -103,6 +103,50 @@ func defaultCodexSourceDiscoveryDoesNotMutateSourceRoot() throws {
     #expect(after == before)
 }
 
+@Test("default Codex source discovery enumerates conservative candidate files with bounded metadata")
+func defaultCodexSourceDiscoveryEnumeratesCandidateFiles() throws {
+    let fixtureRoot = try makeDiscoveryFixtureRoot(name: "candidate-files")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let homeDirectory = fixtureRoot.url.appending(path: "home", directoryHint: .isDirectory)
+    let sessionsRoot = homeDirectory
+        .appending(path: ".codex", directoryHint: .isDirectory)
+        .appending(path: "sessions", directoryHint: .isDirectory)
+    let candidateURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T10-00-00-test.jsonl")
+    let unrelatedJSONL = sessionsRoot.appending(path: "scratch.jsonl")
+    let unrelatedText = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "notes.txt")
+    try FileManager.default.createDirectory(
+        at: candidateURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try #"{"type":"session_meta"}"#.write(to: candidateURL, atomically: true, encoding: .utf8)
+    try #"{"not":"a-codex-session"}"#.write(to: unrelatedJSONL, atomically: true, encoding: .utf8)
+    try "notes".write(to: unrelatedText, atomically: true, encoding: .utf8)
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: nil)
+
+    let candidate = try #require(files.first)
+    #expect(files.count == 1)
+    #expect(candidate.sourceID == DefaultCodexSourceDiscoveryAdapter.sourceID)
+    #expect(candidate.relativePath == "2026/06/04/rollout-2026-06-04T10-00-00-test.jsonl")
+    #expect(candidate.absolutePath == candidateURL.standardizedFileURL.path)
+    #expect(candidate.byteSize == Int64(#"{"type":"session_meta"}"#.utf8.count))
+    #expect(candidate.modifiedAt != nil)
+    #expect(candidate.confidence == .high)
+    #expect(candidate.reason == "codex.sessions.date-bucket-jsonl")
+    #expect(candidate.diagnostic == nil)
+}
+
 private func makeDiscoveryFixtureRoot(name: String) throws -> FixtureTempRoot {
     try FixtureTempRoot(
         parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
