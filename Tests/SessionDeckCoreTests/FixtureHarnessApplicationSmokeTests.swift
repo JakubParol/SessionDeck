@@ -38,7 +38,7 @@ func fixtureHarnessDrivesApplicationUseCasesWithoutRealHomeData() throws {
     let projectPreview = try composition.loadTranscriptPreview.loadPreview(sessionID: projectSession.id)
 
     #expect(sources.map(\.id) == [codexSource.id, appSource.id])
-    #expect(codexSessions.map(\.id) == [projectSession.id, SessionID(rawValue: "00000000-0000-4000-8000-000000005003")])
+    #expect(codexSessions.map(\.id) == [SessionID(rawValue: "00000000-0000-4000-8000-000000005003"), projectSession.id])
     #expect(allSessions.map(\.id).contains(nonProjectChat.id))
     #expect(projectPreview.title == "Synthetic SessionDeck Session")
     #expect(projectPreview.segments.contains { $0.role == .user })

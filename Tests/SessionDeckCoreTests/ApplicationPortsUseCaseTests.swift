@@ -217,18 +217,34 @@ func sessionCatalogUseCaseUsesFakePort() throws {
     let codexSession = SessionSummary(
         id: SessionID(rawValue: "codex-1"),
         sourceID: codexSourceID,
+        sourceLabel: CatalogSourceLabel(
+            sourceID: codexSourceID.rawValue,
+            displayName: "Codex default",
+            profileName: "default"
+        ),
         title: "Implement app shell",
-        projectDisplayName: "SessionDeck",
-        lastActivityDescription: "2026-06-02T20:00:00Z",
-        previewText: "Created a placeholder shell."
+        projectHint: CatalogProjectHint(cwdPath: "/tmp/SessionDeck", displayName: "SessionDeck"),
+        sessionPath: "/tmp/codex-1.jsonl",
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: 1_770_000_000, lastActivityEpochSeconds: 1_770_001_000),
+        fileSize: CatalogFileSize(byteCount: 4096),
+        metadata: CatalogSessionMetadata(modelName: "gpt-test", agentProfileName: "default"),
+        health: CatalogEntryHealth(parseStatus: .complete)
     )
     let hermesSession = SessionSummary(
         id: SessionID(rawValue: "hermes-1"),
         sourceID: hermesSourceID,
+        sourceLabel: CatalogSourceLabel(
+            sourceID: hermesSourceID.rawValue,
+            displayName: "Hermes Naomi",
+            profileName: "naomi"
+        ),
         title: "Review handoff",
-        projectDisplayName: "SessionDeck",
-        lastActivityDescription: "2026-06-02T21:00:00Z",
-        previewText: "Reviewed the delivery slice."
+        projectHint: CatalogProjectHint(cwdPath: "/tmp/SessionDeck", displayName: "SessionDeck"),
+        sessionPath: "/tmp/hermes-1.jsonl",
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: 1_770_000_000, lastActivityEpochSeconds: 1_770_002_000),
+        fileSize: CatalogFileSize(byteCount: 2048),
+        metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: "naomi"),
+        health: CatalogEntryHealth(parseStatus: .complete)
     )
     let useCase = ListSessionsUseCase(
         sessionCatalog: FakeSessionCatalogPort(sessions: [codexSession, hermesSession])

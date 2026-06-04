@@ -141,13 +141,28 @@ final class FixtureHarnessApplicationSmoke {
 
     private func sessionSummary(from sessionFile: TempCodexSessionFile) throws -> SessionSummary {
         let metadata = try readMetadata(from: sessionFile)
+        let sourceID = sourceID(for: sessionFile.source)
         return SessionSummary(
             id: SessionID(rawValue: sessionFile.sessionID),
-            sourceID: sourceID(for: sessionFile.source),
-            title: metadata.title ?? "Synthetic session",
-            projectDisplayName: metadata.project,
-            lastActivityDescription: metadata.timestamp,
-            previewText: metadata.firstText
+            sourceID: sourceID,
+            sourceLabel: CatalogSourceLabel(
+                sourceID: sourceID.rawValue,
+                displayName: sessionFile.source.label,
+                profileName: sessionFile.source.profile
+            ),
+            title: metadata.title,
+            fallbackTitle: "Session \(sessionFile.sessionID)",
+            projectHint: metadata.project.map {
+                CatalogProjectHint(cwdPath: metadata.cwd, displayName: $0)
+            } ?? .unavailable,
+            sessionPath: sessionFile.url.path,
+            activity: CatalogActivityTimestamps(
+                createdAtEpochSeconds: nil,
+                lastActivityEpochSeconds: epochSeconds(from: metadata.timestamp)
+            ),
+            fileSize: CatalogFileSize(byteCount: byteCount(for: sessionFile.url)),
+            metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: sessionFile.source.profile),
+            health: CatalogEntryHealth(parseStatus: metadata.project == nil ? .missingMetadata : .complete)
         )
     }
 
@@ -176,8 +191,22 @@ final class FixtureHarnessApplicationSmoke {
             timestamp: events.first?["timestamp"] as? String,
             title: metadataPayload?["title"] as? String,
             project: metadataPayload?["project"] as? String,
+            cwd: metadataPayload?["cwd"] as? String,
             firstText: firstText
         )
+    }
+
+    private func byteCount(for url: URL) -> Int64 {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey])
+        return Int64(values?.fileSize ?? 0)
+    }
+
+    private func epochSeconds(from timestamp: String?) -> Int64? {
+        guard let timestamp, let date = ISO8601DateFormatter().date(from: timestamp) else {
+            return nil
+        }
+
+        return Int64(date.timeIntervalSince1970)
     }
 
     private func transcriptSegments(from sessionFile: TempCodexSessionFile) throws -> [TranscriptSegment] {
@@ -242,35 +271,4 @@ final class FixtureHarnessApplicationSmoke {
             return .diagnostic
         }
     }
-}
-
-private struct FixtureHarnessLaunchConfigurationProvider: LaunchConfigurationProviding {
-    let configuredSourceCount: Int
-
-    func loadConfiguration() -> AppShellLaunchConfiguration {
-        AppShellLaunchConfiguration(
-            title: "SessionDeck",
-            subtitle: "Synthetic fixture application smoke",
-            statusMessage: "Fixture-backed application composition.",
-            configuredSourceCount: configuredSourceCount,
-            safetyPolicy: .placeholderSafe
-        )
-    }
-}
-
-struct FixtureHarnessApplicationSource: Equatable {
-    let tempSource: TempCodexSessionSource
-    let id: SessionSourceID
-}
-
-struct FixtureHarnessApplicationSession: Equatable {
-    let id: SessionID
-    let file: TempCodexSessionFile
-}
-
-private struct FixtureHarnessMetadata {
-    let timestamp: String?
-    let title: String?
-    let project: String?
-    let firstText: String?
 }
