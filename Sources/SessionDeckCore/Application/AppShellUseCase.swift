@@ -1,13 +1,16 @@
 public struct AppShellUseCase: Sendable {
     private let launchConfigurationProvider: any LaunchConfigurationProviding
     private let discoverSessionSources: DiscoverSessionSourcesUseCase?
+    private let refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase?
 
     public init(
         launchConfigurationProvider: any LaunchConfigurationProviding,
-        discoverSessionSources: DiscoverSessionSourcesUseCase? = nil
+        discoverSessionSources: DiscoverSessionSourcesUseCase? = nil,
+        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase? = nil
     ) {
         self.launchConfigurationProvider = launchConfigurationProvider
         self.discoverSessionSources = discoverSessionSources
+        self.refreshCatalogSnapshot = refreshCatalogSnapshot
     }
 
     public func makeViewModel() -> AppShellViewModel {
@@ -25,6 +28,7 @@ public struct AppShellUseCase: Sendable {
     private func makeViewModel(refreshState: AppShellRefreshState) -> AppShellViewModel {
         let configuration = launchConfigurationProvider.loadConfiguration()
         let discoveryResult = sourceDiscoverySummary()
+        let catalogResult = catalogSummary()
 
         return AppShellViewModel(
             title: configuration.title,
@@ -34,6 +38,7 @@ public struct AppShellUseCase: Sendable {
                 ? configuration.configuredSourceCount
                 : discoveryResult.summary.configuredSourceCount,
             sourceDiscoverySummary: discoveryResult.summary,
+            catalogSummary: catalogResult.summary,
             refreshState: discoveryResult.refreshState ?? refreshState,
             safetyPolicy: configuration.safetyPolicy
         )
@@ -51,6 +56,22 @@ public struct AppShellUseCase: Sendable {
             return (.make(report: try discoverSessionSources.discoveryReport()), nil)
         } catch {
             let message = "Source discovery failed before a summary could be built."
+            return (.failed(message: message), .failed(message))
+        }
+    }
+
+    private func catalogSummary() -> (
+        summary: AppShellCatalogSummary,
+        refreshState: AppShellRefreshState?
+    ) {
+        guard let refreshCatalogSnapshot else {
+            return (.placeholder, nil)
+        }
+
+        do {
+            return (.make(snapshot: try refreshCatalogSnapshot.refreshSnapshot()), nil)
+        } catch {
+            let message = "Catalog refresh failed before rows could be built."
             return (.failed(message: message), .failed(message))
         }
     }
