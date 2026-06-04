@@ -30,16 +30,31 @@ public enum ProjectGroupingPolicy {
         return groupedSessions.map { _, sessions in
             let orderedSessions = SessionCatalogOrdering.sort(sessions)
             let group = resolve(session: orderedSessions[0])
-            return ProjectNavigationGroup(
-                kind: group.kind,
-                id: group.id,
-                title: group.title,
-                sessionIDs: orderedSessions.map(\.id)
+            return (
+                group: ProjectNavigationGroup(
+                    kind: group.kind,
+                    id: group.id,
+                    title: group.title,
+                    sessionIDs: orderedSessions.map(\.id)
+                ),
+                newestActivity: orderedSessions[0].lastActivitySortKey
             )
         }
         .sorted { lhs, rhs in
-            lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
+            switch (lhs.newestActivity, rhs.newestActivity) {
+            case let (lhsTimestamp?, rhsTimestamp?) where lhsTimestamp != rhsTimestamp:
+                return lhsTimestamp > rhsTimestamp
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            default:
+                return lhs.group.title == rhs.group.title
+                    ? lhs.group.id < rhs.group.id
+                    : lhs.group.title < rhs.group.title
+            }
         }
+        .map(\.group)
     }
 
     public static func resolve(session: SessionSummary) -> ProjectNavigationGroup {
