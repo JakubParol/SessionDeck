@@ -68,6 +68,45 @@ func selectedTranscriptDetailStateMapsLoadedReadModel() throws {
     #expect(state.diagnosticMessages == ["Unknown event was kept as a diagnostic."])
 }
 
+@Test("selected transcript rows expose stable role styles for conversation rendering")
+func selectedTranscriptRowsExposeRoleStyles() {
+    let source = transcriptSource(sourceID: SessionSourceID(rawValue: "fixture"), lineNumber: 1)
+    let userRow = AppShellTranscriptSegmentRow.make(
+        segment: TranscriptSegment(
+            id: "user",
+            kind: .userMessage,
+            text: "Hello",
+            order: TranscriptSegmentOrder(index: 0),
+            source: source,
+            timestampDescription: "10:00"
+        )
+    )
+    let assistantRow = AppShellTranscriptSegmentRow.make(
+        segment: TranscriptSegment(
+            id: "assistant",
+            kind: .assistantMessage,
+            text: "Hi",
+            order: TranscriptSegmentOrder(index: 1),
+            source: source,
+            timestampDescription: "10:01"
+        )
+    )
+    let toolRow = AppShellTranscriptSegmentRow.make(
+        segment: TranscriptSegment(
+            id: "tool",
+            kind: .toolOutput(callID: "call-1"),
+            text: "Tool output",
+            order: TranscriptSegmentOrder(index: 2),
+            source: source,
+            timestampDescription: nil
+        )
+    )
+
+    #expect(userRow.roleStyle == .userTurn)
+    #expect(assistantRow.roleStyle == .assistantTurn)
+    #expect(toolRow.roleStyle == .supporting)
+}
+
 @Test("selected transcript detail state exposes readable metadata fallbacks")
 func selectedTranscriptDetailStateExposesReadableMetadataFallbacks() {
     let sessionID = SessionID(rawValue: "missing-metadata")

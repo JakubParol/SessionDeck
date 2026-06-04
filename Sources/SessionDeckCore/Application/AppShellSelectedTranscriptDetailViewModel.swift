@@ -1,22 +1,31 @@
+public enum AppShellTranscriptRoleStyle: Equatable, Sendable {
+    case userTurn
+    case assistantTurn
+    case supporting
+}
+
 public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
     public let id: String
     public let roleLabel: String
     public let timestampLabel: String?
     public let text: String
     public let severity: AppShellCatalogRowSeverity
+    public let roleStyle: AppShellTranscriptRoleStyle
 
     public init(
         id: String,
         roleLabel: String,
         timestampLabel: String?,
         text: String,
-        severity: AppShellCatalogRowSeverity
+        severity: AppShellCatalogRowSeverity,
+        roleStyle: AppShellTranscriptRoleStyle
     ) {
         self.id = id
         self.roleLabel = roleLabel
         self.timestampLabel = timestampLabel
         self.text = text
         self.severity = severity
+        self.roleStyle = roleStyle
     }
 
     public static func make(segment: TranscriptSegment) -> AppShellTranscriptSegmentRow {
@@ -25,7 +34,8 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             roleLabel: roleLabel(for: segment.role),
             timestampLabel: segment.timestampDescription,
             text: segment.text,
-            severity: severity(for: segment.role)
+            severity: severity(for: segment.role),
+            roleStyle: roleStyle(for: segment.role)
         )
     }
 
@@ -52,6 +62,17 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             return .info
         case .diagnostic, .unknown:
             return .warning
+        }
+    }
+
+    private static func roleStyle(for role: TranscriptSegmentRole) -> AppShellTranscriptRoleStyle {
+        switch role {
+        case .user:
+            return .userTurn
+        case .assistant:
+            return .assistantTurn
+        case .tool, .diagnostic, .unknown:
+            return .supporting
         }
     }
 }
