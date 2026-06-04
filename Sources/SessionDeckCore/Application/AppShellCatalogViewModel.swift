@@ -210,13 +210,15 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
     }
 
     public static func make(snapshot: CatalogSnapshot, scope: CatalogSessionScope) -> AppShellCatalogSummary {
+        let scopedSessions = SourceProfileNavigationPolicy.filter(sessions: snapshot.sessions, scope: scope)
+        let scopedSourceIDs = sourceIDs(for: scope, scopedSessions: scopedSessions)
         let scopedSnapshot = CatalogSnapshot(
             refreshedAt: snapshot.refreshedAt,
             sources: snapshot.sources,
-            sessions: SourceProfileNavigationPolicy.filter(sessions: snapshot.sessions, scope: scope),
+            sessions: scopedSessions,
             diagnostics: snapshot.diagnostics,
-            sourceWarnings: snapshot.sourceWarnings,
-            refreshErrors: snapshot.refreshErrors
+            sourceWarnings: sourceWarnings(snapshot.sourceWarnings, scopedTo: scopedSourceIDs),
+            refreshErrors: refreshErrors(snapshot.refreshErrors, scopedTo: scopedSourceIDs)
         )
 
         return make(snapshot: scopedSnapshot)
@@ -257,6 +259,44 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
 
     private static func sourceCountLabel(_ count: Int) -> String {
         count == 1 ? "1 source" : "\(count) sources"
+    }
+
+    private static func sourceIDs(
+        for scope: CatalogSessionScope,
+        scopedSessions: [SessionSummary]
+    ) -> Set<SessionSourceID>? {
+        switch scope {
+        case .all:
+            return nil
+        case let .source(sourceMetadata):
+            return sourceMetadata.sourceID.map { [$0] } ?? Set(scopedSessions.map(\.sourceID))
+        case let .profile(profileMetadata):
+            return profileMetadata.sourceID.map { [$0] } ?? Set(scopedSessions.map(\.sourceID))
+        case .sessionIDs:
+            return Set(scopedSessions.map(\.sourceID))
+        }
+    }
+
+    private static func sourceWarnings(
+        _ warnings: [CatalogSnapshotSourceWarning],
+        scopedTo sourceIDs: Set<SessionSourceID>?
+    ) -> [CatalogSnapshotSourceWarning] {
+        guard let sourceIDs else {
+            return warnings
+        }
+
+        return warnings.filter { sourceIDs.contains($0.sourceID) }
+    }
+
+    private static func refreshErrors(
+        _ errors: [CatalogSnapshotRefreshError],
+        scopedTo sourceIDs: Set<SessionSourceID>?
+    ) -> [CatalogSnapshotRefreshError] {
+        guard let sourceIDs else {
+            return errors
+        }
+
+        return errors.filter { sourceIDs.contains($0.sourceID) }
     }
 }
 

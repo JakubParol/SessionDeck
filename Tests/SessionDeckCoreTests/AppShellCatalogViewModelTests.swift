@@ -107,6 +107,56 @@ func catalogSummaryScopesRowsFromSourceProfileNavigationSelections() throws {
     #expect(unknownSummary.rows.map(\.id.rawValue) == ["unknown-non-project"])
 }
 
+@Test("scoped catalog summary excludes source diagnostics outside the selected scope")
+func scopedCatalogSummaryExcludesSourceDiagnosticsOutsideSelectedScope() {
+    let selectedSourceID = SessionSourceID(rawValue: "selected-source")
+    let unrelatedSourceID = SessionSourceID(rawValue: "unrelated-source")
+    let selectedSession = catalogViewModelSession(
+        id: SessionID(rawValue: "selected-session"),
+        identity: CatalogSessionIdentity(rawValue: "selected-session"),
+        sourceID: selectedSourceID,
+        title: "Selected Session"
+    )
+    let selectedScope = SourceProfileSourceNavigationMetadata(
+        stableID: "source.selected-source",
+        sourceID: selectedSourceID,
+        displayName: "Selected Source",
+        isFallback: false
+    )
+    let snapshot = CatalogSnapshot(
+        refreshedAt: Date(timeIntervalSince1970: 1_770_200_004),
+        sources: [
+            catalogViewModelSource(id: selectedSourceID),
+            catalogViewModelSource(id: unrelatedSourceID),
+        ],
+        sessions: [selectedSession],
+        sourceWarnings: [
+            CatalogSnapshotSourceWarning(
+                sourceID: unrelatedSourceID,
+                displayName: "Unrelated Source",
+                message: "Unrelated source warning."
+            )
+        ],
+        refreshErrors: [
+            CatalogSnapshotRefreshError(
+                sourceID: unrelatedSourceID,
+                displayName: "Unrelated Source",
+                message: "Unrelated source failed."
+            )
+        ]
+    )
+
+    let selectedSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: .source(selectedScope))
+    let allSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: .all)
+
+    #expect(selectedSummary.rows.map(\.id.rawValue) == ["selected-session"])
+    #expect(selectedSummary.sourceWarningCount == 0)
+    #expect(selectedSummary.sourceFailureCount == 0)
+    #expect(selectedSummary.statusMessage == "Catalog shows 1 entry healthy.")
+    #expect(allSummary.sourceWarningCount == 1)
+    #expect(allSummary.sourceFailureCount == 1)
+}
+
 private func catalogViewModelSource(id: SessionSourceID) -> SessionSourceSummary {
     SessionSourceSummary(
         id: id,
