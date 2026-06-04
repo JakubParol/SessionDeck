@@ -33,10 +33,14 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             id: segment.id,
             roleLabel: roleLabel(for: segment.role),
             timestampLabel: segment.timestampDescription,
-            text: segment.text,
+            text: textLabel(for: segment.text),
             severity: severity(for: segment.role),
             roleStyle: roleStyle(for: segment.role)
         )
+    }
+
+    private static func textLabel(for text: String) -> String {
+        text.allSatisfy(\.isWhitespace) ? "Empty transcript segment." : text
     }
 
     private static func roleLabel(for role: TranscriptSegmentRole) -> String {

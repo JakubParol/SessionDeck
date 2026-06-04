@@ -107,6 +107,62 @@ func selectedTranscriptRowsExposeRoleStyles() {
     #expect(toolRow.roleStyle == .supporting)
 }
 
+@Test("selected transcript detail state renders multi-turn fixture conversations in order")
+func selectedTranscriptDetailStateRendersMultiTurnFixtureConversationsInOrder() throws {
+    let sessionID = SessionID(rawValue: "multi-turn-selected-session")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let source = TranscriptSegmentSourceReference(
+        sourceID: sourceID,
+        relativePath: try CodexTranscriptFixtureManifest.fixture(for: .multiTurnConversation).filename,
+        lineNumber: nil
+    )
+    let file = CodexTranscriptFile(
+        sessionID: sessionID,
+        fileURL: try CodexTranscriptFixtureManifest.fixtureURL(for: .multiTurnConversation),
+        source: source,
+        fallbackTitle: "Fallback title"
+    )
+    let decodeResult = try CodexTranscriptDecodingAdapter(files: [file]).loadTranscript(sessionID: sessionID)
+    let readModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: decodeResult
+    )
+
+    let state = AppShellSelectedTranscriptDetailState.loaded(readModel)
+
+    #expect(state.rows.map(\.roleStyle) == [
+        .userTurn,
+        .assistantTurn,
+        .userTurn,
+        .supporting,
+        .assistantTurn,
+    ])
+    #expect(state.rows.map(\.text) == [
+        "List the synthetic steps.",
+        "First, inspect the fixture. Second, decode the turns.",
+        "Keep the order stable.",
+        "Unsupported Codex event: future_codex_event",
+        "Order and roles remain stable.",
+    ])
+}
+
+@Test("selected transcript row exposes readable fallback text for empty content")
+func selectedTranscriptRowExposesReadableFallbackTextForEmptyContent() {
+    let row = AppShellTranscriptSegmentRow.make(
+        segment: TranscriptSegment(
+            id: "empty",
+            kind: .assistantMessage,
+            text: "  ",
+            order: TranscriptSegmentOrder(index: 0),
+            source: transcriptSource(sourceID: SessionSourceID(rawValue: "fixture"), lineNumber: 1),
+            timestampDescription: nil
+        )
+    )
+
+    #expect(row.text == "Empty transcript segment.")
+    #expect(row.roleStyle == .assistantTurn)
+}
+
 @Test("selected transcript detail state exposes readable metadata fallbacks")
 func selectedTranscriptDetailStateExposesReadableMetadataFallbacks() {
     let sessionID = SessionID(rawValue: "missing-metadata")
