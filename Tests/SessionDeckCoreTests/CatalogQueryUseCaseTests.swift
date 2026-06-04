@@ -34,6 +34,89 @@ func catalogSummaryCarriesLightweightPreviewMetadataForSearch() {
     #expect(summary.previewText == "Preview mentions metadata search without loading transcript bodies.")
 }
 
+@Test("catalog query use case searches lightweight metadata only")
+func catalogQueryUseCaseSearchesLightweightMetadataOnly() throws {
+    let titleMatch = makeQueryCatalogSummary(id: "title", title: "Implement Catalog Search")
+    let previewMatch = makeQueryCatalogSummary(id: "preview", previewText: "Preview mentions metadata search.")
+    let pathMatch = makeQueryCatalogSummary(id: "path", path: "/tmp/searchable-path.jsonl")
+    let projectMatch = makeQueryCatalogSummary(id: "project", projectName: "SearchableProject")
+    let sourceMatch = makeQueryCatalogSummary(id: "source", sourceDisplayName: "Searchable Source")
+    let profileMatch = makeQueryCatalogSummary(id: "profile", profileName: "searchable-profile")
+    let nonMatch = makeQueryCatalogSummary(id: "other", title: "Other Session")
+    let useCase = QueryCatalogUseCase(
+        sessionCatalog: FakeSessionCatalogPort(
+            sessions: [nonMatch, profileMatch, titleMatch, sourceMatch, pathMatch, previewMatch, projectMatch]
+        )
+    )
+
+    let results = try useCase.query(CatalogQueryRequest(searchText: "  SEARCHABLE  "))
+
+    #expect(results.map(\.id.rawValue) == ["path", "profile", "project", "source"])
+}
+
+@Test("catalog query use case applies combined explicit filters")
+func catalogQueryUseCaseAppliesCombinedExplicitFilters() throws {
+    let matching = makeQueryCatalogSummary(
+        id: "matching",
+        sourceID: "codex-cli",
+        profileName: "naomi",
+        title: "Release notes",
+        previewText: "Contains query needle",
+        projectName: "SessionDeck",
+        cwdPath: "/repos/SessionDeck",
+        lastActivity: 300,
+        parseStatus: .unreadable(reason: "permission denied")
+    )
+    let wrongProject = makeQueryCatalogSummary(
+        id: "wrong-project",
+        sourceID: "codex-cli",
+        profileName: "naomi",
+        previewText: "Contains query needle",
+        projectName: "Other",
+        cwdPath: "/repos/Other",
+        lastActivity: 400,
+        parseStatus: .unreadable(reason: "permission denied")
+    )
+    let wrongSource = makeQueryCatalogSummary(
+        id: "wrong-source",
+        sourceID: "codex-app",
+        profileName: "naomi",
+        previewText: "Contains query needle",
+        projectName: "SessionDeck",
+        cwdPath: "/repos/SessionDeck",
+        lastActivity: 500,
+        parseStatus: .unreadable(reason: "permission denied")
+    )
+    let wrongStatus = makeQueryCatalogSummary(
+        id: "wrong-status",
+        sourceID: "codex-cli",
+        profileName: "naomi",
+        previewText: "Contains query needle",
+        projectName: "SessionDeck",
+        cwdPath: "/repos/SessionDeck",
+        lastActivity: 600,
+        parseStatus: .complete
+    )
+    let useCase = QueryCatalogUseCase(
+        sessionCatalog: FakeSessionCatalogPort(sessions: [wrongStatus, wrongSource, wrongProject, matching])
+    )
+
+    let results = try useCase.query(
+        CatalogQueryRequest(
+            searchText: "needle",
+            project: .project(id: "project./repos/SessionDeck"),
+            sourceID: SessionSourceID(rawValue: "codex-cli"),
+            profile: CatalogProfileFilter(
+                stableID: "source.codex-cli.profile.naomi",
+                sourceID: SessionSourceID(rawValue: "codex-cli")
+            ),
+            parseStatuses: [.unreadable]
+        )
+    )
+
+    #expect(results.map(\.id.rawValue) == ["matching"])
+}
+
 private func makeQueryCatalogSummary(
     id: String,
     sourceID: String = "codex-default",
