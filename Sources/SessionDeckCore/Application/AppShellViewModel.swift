@@ -97,6 +97,7 @@ public struct AppShellViewModel: Equatable, Sendable {
     public let configuredSourceCount: Int
     public let sourceDiscoverySummary: AppShellSourceDiscoverySummary
     public let catalogSummary: AppShellCatalogSummary
+    public let catalogQueryControls: AppShellCatalogQueryControls
     public let navigationSummary: AppShellNavigationSummary
     public let selectedNavigationNodeID: String
     public let selectedNavigationTitle: String
@@ -110,6 +111,7 @@ public struct AppShellViewModel: Equatable, Sendable {
         configuredSourceCount: Int,
         sourceDiscoverySummary: AppShellSourceDiscoverySummary = .placeholder,
         catalogSummary: AppShellCatalogSummary = .placeholder,
+        catalogQueryControls: AppShellCatalogQueryControls = .placeholder,
         navigationSummary: AppShellNavigationSummary = .placeholder,
         selectedNavigationNodeID: String = "all-chats",
         selectedNavigationTitle: String = "All Chats",
@@ -122,6 +124,7 @@ public struct AppShellViewModel: Equatable, Sendable {
         self.configuredSourceCount = configuredSourceCount
         self.sourceDiscoverySummary = sourceDiscoverySummary
         self.catalogSummary = catalogSummary
+        self.catalogQueryControls = catalogQueryControls
         self.navigationSummary = navigationSummary
         self.selectedNavigationNodeID = selectedNavigationNodeID
         self.selectedNavigationTitle = selectedNavigationTitle
