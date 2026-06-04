@@ -68,8 +68,6 @@ struct AppShellCatalogView: View {
     private var rowList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                header
-
                 ForEach(summary.rows) { row in
                     rowView(row)
                 }
@@ -84,52 +82,38 @@ struct AppShellCatalogView: View {
         )
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text("Session")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text("Source")
-                .frame(width: 150, alignment: .leading)
-            Text("Project")
-                .frame(width: 150, alignment: .leading)
-            Text("Activity")
-                .frame(width: 140, alignment: .leading)
-            Text("Size")
-                .frame(width: 70, alignment: .trailing)
-            Text("Status")
-                .frame(width: 120, alignment: .leading)
-        }
-        .font(.caption.bold())
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
-
     private func rowView(_ row: AppShellCatalogRow) -> some View {
         VStack(spacing: 0) {
             Button(action: { selectedSessionID = row.id }) {
-                HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
                     rowTitle(row)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text(row.sourceLabel)
-                        .frame(width: 150, alignment: .leading)
-                    Text(row.projectHint)
-                        .frame(width: 150, alignment: .leading)
-                    Text(row.lastActivityLabel)
-                        .frame(width: 140, alignment: .leading)
-                    Text(row.sizeLabel)
-                        .frame(width: 70, alignment: .trailing)
+                    Text("\(row.sourceLabel) / \(row.projectHint)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
 
-                    Label(row.statusLabel, systemImage: severityIcon(row.severity))
-                        .labelStyle(.titleAndIcon)
-                        .frame(width: 120, alignment: .leading)
-                        .foregroundStyle(severityColor(row.severity))
+                    HStack(spacing: 10) {
+                        Text(row.lastActivityLabel)
+                            .lineLimit(1)
+                        Text(row.sizeLabel)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 8)
+
+                        Label(row.statusLabel, systemImage: severityIcon(row.severity))
+                            .labelStyle(.titleAndIcon)
+                            .foregroundStyle(severityColor(row.severity))
+                            .lineLimit(1)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
                 .font(.callout)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 9)
+                .padding(.vertical, 10)
                 .contentShape(Rectangle())
                 .background(rowBackground(row))
             }
@@ -144,7 +128,8 @@ struct AppShellCatalogView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(row.title)
                 .font(.body.weight(.semibold))
-                .lineLimit(1)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let diagnosticSummary = row.diagnosticSummary {
                 Text(diagnosticSummary)
