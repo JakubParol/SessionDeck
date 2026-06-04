@@ -68,7 +68,12 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
     public func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile] {
         guard let enumerator = fileManager.enumerator(
             at: sessionsRoot,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey],
+            includingPropertiesForKeys: [
+                .isRegularFileKey,
+                .isSymbolicLinkKey,
+                .fileSizeKey,
+                .contentModificationDateKey,
+            ],
             options: [.skipsHiddenFiles]
         ) else {
             return []
@@ -83,14 +88,28 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
 
             let values = try fileURL.resourceValues(forKeys: [
                 .isRegularFileKey,
+                .isSymbolicLinkKey,
                 .fileSizeKey,
                 .contentModificationDateKey,
             ])
-            guard values.isRegularFile == true else {
+            guard values.isRegularFile == true,
+                  values.isSymbolicLink != true,
+                  isContainedAfterResolvingSymlinks(fileURL: fileURL, sessionsRoot: sessionsRoot)
+            else {
                 continue
             }
 
             let absolutePath = fileURL.standardizedFileURL.path
+            let diagnostic: CandidateSessionFileDiagnostic?
+            if fileManager.isReadableFile(atPath: absolutePath) {
+                diagnostic = nil
+            } else {
+                diagnostic = CandidateSessionFileDiagnostic(
+                    code: "codex.candidate_file_unreadable",
+                    message: "Candidate transcript file could not be read by the current process."
+                )
+            }
+
             files.append(
                 CandidateSessionFile(
                     sourceID: sourceID,
@@ -100,7 +119,7 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
                     modifiedAt: values.contentModificationDate,
                     confidence: .high,
                     reason: "codex.sessions.date-bucket-jsonl",
-                    diagnostic: nil
+                    diagnostic: diagnostic
                 )
             )
 
@@ -134,6 +153,12 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
 
     private func relativePath(absolutePath: String, rootPath: String) -> String {
         absolutePath.replacingOccurrences(of: "\(rootPath)/", with: "")
+    }
+
+    private func isContainedAfterResolvingSymlinks(fileURL: URL, sessionsRoot: URL) -> Bool {
+        let resolvedRootPath = sessionsRoot.resolvingSymlinksInPath().standardizedFileURL.path
+        let resolvedFilePath = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+        return resolvedFilePath.hasPrefix("\(resolvedRootPath)/")
     }
 }
 
