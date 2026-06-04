@@ -84,6 +84,30 @@ func catalogSummaryRepresentsParseAndIndexHealthStates() {
     #expect(summaries.allSatisfy { $0.health.allowsListing })
 }
 
+@Test("catalog entry health exposes typed diagnostics for visible problem sessions")
+func catalogEntryHealthExposesTypedDiagnostics() {
+    let diagnostics = [
+        CatalogEntryDiagnostic(
+            code: .malformedJSONL,
+            severity: .warning,
+            message: "One transcript line could not be parsed."
+        ),
+        CatalogEntryDiagnostic(
+            code: .boundedReadTruncated,
+            severity: .warning,
+            message: "Catalog metadata scan stopped at the configured byte limit."
+        ),
+    ]
+    let health = CatalogEntryHealth(
+        parseStatus: .malformed(reason: "Malformed JSONL inside bounded catalog scan."),
+        diagnostics: diagnostics
+    )
+
+    #expect(health.diagnostics.map(\.code) == [.malformedJSONL, .boundedReadTruncated])
+    #expect(health.diagnostics.allSatisfy { $0.severity == .warning })
+    #expect(health.allowsListing)
+}
+
 @Test("catalog use case applies deterministic ordering")
 func catalogUseCaseAppliesDeterministicOrdering() throws {
     let newer = makeCatalogSummary(id: "newer", title: "A", lastActivity: 300)

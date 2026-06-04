@@ -47,7 +47,7 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
         for candidate: CandidateSessionFile,
         sourceLabelsByID: [SessionSourceID: CatalogSourceLabel]
     ) throws -> SessionSummary {
-        let scanResult = scan(candidate: candidate)
+        let scanResult = CodexCatalogScanner(scanLimits: scanLimits).scan(candidate: candidate)
         let sessionID = scanResult.metadata.id ?? fallbackSessionID(for: candidate)
         let sourceLabel = sourceLabelsByID[candidate.sourceID]
             ?? CatalogSourceLabel(sourceID: candidate.sourceID.rawValue, displayName: candidate.sourceID.rawValue, profileName: nil)
@@ -67,109 +67,8 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
                 modelName: scanResult.metadata.modelName,
                 agentProfileName: scanResult.metadata.source
             ),
-            health: CatalogEntryHealth(parseStatus: scanResult.parseStatus)
+            health: CatalogEntryHealth(parseStatus: scanResult.parseStatus, diagnostics: scanResult.diagnostics)
         )
-    }
-
-    private func scan(candidate: CandidateSessionFile) -> CodexCatalogScanResult {
-        if let diagnostic = candidate.diagnostic {
-            return CodexCatalogScanResult(
-                metadata: CodexCatalogMetadata(),
-                createdAtEpochSeconds: candidate.modifiedAt.map(epochSeconds),
-                lastActivityEpochSeconds: candidate.modifiedAt.map(epochSeconds),
-                parseStatus: .unreadable(reason: diagnostic.message)
-            )
-        }
-
-        guard let boundedRead = boundedData(at: candidate.absolutePath, fileByteSize: candidate.byteSize) else {
-            return CodexCatalogScanResult(
-                metadata: CodexCatalogMetadata(),
-                createdAtEpochSeconds: candidate.modifiedAt.map(epochSeconds),
-                lastActivityEpochSeconds: candidate.modifiedAt.map(epochSeconds),
-                parseStatus: .unreadable(reason: "Candidate transcript file could not be read.")
-            )
-        }
-
-        let content = String(decoding: boundedRead.data, as: UTF8.self)
-        let lines = Array(content.split(separator: "\n", omittingEmptySubsequences: true).prefix(scanLimits.maximumLines))
-        var metadata = CodexCatalogMetadata()
-        var createdAtEpochSeconds: Int64?
-        var lastActivityEpochSeconds: Int64?
-        var encounteredMalformedLine = false
-
-        for (index, line) in lines.enumerated() {
-            guard let event = decodeEvent(line: String(line)) else {
-                if !isFinalByteLimitFragment(index: index, lineCount: lines.count, content: content, read: boundedRead) {
-                    encounteredMalformedLine = true
-                }
-                continue
-            }
-
-            if let timestamp = event.timestampEpochSeconds {
-                createdAtEpochSeconds = createdAtEpochSeconds ?? timestamp
-                lastActivityEpochSeconds = timestamp
-            }
-
-            if event.type == "session_meta" {
-                metadata.apply(payload: event.payload)
-            }
-        }
-
-        return CodexCatalogScanResult(
-            metadata: metadata,
-            createdAtEpochSeconds: createdAtEpochSeconds,
-            lastActivityEpochSeconds: lastActivityEpochSeconds,
-            parseStatus: parseStatus(metadata: metadata, encounteredMalformedLine: encounteredMalformedLine)
-        )
-    }
-
-    private func boundedData(at path: String, fileByteSize: Int64) -> CodexCatalogBoundedRead? {
-        guard scanLimits.maximumBytes > 0,
-              let fileHandle = FileHandle(forReadingAtPath: path)
-        else {
-            return nil
-        }
-        defer {
-            try? fileHandle.close()
-        }
-        guard let data = try? fileHandle.read(upToCount: scanLimits.maximumBytes) else {
-            return nil
-        }
-        return CodexCatalogBoundedRead(data: data, reachedByteLimit: fileByteSize > Int64(scanLimits.maximumBytes))
-    }
-
-    private func isFinalByteLimitFragment(
-        index: Int,
-        lineCount: Int,
-        content: String,
-        read: CodexCatalogBoundedRead
-    ) -> Bool {
-        read.reachedByteLimit && index == lineCount - 1 && !content.hasSuffix("\n")
-    }
-
-    private func decodeEvent(line: String) -> CodexCatalogEvent? {
-        guard let data = line.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            return nil
-        }
-
-        let timestamp = (object["timestamp"] as? String).flatMap(epochSeconds)
-        return CodexCatalogEvent(
-            type: object["type"] as? String,
-            timestampEpochSeconds: timestamp,
-            payload: object["payload"] as? [String: Any]
-        )
-    }
-
-    private func parseStatus(metadata: CodexCatalogMetadata, encounteredMalformedLine: Bool) -> CatalogParseStatus {
-        if encounteredMalformedLine {
-            return .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata.")
-        }
-        if metadata.id == nil || metadata.title == nil || metadata.project == nil || metadata.cwd == nil {
-            return .missingMetadata
-        }
-        return .complete
     }
 
     private func projectHint(for metadata: CodexCatalogMetadata) -> CatalogProjectHint {
@@ -185,57 +84,5 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
 
     private func epochSeconds(from date: Date) -> Int64 {
         Int64(date.timeIntervalSince1970)
-    }
-
-    private func epochSeconds(from timestamp: String) -> Int64? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: timestamp) {
-            return epochSeconds(from: date)
-        }
-
-        let fractionalFormatter = ISO8601DateFormatter()
-        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return fractionalFormatter.date(from: timestamp).map(epochSeconds)
-    }
-}
-
-private struct CodexCatalogScanResult {
-    let metadata: CodexCatalogMetadata
-    let createdAtEpochSeconds: Int64?
-    let lastActivityEpochSeconds: Int64?
-    let parseStatus: CatalogParseStatus
-}
-
-private struct CodexCatalogBoundedRead {
-    let data: Data
-    let reachedByteLimit: Bool
-}
-
-private struct CodexCatalogEvent {
-    let type: String?
-    let timestampEpochSeconds: Int64?
-    let payload: [String: Any]?
-}
-
-private struct CodexCatalogMetadata {
-    var id: String?
-    var title: String?
-    var project: String?
-    var cwd: String?
-    var source: String?
-    var modelName: String?
-
-    mutating func apply(payload: [String: Any]?) {
-        guard let payload else {
-            return
-        }
-
-        id = payload["id"] as? String ?? id
-        title = payload["title"] as? String ?? title
-        project = payload["project"] as? String ?? project
-        cwd = payload["cwd"] as? String ?? cwd
-        source = payload["source"] as? String ?? source
-        modelName = payload["model"] as? String ?? payload["model_name"] as? String ?? modelName
     }
 }

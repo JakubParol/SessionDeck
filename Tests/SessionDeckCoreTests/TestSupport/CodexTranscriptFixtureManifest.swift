@@ -5,6 +5,7 @@ enum CodexTranscriptFixtureID: String, CaseIterable {
     case malformedLine = "malformed-line"
     case unknownEvent = "unknown-event"
     case missingMetadata = "missing-metadata"
+    case boundedReadTruncated = "bounded-read-truncated"
     case nonProjectChat = "non-project-chat"
 }
 
@@ -44,6 +45,12 @@ enum CodexTranscriptFixtureManifest {
             filename: "missing-metadata.jsonl",
             summary: "Synthetic transcript with missing cwd/project metadata.",
             categories: ["degraded", "missing-metadata"]
+        ),
+        CodexTranscriptFixture(
+            id: .boundedReadTruncated,
+            filename: "bounded-read-truncated.jsonl",
+            summary: "Synthetic transcript with valid metadata followed by a large payload for bounded-read truncation tests.",
+            categories: ["degraded", "bounded-read-truncated", "large-output"]
         ),
         CodexTranscriptFixture(
             id: .nonProjectChat,

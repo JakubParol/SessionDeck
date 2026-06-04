@@ -19,6 +19,7 @@ func codexTranscriptFixtureManifestCoversRequiredFixtureCategories() {
     #expect(hasFixtureCategory("malformed-line"))
     #expect(hasFixtureCategory("unknown-event"))
     #expect(hasFixtureCategory("missing-metadata"))
+    #expect(hasFixtureCategory("bounded-read-truncated"))
     #expect(hasFixtureCategory("non-project"))
 }
 
@@ -60,6 +61,9 @@ func codexTranscriptFixturesPreserveDegradedInputExamples() throws {
     let missingMetadata = try CodexTranscriptFixtureManifest.readFixture(.missingMetadata)
     #expect(!missingMetadata.contains("\"cwd\""))
     #expect(!missingMetadata.contains("\"project\""))
+
+    let boundedReadTruncated = try CodexTranscriptFixtureManifest.readFixture(.boundedReadTruncated)
+    #expect(boundedReadTruncated.contains("synthetic bounded-read payload"))
 
     let nonProjectChat = try CodexTranscriptFixtureManifest.readFixture(.nonProjectChat)
     #expect(nonProjectChat.contains("\"project\":null"))
