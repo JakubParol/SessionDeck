@@ -47,3 +47,30 @@ func fixtureHarnessDrivesApplicationUseCasesWithoutRealHomeData() throws {
     #expect(harness.rootPath.contains("/.codex") == false)
     #expect(harness.rootPath.contains("/.hermes") == false)
 }
+
+@Test("fixture harness loads selected transcript detail through the app shell use case")
+func fixtureHarnessLoadsSelectedTranscriptDetailThroughAppShellUseCase() throws {
+    let harness = try FixtureHarnessApplicationSmoke(name: "selected-detail")
+    defer {
+        try? harness.cleanup()
+    }
+
+    let codexSource = try harness.codexSource(label: "codex-cli", profile: "default")
+    let projectSession = try harness.installProjectSession(
+        .projectSession,
+        source: codexSource,
+        sessionID: "00000000-0000-4000-8000-000000005101",
+        projectName: "SessionDeck",
+        timestamp: "2026-06-03T05:10:01Z"
+    )
+
+    let composition = try harness.makeApplicationComposition()
+    let viewModel = composition.appShellUseCase.makeViewModel(selectedSessionID: projectSession.id)
+
+    #expect(viewModel.selectedTranscriptDetail.title == "Synthetic SessionDeck Session")
+    #expect(viewModel.selectedTranscriptDetail.rows.contains { $0.roleLabel == "User" })
+    #expect(viewModel.selectedTranscriptDetail.rows.contains { $0.roleLabel == "Tool" })
+    #expect(viewModel.selectedTranscriptDetail.statusMessage == "Loaded 3 transcript segment(s) from a partial transcript.")
+    #expect(harness.rootPath.contains("/.codex") == false)
+    #expect(harness.rootPath.contains("/.hermes") == false)
+}

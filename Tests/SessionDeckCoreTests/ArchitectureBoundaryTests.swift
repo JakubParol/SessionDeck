@@ -39,6 +39,7 @@ func presentationDoesNotConstructInfrastructure() throws {
         "PlaceholderSourceDiscoveryAdapter(",
         "DefaultCodexSourceDiscoveryAdapter(",
         "CodexSessionCatalogAdapter(",
+        "CodexSelectedTranscriptLoadingAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
         "PlaceholderTranscriptDecodingAdapter(",
@@ -119,6 +120,33 @@ func presentationUsesNativeSidebarSelectionToScopeCatalogContent() throws {
     )
 }
 
+@Test("Presentation renders selected transcript detail from application state")
+func presentationRendersSelectedTranscriptDetailFromApplicationState() throws {
+    let appShellView = repositoryRoot()
+        .appending(path: "Sources/SessionDeckApp/Presentation/AppShellView.swift")
+    let detailView = repositoryRoot()
+        .appending(path: "Sources/SessionDeckApp/Presentation/AppShellTranscriptDetailView.swift")
+    let appShellContents = try String(contentsOf: appShellView, encoding: .utf8)
+    let detailContents = try String(contentsOf: detailView, encoding: .utf8)
+
+    #expect(
+        appShellContents.contains("onChange(of: selectedSessionID)"),
+        "AppShellView should react to catalog row selection"
+    )
+    #expect(
+        appShellContents.contains("selectedSessionID: selectedSessionID"),
+        "AppShellView should pass selected session identity into the Application use case"
+    )
+    #expect(
+        appShellContents.contains("AppShellTranscriptDetailView(state: viewModel.selectedTranscriptDetail)"),
+        "AppShellView should render transcript detail from the Application-owned view model"
+    )
+    #expect(
+        detailContents.contains("AppShellSelectedTranscriptDetailState"),
+        "AppShellTranscriptDetailView should consume the Application detail state DTO"
+    )
+}
+
 @Test("concrete adapters are only constructed in the composition root")
 func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
     let sourcesDirectory = repositoryRoot().appending(path: "Sources")
@@ -131,6 +159,7 @@ func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
         "PlaceholderSourceDiscoveryAdapter(",
         "DefaultCodexSourceDiscoveryAdapter(",
         "CodexSessionCatalogAdapter(",
+        "CodexSelectedTranscriptLoadingAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
         "PlaceholderTranscriptDecodingAdapter(",
