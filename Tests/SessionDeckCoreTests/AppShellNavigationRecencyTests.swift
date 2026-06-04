@@ -101,6 +101,121 @@ func navigationTreeBoundsRecentlyActiveSessions() {
     ])
 }
 
+@Test("navigation recency uses deterministic fallback ordering")
+func navigationRecencyUsesDeterministicFallbackOrdering() {
+    let sourceID = SessionSourceID(rawValue: "fallback-source")
+    let sourceLabel = CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex",
+        profileName: nil
+    )
+    let snapshot = recencySnapshot(
+        sessions: [
+            recencySession(
+                id: "missing-title-b",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: nil,
+                title: "Beta",
+                lastActivity: nil,
+                createdAt: nil
+            ),
+            recencySession(
+                id: "created-fallback",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: nil,
+                title: "Created fallback",
+                lastActivity: nil,
+                createdAt: 40
+            ),
+            recencySession(
+                id: "equal-title-b",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: nil,
+                title: "Same title",
+                lastActivity: 50
+            ),
+            recencySession(
+                id: "equal-title-a",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: nil,
+                title: "Same title",
+                lastActivity: 50
+            ),
+            recencySession(
+                id: "missing-title-a",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: nil,
+                title: "Alpha",
+                lastActivity: nil,
+                createdAt: nil
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+
+    #expect(summary.recentlyActiveNode.sessionIDs.map(\.rawValue) == [
+        "equal-title-a",
+        "equal-title-b",
+        "created-fallback",
+        "missing-title-a",
+        "missing-title-b",
+    ])
+}
+
+@Test("navigation recency keeps malformed metadata sessions visible")
+func navigationRecencyKeepsMalformedMetadataSessionsVisible() {
+    let sourceID = SessionSourceID(rawValue: "malformed-source")
+    let sourceLabel = CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex",
+        profileName: nil
+    )
+    let snapshot = recencySnapshot(
+        sessions: [
+            recencySession(
+                id: "complete-session",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: nil,
+                lastActivity: 10
+            ),
+            recencySession(
+                id: "malformed-session",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: nil,
+                lastActivity: 20,
+                health: CatalogEntryHealth(parseStatus: .malformed(reason: "synthetic malformed timestamp"))
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+
+    #expect(summary.allChatsNode.sessionIDs.map(\.rawValue) == [
+        "malformed-session",
+        "complete-session",
+    ])
+    #expect(summary.nonProjectChatsNode.sessionIDs.map(\.rawValue) == [
+        "malformed-session",
+        "complete-session",
+    ])
+    #expect(summary.problemSessionsNode.sessionIDs.map(\.rawValue) == ["malformed-session"])
+}
+
 private func recencySnapshot(sessions: [SessionSummary]) -> CatalogSnapshot {
     CatalogSnapshot(
         refreshedAt: Date(timeIntervalSince1970: 1_770_300_300),
@@ -115,18 +230,21 @@ private func recencySession(
     sourceLabel: CatalogSourceLabel,
     projectHint: CatalogProjectHint,
     profileName: String?,
-    lastActivity: Int64
+    title: String? = nil,
+    lastActivity: Int64?,
+    createdAt: Int64? = nil,
+    health: CatalogEntryHealth = CatalogEntryHealth(parseStatus: .complete)
 ) -> SessionSummary {
     SessionSummary(
         id: SessionID(rawValue: id),
         sourceID: sourceID,
         sourceLabel: sourceLabel,
-        title: "Session \(id)",
+        title: title ?? "Session \(id)",
         projectHint: projectHint,
         sessionPath: "/tmp/sessiondeck/\(id).jsonl",
-        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: lastActivity),
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: createdAt, lastActivityEpochSeconds: lastActivity),
         fileSize: CatalogFileSize(byteCount: 128),
         metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: profileName),
-        health: CatalogEntryHealth(parseStatus: .complete)
+        health: health
     )
 }
