@@ -9,10 +9,7 @@ struct CodexCatalogScanner: Sendable {
 
     func scan(candidate: CandidateSessionFile) -> CodexCatalogScanResult {
         if let diagnostic = candidate.diagnostic {
-            return unreadableResult(
-                reason: diagnostic.message,
-                modifiedAt: candidate.modifiedAt
-            )
+            return unreadableResult(diagnostic: diagnostic, modifiedAt: candidate.modifiedAt)
         }
 
         guard let boundedRead = boundedData(at: candidate.absolutePath, fileByteSize: candidate.byteSize) else {
@@ -79,6 +76,45 @@ struct CodexCatalogScanner: Sendable {
                 ),
             ]
         )
+    }
+
+    private func unreadableResult(
+        diagnostic: CandidateSessionFileDiagnostic,
+        modifiedAt: Date?
+    ) -> CodexCatalogScanResult {
+        let code = catalogDiagnosticCode(for: diagnostic)
+        return CodexCatalogScanResult(
+            metadata: CodexCatalogMetadata(),
+            createdAtEpochSeconds: modifiedAt.map(epochSeconds),
+            lastActivityEpochSeconds: modifiedAt.map(epochSeconds),
+            parseStatus: .unreadable(reason: "Candidate transcript file could not be read."),
+            diagnostics: [
+                CatalogEntryDiagnostic(
+                    code: code,
+                    severity: .warning,
+                    message: catalogDiagnosticMessage(for: code)
+                ),
+            ]
+        )
+    }
+
+    private func catalogDiagnosticCode(for diagnostic: CandidateSessionFileDiagnostic) -> CatalogEntryDiagnosticCode {
+        if diagnostic.message.localizedCaseInsensitiveContains("permission") {
+            return .permissionDenied
+        }
+
+        return .unreadableFile
+    }
+
+    private func catalogDiagnosticMessage(for code: CatalogEntryDiagnosticCode) -> String {
+        switch code {
+        case .permissionDenied:
+            return "Candidate transcript file permission was denied during catalog metadata scanning."
+        case .unreadableFile:
+            return "Candidate transcript file could not be read for catalog metadata."
+        default:
+            return "Candidate transcript produced a catalog diagnostic."
+        }
     }
 
     private func boundedData(at path: String, fileByteSize: Int64) -> CodexCatalogBoundedRead? {

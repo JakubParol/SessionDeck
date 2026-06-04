@@ -233,7 +233,7 @@ func codexCatalogAdapterMapsUnreadableCandidatesToVisibleDiagnosticEntries() thr
     let summary = try #require(try adapter.listSessions(sourceID: nil).first)
 
     #expect(summary.id == SessionID(rawValue: "rollout-2026-01-01T00-05-00Z-candidate-diagnostic"))
-    #expect(summary.health.parseStatus == .unreadable(reason: "Candidate transcript file is not readable."))
+    #expect(summary.health.parseStatus == .unreadable(reason: "Candidate transcript file could not be read."))
     #expect(summary.health.diagnostics.map(\.code) == [.unreadableFile])
     #expect(summary.health.allowsListing)
 }
