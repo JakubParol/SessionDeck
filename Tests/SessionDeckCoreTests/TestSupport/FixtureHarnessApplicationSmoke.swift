@@ -158,7 +158,7 @@ final class FixtureHarnessApplicationSmoke {
             sessionPath: sessionFile.url.path,
             activity: CatalogActivityTimestamps(
                 createdAtEpochSeconds: nil,
-                lastActivityEpochSeconds: nil
+                lastActivityEpochSeconds: epochSeconds(from: metadata.timestamp)
             ),
             fileSize: CatalogFileSize(byteCount: byteCount(for: sessionFile.url)),
             metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: sessionFile.source.profile),
@@ -199,6 +199,14 @@ final class FixtureHarnessApplicationSmoke {
     private func byteCount(for url: URL) -> Int64 {
         let values = try? url.resourceValues(forKeys: [.fileSizeKey])
         return Int64(values?.fileSize ?? 0)
+    }
+
+    private func epochSeconds(from timestamp: String?) -> Int64? {
+        guard let timestamp, let date = ISO8601DateFormatter().date(from: timestamp) else {
+            return nil
+        }
+
+        return Int64(date.timeIntervalSince1970)
     }
 
     private func transcriptSegments(from sessionFile: TempCodexSessionFile) throws -> [TranscriptSegment] {
