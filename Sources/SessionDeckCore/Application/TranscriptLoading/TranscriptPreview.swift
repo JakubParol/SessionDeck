@@ -127,6 +127,73 @@ private extension TranscriptSegmentKind {
     }
 }
 
+public enum TranscriptDecodeDiagnosticSeverity: Equatable, Sendable {
+    case info
+    case warning
+    case error
+}
+
+public struct TranscriptDecodeDiagnostic: Equatable, Sendable {
+    public let code: String
+    public let severity: TranscriptDecodeDiagnosticSeverity
+    public let message: String
+    public let source: TranscriptSegmentSourceReference?
+    public let allowsDecodingToContinue: Bool
+
+    public init(
+        code: String,
+        severity: TranscriptDecodeDiagnosticSeverity,
+        message: String,
+        source: TranscriptSegmentSourceReference?,
+        allowsDecodingToContinue: Bool
+    ) {
+        self.code = code
+        self.severity = severity
+        self.message = message
+        self.source = source
+        self.allowsDecodingToContinue = allowsDecodingToContinue
+    }
+}
+
+public struct TranscriptDecodeResult: Equatable, Sendable {
+    public let sessionID: SessionID
+    public let title: String
+    public let segments: [TranscriptSegment]
+    public let diagnostics: [TranscriptDecodeDiagnostic]
+    public let isPartial: Bool
+
+    public var orderedSegments: [TranscriptSegment] {
+        segments.sorted { $0.order < $1.order }
+    }
+
+    public var canContinueDecoding: Bool {
+        diagnostics.allSatisfy(\.allowsDecodingToContinue)
+    }
+
+    public init(
+        sessionID: SessionID,
+        title: String,
+        segments: [TranscriptSegment],
+        diagnostics: [TranscriptDecodeDiagnostic],
+        isPartial: Bool
+    ) {
+        self.sessionID = sessionID
+        self.title = title
+        self.segments = segments
+        self.diagnostics = diagnostics
+        self.isPartial = isPartial
+    }
+
+    public func preview(isTruncated: Bool) -> TranscriptPreview {
+        TranscriptPreview(
+            sessionID: sessionID,
+            title: title,
+            segments: orderedSegments,
+            isTruncated: isTruncated
+        )
+    }
+}
+
 public struct TranscriptPreview: Equatable, Sendable {
     public let sessionID: SessionID
     public let title: String

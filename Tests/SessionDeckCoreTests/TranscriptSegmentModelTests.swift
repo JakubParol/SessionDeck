@@ -126,3 +126,67 @@ func transcriptSegmentOrderProvidesDeterministicSorting() throws {
     #expect(sorted.map(\.id) == ["segment-1", "segment-2", "segment-3"])
     #expect(sorted.map(\.source.lineNumber) == [nil, 10, 99])
 }
+
+@Test("transcript decode result preserves ordered segments diagnostics and preview projection")
+func transcriptDecodeResultPreservesSegmentsDiagnosticsAndPreviewProjection() throws {
+    let sessionID = SessionID(rawValue: "session-1")
+    let source = TranscriptSegmentSourceReference(
+        sourceID: SessionSourceID(rawValue: "codex-fixture"),
+        relativePath: "2026/06/04/rollout.jsonl",
+        lineNumber: 8
+    )
+    let segments = [
+        TranscriptSegment(
+            id: "segment-2",
+            kind: .assistantMessage,
+            text: "Done.",
+            order: TranscriptSegmentOrder(index: 1),
+            source: source.withLineNumber(9),
+            timestampDescription: nil
+        ),
+        TranscriptSegment(
+            id: "segment-1",
+            kind: .userMessage,
+            text: "Summarize this session.",
+            order: TranscriptSegmentOrder(index: 0),
+            source: source,
+            timestampDescription: nil
+        ),
+    ]
+    let diagnostics = [
+        TranscriptDecodeDiagnostic(
+            code: "unknown_event",
+            severity: .warning,
+            message: "Preserved unknown event as diagnostic segment.",
+            source: source.withLineNumber(10),
+            allowsDecodingToContinue: true
+        ),
+        TranscriptDecodeDiagnostic(
+            code: "truncated_large_output",
+            severity: .info,
+            message: "Large tool output was truncated for preview.",
+            source: source.withLineNumber(11),
+            allowsDecodingToContinue: true
+        ),
+    ]
+
+    let result = TranscriptDecodeResult(
+        sessionID: sessionID,
+        title: "Fixture session",
+        segments: segments,
+        diagnostics: diagnostics,
+        isPartial: true
+    )
+
+    #expect(result.orderedSegments.map(\.id) == ["segment-1", "segment-2"])
+    #expect(result.diagnostics.map(\.code) == ["unknown_event", "truncated_large_output"])
+    #expect(result.diagnostics.map(\.severity) == [.warning, .info])
+    #expect(result.canContinueDecoding)
+
+    let preview = result.preview(isTruncated: true)
+
+    #expect(preview.sessionID == sessionID)
+    #expect(preview.title == "Fixture session")
+    #expect(preview.segments.map(\.id) == ["segment-1", "segment-2"])
+    #expect(preview.isTruncated)
+}
