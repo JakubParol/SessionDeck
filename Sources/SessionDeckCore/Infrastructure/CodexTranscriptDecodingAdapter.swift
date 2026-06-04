@@ -311,7 +311,37 @@ private struct CodexTranscriptJSONEvent {
     }
 
     var toolOutputText: String? {
-        payloadString("output") ?? payloadString("error") ?? payloadString("result")
+        payloadString("output")
+            ?? payloadString("error")
+            ?? payloadString("result")
+            ?? payloadSummary("error")
+            ?? payloadSummary("output")
+            ?? payloadSummary("result")
+    }
+
+    func payloadSummary(_ key: String) -> String? {
+        guard let object = payload[key] as? [String: Any] else {
+            return nil
+        }
+
+        if let code = object["code"] as? String,
+           let message = object["message"] as? String {
+            return "\(code): \(message)"
+        }
+
+        if let message = object["message"] as? String {
+            return message
+        }
+
+        let pairs = object.keys.sorted().compactMap { key -> String? in
+            guard let value = object[key] else {
+                return nil
+            }
+
+            return "\(key)=\(String(describing: value))"
+        }
+
+        return pairs.isEmpty ? nil : pairs.joined(separator: ", ")
     }
 
     var messageText: String? {

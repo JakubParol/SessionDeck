@@ -81,6 +81,7 @@ func codexTranscriptFixturesIncludeMixedToolActivityExamples() throws {
     #expect(toolActivity.contains("\"call_id\":\"call_tool_activity_002\""))
     #expect(toolActivity.contains("\"status\":\"failed\""))
     #expect(toolActivity.contains("synthetic failure output"))
+    #expect(toolActivity.contains("synthetic structured failure"))
 }
 
 @Test("Codex transcript fixtures contain only synthetic redacted content")
