@@ -21,33 +21,11 @@ func codexCatalogAdapterExtractsBoundedMetadataFromCandidateFiles() throws {
         placement: .project("SessionDeck"),
         timestamp: "2026-01-01T00:00:00Z"
     )
-    let sourceID = SessionSourceID(rawValue: "codex-default")
-    let adapter = CodexSessionCatalogAdapter(
-        sourceDiscovery: FakeSourceDiscoveryPort(
-            sources: [
-                SessionSourceSummary(
-                    id: sourceID,
-                    displayName: "Codex default",
-                    kind: .codex,
-                    locationDescription: source.sessionsRootURL.path,
-                    isEnabled: true
-                ),
-            ]
-        ),
-        candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(
-            files: [
-                CandidateSessionFile(
-                    sourceID: sourceID,
-                    relativePath: "2026/01/01/rollout-2026-01-01T00-00-00Z-session-1.jsonl",
-                    absolutePath: transcript.url.path,
-                    byteSize: Int64((try String(contentsOf: transcript.url, encoding: .utf8)).utf8.count),
-                    modifiedAt: Date(timeIntervalSince1970: 1_767_225_605),
-                    confidence: .high,
-                    reason: "test",
-                    diagnostic: nil
-                ),
-            ]
-        ),
+    let sourceID = defaultCatalogSourceID()
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        modifiedAt: Date(timeIntervalSince1970: 1_767_225_605),
         scanLimits: CodexCatalogScanLimits(maximumBytes: 512, maximumLines: 8)
     )
 
@@ -86,33 +64,9 @@ func codexCatalogAdapterIgnoresByteLimitTruncationAfterMetadata() throws {
         placement: .project("SessionDeck"),
         timestamp: "2026-01-01T00:00:00Z"
     )
-    let sourceID = SessionSourceID(rawValue: "codex-default")
-    let adapter = CodexSessionCatalogAdapter(
-        sourceDiscovery: FakeSourceDiscoveryPort(
-            sources: [
-                SessionSourceSummary(
-                    id: sourceID,
-                    displayName: "Codex default",
-                    kind: .codex,
-                    locationDescription: source.sessionsRootURL.path,
-                    isEnabled: true
-                ),
-            ]
-        ),
-        candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(
-            files: [
-                CandidateSessionFile(
-                    sourceID: sourceID,
-                    relativePath: "2026/01/01/rollout-2026-01-01T00-00-00Z-large-session.jsonl",
-                    absolutePath: transcript.url.path,
-                    byteSize: Int64((try String(contentsOf: transcript.url, encoding: .utf8)).utf8.count),
-                    modifiedAt: nil,
-                    confidence: .high,
-                    reason: "test",
-                    diagnostic: nil
-                ),
-            ]
-        ),
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
         scanLimits: CodexCatalogScanLimits(maximumBytes: 256, maximumLines: 8)
     )
 
@@ -144,8 +98,64 @@ func codexCatalogAdapterReportsMalformedLinesInsideScanBounds() throws {
         placement: .project("SessionDeck"),
         timestamp: "2026-01-01T00:00:00Z"
     )
-    let sourceID = SessionSourceID(rawValue: "codex-default")
-    let adapter = CodexSessionCatalogAdapter(
+    let adapter = try makeCatalogAdapter(source: source, transcript: transcript)
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.id == SessionID(rawValue: "malformed-session"))
+    #expect(summary.health.parseStatus == .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata."))
+    #expect(summary.health.allowsListing)
+}
+
+@Test("Codex catalog adapter keeps missing-metadata sessions visible without mutating fixtures")
+func codexCatalogAdapterKeepsMissingMetadataSessionsVisibleWithoutMutation() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "missing-metadata")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-01-01T00:03:00Z","type":"session_meta","payload":{"id":"missing-meta","title":"Missing Metadata Catalog","source":"codex-cli"}}
+        {"timestamp":"2026-01-01T00:03:01Z","type":"synthetic_unknown_event","payload":{"note":"unknown events are tolerated"}}
+
+        """,
+        source: source,
+        sessionID: "missing-meta",
+        placement: .missingMetadata,
+        timestamp: "2026-01-01T00:03:00Z"
+    )
+    let before = try String(contentsOf: transcript.url, encoding: .utf8)
+    let adapter = try makeCatalogAdapter(source: source, transcript: transcript)
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+    let after = try String(contentsOf: transcript.url, encoding: .utf8)
+
+    #expect(summary.id == SessionID(rawValue: "missing-meta"))
+    #expect(summary.projectHint == .unavailable)
+    #expect(summary.health.parseStatus == .missingMetadata)
+    #expect(summary.activity.createdAtEpochSeconds == 1_767_225_780)
+    #expect(after == before)
+}
+
+private func makeCatalogFixtureRoot(name: String) throws -> FixtureTempRoot {
+    try FixtureTempRoot(
+        parentDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("SessionDeckCodexSessionCatalogAdapterTests", isDirectory: true),
+        name: name,
+        pathGuard: FixturePathGuard(forbiddenHomeDirectories: [FileManager.default.homeDirectoryForCurrentUser])
+    )
+}
+
+private func makeCatalogAdapter(
+    source: TempCodexSessionSource,
+    transcript: TempCodexSessionFile,
+    modifiedAt: Date? = nil,
+    scanLimits: CodexCatalogScanLimits = CodexCatalogScanLimits()
+) throws -> CodexSessionCatalogAdapter {
+    let sourceID = defaultCatalogSourceID()
+    return CodexSessionCatalogAdapter(
         sourceDiscovery: FakeSourceDiscoveryPort(
             sources: [
                 SessionSourceSummary(
@@ -161,30 +171,20 @@ func codexCatalogAdapterReportsMalformedLinesInsideScanBounds() throws {
             files: [
                 CandidateSessionFile(
                     sourceID: sourceID,
-                    relativePath: "2026/01/01/rollout-2026-01-01T00-00-00Z-malformed-session.jsonl",
+                    relativePath: transcript.url.lastPathComponent,
                     absolutePath: transcript.url.path,
                     byteSize: Int64((try String(contentsOf: transcript.url, encoding: .utf8)).utf8.count),
-                    modifiedAt: nil,
+                    modifiedAt: modifiedAt,
                     confidence: .high,
                     reason: "test",
                     diagnostic: nil
                 ),
             ]
-        )
+        ),
+        scanLimits: scanLimits
     )
-
-    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
-
-    #expect(summary.id == SessionID(rawValue: "malformed-session"))
-    #expect(summary.health.parseStatus == .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata."))
-    #expect(summary.health.allowsListing)
 }
 
-private func makeCatalogFixtureRoot(name: String) throws -> FixtureTempRoot {
-    try FixtureTempRoot(
-        parentDirectory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("SessionDeckCodexSessionCatalogAdapterTests", isDirectory: true),
-        name: name,
-        pathGuard: FixturePathGuard(forbiddenHomeDirectories: [FileManager.default.homeDirectoryForCurrentUser])
-    )
+private func defaultCatalogSourceID() -> SessionSourceID {
+    SessionSourceID(rawValue: "codex-default")
 }
