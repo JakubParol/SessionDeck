@@ -48,12 +48,16 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else {
-            return .empty
+            throw CodexSourceFileSystemError.unreadableDirectory
         }
 
         var transcriptFileCount = 0
         var sessionBucketDirectoryPaths: Set<String> = []
         for case let fileURL as URL in enumerator {
+            guard isConservativeCodexTranscriptCandidate(fileURL: fileURL, sessionsRoot: sessionsRoot) else {
+                continue
+            }
+
             let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
             if values.isRegularFile == true && fileURL.pathExtension == "jsonl" {
                 transcriptFileCount += 1
@@ -172,6 +176,10 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
         let resolvedFilePath = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
         return resolvedFilePath.hasPrefix("\(resolvedRootPath)/")
     }
+}
+
+public enum CodexSourceFileSystemError: Error, Equatable {
+    case unreadableDirectory
 }
 
 public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, CandidateSessionFileEnumerationPort, Sendable {
@@ -398,7 +406,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             displayName: definition.displayName,
             kind: definition.kind,
             locationDescription: rootURL.standardizedFileURL.path,
-            isEnabled: availability == .available,
+            isEnabled: definition.isEnabled,
             availability: availability,
             diagnostic: diagnostic,
             counts: counts

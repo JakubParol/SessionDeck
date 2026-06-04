@@ -48,6 +48,39 @@ func defaultCodexSourceDiscoveryReportsAvailableTempHomeRoot() throws {
     #expect(source.counts == SessionSourceCounts(sessionBucketDirectoryCount: 2, transcriptFileCount: 2))
 }
 
+@Test("default Codex source discovery treats non-candidate JSONL as empty")
+func defaultCodexSourceDiscoveryTreatsNonCandidateJSONLAsEmpty() throws {
+    let fixtureRoot = try makeDiscoveryFixtureRoot(name: "non-candidate-empty")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let homeDirectory = fixtureRoot.url.appending(path: "home", directoryHint: .isDirectory)
+    let sessionsRoot = homeDirectory
+        .appending(path: ".codex", directoryHint: .isDirectory)
+        .appending(path: "sessions", directoryHint: .isDirectory)
+    let scratchJSONL = sessionsRoot.appending(path: "scratch.jsonl")
+    let nonRolloutJSONL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "not-a-codex-rollout.jsonl")
+    try FileManager.default.createDirectory(
+        at: nonRolloutJSONL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try #"{"not":"a-codex-session"}"#.write(to: scratchJSONL, atomically: true, encoding: .utf8)
+    try #"{"not":"a-codex-rollout"}"#.write(to: nonRolloutJSONL, atomically: true, encoding: .utf8)
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
+    )
+
+    let source = try #require(try adapter.discoverSources().first)
+
+    #expect(source.availability == .available)
+    #expect(source.diagnostic?.code == .codexSessionsRootEmpty)
+    #expect(source.counts == .empty)
+}
+
 @Test("default Codex source discovery reports a missing diagnostic without crashing")
 func defaultCodexSourceDiscoveryReportsMissingTempHomeRoot() throws {
     let fixtureRoot = try makeDiscoveryFixtureRoot(name: "missing")
@@ -65,7 +98,7 @@ func defaultCodexSourceDiscoveryReportsMissingTempHomeRoot() throws {
 
     let source = try #require(sources.first)
     #expect(source.availability == .missing)
-    #expect(source.isEnabled == false)
+    #expect(source.isEnabled == true)
     #expect(source.diagnostic?.code == .codexSessionsRootMissing)
     #expect(source.locationDescription.hasPrefix(homeDirectory.path))
     #expect(source.locationDescription.contains(NSHomeDirectory()) == false)

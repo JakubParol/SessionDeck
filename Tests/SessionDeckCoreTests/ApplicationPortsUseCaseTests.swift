@@ -68,6 +68,44 @@ func sourceDiscoveryReportPreservesHealthySourcesAndFailedDiagnostics() throws {
     #expect(report.canContinueDiscovery)
 }
 
+@Test("source discovery report includes candidate file diagnostics in health summaries")
+func sourceDiscoveryReportIncludesCandidateFileDiagnosticsInHealthSummaries() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-primary")
+    let source = SessionSourceSummary(
+        id: sourceID,
+        displayName: "Codex primary",
+        kind: .codex,
+        locationDescription: "Synthetic primary source",
+        isEnabled: true,
+        availability: .available,
+        counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 2)
+    )
+    let candidate = CandidateSessionFile(
+        sourceID: sourceID,
+        relativePath: "2026/06/04/rollout-2026-06-04T10-01-00-unreadable.jsonl",
+        absolutePath: "/tmp/source/.codex/sessions/2026/06/04/rollout-2026-06-04T10-01-00-unreadable.jsonl",
+        byteSize: 128,
+        modifiedAt: nil,
+        confidence: .high,
+        reason: "codex.sessions.date-bucket-jsonl",
+        diagnostic: CandidateSessionFileDiagnostic(
+            code: .codexCandidateFileUnreadable,
+            message: "Candidate transcript file could not be read by the current process."
+        )
+    )
+    let useCase = DiscoverSessionSourcesUseCase(
+        sourceDiscovery: FakeSourceDiscoveryPort(sources: [source]),
+        candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(files: [candidate])
+    )
+
+    let report = try useCase.discoveryReport()
+
+    #expect(report.candidateDiagnostics.map(\.sourceID) == [sourceID])
+    #expect(report.candidateDiagnostics.map(\.candidate.relativePath) == [candidate.relativePath])
+    #expect(report.healthSummaries.map(\.candidateDiagnosticCode) == [.codexCandidateFileUnreadable])
+    #expect(report.healthSummaries.map(\.severity) == [.warning])
+}
+
 @Test("source discovery report exposes presentation-facing health summaries")
 func sourceDiscoveryReportExposesPresentationFacingHealthSummaries() throws {
     let healthySource = SessionSourceSummary(
