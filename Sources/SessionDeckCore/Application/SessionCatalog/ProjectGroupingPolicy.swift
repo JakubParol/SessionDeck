@@ -24,6 +24,24 @@ public struct ProjectNavigationGroup: Equatable, Sendable {
 }
 
 public enum ProjectGroupingPolicy {
+    public static func resolve(sessions: [SessionSummary]) -> [ProjectNavigationGroup] {
+        let groupedSessions = Dictionary(grouping: sessions, by: { resolve(session: $0).id })
+
+        return groupedSessions.map { _, sessions in
+            let orderedSessions = SessionCatalogOrdering.sort(sessions)
+            let group = resolve(session: orderedSessions[0])
+            return ProjectNavigationGroup(
+                kind: group.kind,
+                id: group.id,
+                title: group.title,
+                sessionIDs: orderedSessions.map(\.id)
+            )
+        }
+        .sorted { lhs, rhs in
+            lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
+        }
+    }
+
     public static func resolve(session: SessionSummary) -> ProjectNavigationGroup {
         let projectHint = session.projectHint
 
