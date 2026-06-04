@@ -115,6 +115,15 @@ final class FixtureHarnessApplicationSmoke {
             }
         )
         let transcriptPreviews = try sessionFiles.map(transcriptPreview)
+        let transcriptResults = transcriptPreviews.map { preview in
+            TranscriptDecodeResult(
+                sessionID: preview.sessionID,
+                title: preview.title,
+                segments: preview.segments,
+                diagnostics: [],
+                isPartial: preview.isTruncated
+            )
+        }
         let discoverSessionSources = DiscoverSessionSourcesUseCase(
             sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries)
         )
@@ -141,6 +150,9 @@ final class FixtureHarnessApplicationSmoke {
             ),
             loadTranscriptPreview: LoadTranscriptPreviewUseCase(
                 transcriptLoading: FakeTranscriptLoadingPort(previews: transcriptPreviews)
+            ),
+            loadTranscriptSegments: LoadTranscriptSegmentsUseCase(
+                transcriptDecoding: FakeTranscriptDecodingPort(results: transcriptResults)
             )
         )
     }

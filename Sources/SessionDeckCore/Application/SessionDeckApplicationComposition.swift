@@ -6,6 +6,7 @@ public struct SessionDeckApplicationComposition: Sendable {
     public let listSessions: ListSessionsUseCase
     public let refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase
     public let loadTranscriptPreview: LoadTranscriptPreviewUseCase
+    public let loadTranscriptSegments: LoadTranscriptSegmentsUseCase
 
     public init(
         appShellUseCase: AppShellUseCase,
@@ -14,7 +15,8 @@ public struct SessionDeckApplicationComposition: Sendable {
         enumerateCandidateSessionFiles: EnumerateCandidateSessionFilesUseCase,
         listSessions: ListSessionsUseCase,
         refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase,
-        loadTranscriptPreview: LoadTranscriptPreviewUseCase
+        loadTranscriptPreview: LoadTranscriptPreviewUseCase,
+        loadTranscriptSegments: LoadTranscriptSegmentsUseCase
     ) {
         self.appShellUseCase = appShellUseCase
         self.appShellViewModel = appShellViewModel
@@ -23,5 +25,6 @@ public struct SessionDeckApplicationComposition: Sendable {
         self.listSessions = listSessions
         self.refreshCatalogSnapshot = refreshCatalogSnapshot
         self.loadTranscriptPreview = loadTranscriptPreview
+        self.loadTranscriptSegments = loadTranscriptSegments
     }
 }

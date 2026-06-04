@@ -65,6 +65,26 @@ enum FakeTranscriptLoadingError: Error, Equatable {
     case previewNotFound(SessionID)
 }
 
+struct FakeTranscriptDecodingPort: TranscriptDecodingPort {
+    let resultsBySessionID: [SessionID: TranscriptDecodeResult]
+
+    init(results: [TranscriptDecodeResult]) {
+        self.resultsBySessionID = Dictionary(uniqueKeysWithValues: results.map { ($0.sessionID, $0) })
+    }
+
+    func loadTranscript(sessionID: SessionID) throws -> TranscriptDecodeResult {
+        guard let result = resultsBySessionID[sessionID] else {
+            throw FakeTranscriptDecodingError.resultNotFound(sessionID)
+        }
+
+        return result
+    }
+}
+
+enum FakeTranscriptDecodingError: Error, Equatable {
+    case resultNotFound(SessionID)
+}
+
 struct FakeCatalogMetadataExtractionPort: CatalogMetadataExtractionPort {
     let resultsBySourceID: [SessionSourceID: CatalogSourceExtractionResult]
     let errorsBySourceID: [SessionSourceID: Error]
