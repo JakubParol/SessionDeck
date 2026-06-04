@@ -106,6 +106,14 @@ final class FixtureHarnessApplicationSmoke {
         }
         let sessionFiles = store.sessionFiles
         let sessionSummaries = try sessionFiles.map(sessionSummary)
+        let extractionResultsBySourceID = Dictionary(
+            uniqueKeysWithValues: Dictionary(grouping: sessionSummaries, by: \.sourceID).map { sourceID, sessions in
+                (
+                    sourceID,
+                    CatalogSourceExtractionResult(sourceID: sourceID, sessions: sessions)
+                )
+            }
+        )
         let transcriptPreviews = try sessionFiles.map(transcriptPreview)
         let discoverSessionSources = DiscoverSessionSourcesUseCase(
             sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries)
@@ -126,6 +134,10 @@ final class FixtureHarnessApplicationSmoke {
             ),
             listSessions: ListSessionsUseCase(
                 sessionCatalog: FakeSessionCatalogPort(sessions: sessionSummaries)
+            ),
+            refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase(
+                sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries),
+                metadataExtraction: FakeCatalogMetadataExtractionPort(resultsBySourceID: extractionResultsBySourceID)
             ),
             loadTranscriptPreview: LoadTranscriptPreviewUseCase(
                 transcriptLoading: FakeTranscriptLoadingPort(previews: transcriptPreviews)
