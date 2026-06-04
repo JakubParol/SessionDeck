@@ -43,7 +43,7 @@ func fixtureToolActivityRowsAreCollapsedAndOrdered() throws {
         "Tool call: synthetic_fixture_failure_probe",
         "Tool output from synthetic_fixture_failure_probe",
         "Tool call: unknown_tool",
-        "Tool output from tool output",
+        "Tool output",
         "Tool call: synthetic_structured_failure_probe",
         "Tool output from synthetic_structured_failure_probe",
     ])
@@ -64,7 +64,7 @@ func fixtureLargeToolOutputStaysOutOfCollapsedRowText() throws {
     let toolRow = try #require(state.rows.first)
     let presentation = try #require(toolRow.toolPresentation)
 
-    #expect(toolRow.text == "Tool output from tool output")
+    #expect(toolRow.text == "Tool output")
     #expect(presentation.isCollapsedByDefault)
     #expect(presentation.metadataSummary.contains("characters"))
     #expect(presentation.expandedText.contains("synthetic bounded-read payload"))
@@ -84,7 +84,7 @@ func toolRowsWithoutStructuredMetadataExposeFallback() {
         )
     )
 
-    #expect(row.text == "Tool call: Unknown tool")
+    #expect(row.text == "Tool call: legacy_tool")
     #expect(row.toolPresentation?.metadataSummary == "metadata unavailable")
     #expect(row.toolPresentation?.expandedText == "{}")
 }

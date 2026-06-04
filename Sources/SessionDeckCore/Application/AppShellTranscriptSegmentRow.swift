@@ -68,6 +68,9 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             case .toolCall:
                 return "Tool call: \(toolPresentation.displayLabel)"
             case .toolOutput:
+                if toolPresentation.displayLabel == "tool output" {
+                    return "Tool output"
+                }
                 return "Tool output from \(toolPresentation.displayLabel)"
             case .assistantMessage, .error, .metadata, .unknown, .userMessage:
                 break
@@ -89,7 +92,7 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
         }
 
         let metadata = segment.toolMetadata
-        let displayLabel = textLabel(for: metadata?.displayLabel ?? "Unknown tool")
+        let displayLabel = textLabel(for: metadata?.displayLabel ?? fallbackToolDisplayLabel(for: segment.kind))
 
         return AppShellTranscriptToolPresentation(
             displayLabel: displayLabel,
@@ -97,6 +100,17 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             expandedText: textLabel(for: segment.text),
             isCollapsedByDefault: true
         )
+    }
+
+    private static func fallbackToolDisplayLabel(for kind: TranscriptSegmentKind) -> String {
+        switch kind {
+        case let .toolCall(name, _):
+            return name.isEmpty ? "Unknown tool" : name
+        case .toolOutput:
+            return "tool output"
+        case .assistantMessage, .error, .metadata, .unknown, .userMessage:
+            return "Unknown tool"
+        }
     }
 
     private static func toolMetadataSummary(for metadata: TranscriptToolMetadata?) -> String {
