@@ -77,6 +77,31 @@ func codexTranscriptDecoderMapsToolCallEventsIntoDistinctSegments() throws {
     #expect(orderedSegments[2].metadata["call_id"] == "call_synthetic_001")
 }
 
+@Test("Codex transcript decoder maps tool outputs and failures into distinct segments")
+func codexTranscriptDecoderMapsToolOutputsAndFailuresIntoDistinctSegments() throws {
+    let result = try decodeFixture(.toolActivityMixed, sessionID: "tool-output-session")
+    let orderedSegments = result.orderedSegments
+
+    #expect(orderedSegments.map(\.kind) == [
+        .userMessage,
+        .assistantMessage,
+        .toolCall(name: "synthetic_fixture_probe", callID: "call_tool_activity_001"),
+        .toolOutput(callID: "call_tool_activity_001"),
+        .toolCall(name: "synthetic_fixture_failure_probe", callID: "call_tool_activity_002"),
+        .toolOutput(callID: "call_tool_activity_002"),
+        .toolCall(name: "unknown_tool", callID: nil),
+        .toolOutput(callID: nil),
+    ])
+    #expect(orderedSegments[3].text == "synthetic tool output")
+    #expect(orderedSegments[3].metadata["payload_type"] == "function_call_output")
+    #expect(orderedSegments[3].metadata["call_id"] == "call_tool_activity_001")
+    #expect(orderedSegments[5].text == "synthetic failure output")
+    #expect(orderedSegments[5].metadata["status"] == "failed")
+    #expect(orderedSegments[7].text == "synthetic missing call id failure")
+    #expect(orderedSegments[7].metadata["status"] == "failed")
+    #expect(orderedSegments[7].metadata["call_id"] == nil)
+}
+
 private func decodeFixture(
     _ fixtureID: CodexTranscriptFixtureID,
     sessionID rawSessionID: String
