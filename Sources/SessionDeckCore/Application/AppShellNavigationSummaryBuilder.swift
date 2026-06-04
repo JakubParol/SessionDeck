@@ -31,12 +31,14 @@ public extension AppShellNavigationSummary {
     }
 
     private static func projectsNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
-        let projectSessions = sessions.filter { $0.projectHint.cwdPath != nil }
+        let projectSessions = sessions.filter { session in
+            ProjectGroupingPolicy.resolve(session: session).kind != .nonProject
+        }
         let children = groupNodes(
             sessions: projectSessions,
             idPrefix: "projects",
-            key: { $0.projectHint.stableNavigationKey },
-            title: \.projectDisplayName
+            key: { ProjectGroupingPolicy.resolve(session: $0).id },
+            title: { ProjectGroupingPolicy.resolve(session: $0).title }
         )
 
         return AppShellNavigationNode(
@@ -49,7 +51,9 @@ public extension AppShellNavigationSummary {
     }
 
     private static func nonProjectChatsNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
-        let nonProjectSessions = sessions.filter { $0.projectHint.cwdPath == nil }
+        let nonProjectSessions = sessions.filter { session in
+            ProjectGroupingPolicy.resolve(session: session).kind == .nonProject
+        }
 
         return AppShellNavigationNode(
             id: "non-project-chats",
@@ -194,12 +198,6 @@ public extension AppShellNavigationSummary {
         }
 
         return categories.uniquePreservingOrder()
-    }
-}
-
-private extension CatalogProjectHint {
-    var stableNavigationKey: String {
-        cwdPath ?? displayName
     }
 }
 

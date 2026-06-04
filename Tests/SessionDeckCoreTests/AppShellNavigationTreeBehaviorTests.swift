@@ -62,6 +62,120 @@ func navigationTreeKeepsStableGroupIdentifiersAcrossRefreshOrderChanges() {
     #expect(refreshedSummary.recentlyActiveNode.sessionIDs.map(\.rawValue) == ["beta-newer", "alpha-older"])
 }
 
+@Test("navigation tree groups unknown project fallbacks without hiding sessions")
+func navigationTreeGroupsUnknownProjectFallbacksWithoutHidingSessions() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-fallbacks")
+    let sourceLabel = CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex",
+        profileName: nil
+    )
+    let snapshot = navigationSnapshot(
+        sessions: [
+            navigationSession(
+                id: "valid-project",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: CatalogProjectHint(
+                    cwdPath: "/Users/kuba/Repos/SessionDeck",
+                    displayName: "SessionDeck"
+                ),
+                profileName: "Naomi",
+                lastActivity: 40
+            ),
+            navigationSession(
+                id: "ambiguous-project",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: CatalogProjectHint(
+                    cwdPath: "/Users/kuba/Repos/SessionDeck",
+                    displayName: "SessionDeck"
+                ),
+                profileName: "Naomi",
+                lastActivity: 30,
+                fallbackReasons: [.ambiguousProject]
+            ),
+            navigationSession(
+                id: "scratch-project",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: CatalogProjectHint(
+                    cwdPath: "/tmp/sessiondeck-scratch",
+                    displayName: "scratch"
+                ),
+                profileName: "Naomi",
+                lastActivity: 20
+            ),
+            navigationSession(
+                id: "plain-chat",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: .unavailable,
+                profileName: "Naomi",
+                lastActivity: 10
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+    let unknownProjectNode = try #require(
+        summary.projectsNode.children.first { $0.id == "projects.unknown-project" }
+    )
+
+    #expect(summary.allChatsNode.count == 4)
+    #expect(summary.projectsNode.count == 3)
+    #expect(summary.nonProjectChatsNode.count == 1)
+    #expect(summary.nonProjectChatsNode.sessionIDs.map(\.rawValue) == ["plain-chat"])
+    #expect(summary.projectsNode.children.map(\.id) == [
+        "projects.project./Users/kuba/Repos/SessionDeck",
+        "projects.unknown-project",
+    ])
+    #expect(unknownProjectNode.title == "Unknown Project")
+    #expect(unknownProjectNode.sessionIDs.map(\.rawValue) == [
+        "ambiguous-project",
+        "scratch-project",
+    ])
+    #expect(summary.diagnosticsNode.sessionIDs.map(\.rawValue) == ["ambiguous-project"])
+}
+
+@Test("navigation tree keeps duplicate project display names distinct")
+func navigationTreeKeepsDuplicateProjectDisplayNamesDistinct() {
+    let sourceID = SessionSourceID(rawValue: "codex-duplicates")
+    let sourceLabel = CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex",
+        profileName: nil
+    )
+    let snapshot = navigationSnapshot(
+        sessions: [
+            navigationSession(
+                id: "alpha-toolbox",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: CatalogProjectHint(cwdPath: "/Users/kuba/Repos/Alpha", displayName: "Toolbox"),
+                profileName: "Naomi",
+                lastActivity: 20
+            ),
+            navigationSession(
+                id: "beta-toolbox",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: CatalogProjectHint(cwdPath: "/Users/kuba/Repos/Beta", displayName: "Toolbox"),
+                profileName: "Naomi",
+                lastActivity: 10
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+
+    #expect(summary.projectsNode.children.map(\.id) == [
+        "projects.project./Users/kuba/Repos/Alpha",
+        "projects.project./Users/kuba/Repos/Beta",
+    ])
+    #expect(summary.projectsNode.children.map(\.title) == ["Toolbox", "Toolbox"])
+}
+
 private func navigationSnapshot(sessions: [SessionSummary]) -> CatalogSnapshot {
     CatalogSnapshot(
         refreshedAt: Date(timeIntervalSince1970: 1_770_300_300),
@@ -76,7 +190,9 @@ private func navigationSession(
     sourceLabel: CatalogSourceLabel,
     projectHint: CatalogProjectHint,
     profileName: String,
-    lastActivity: Int64
+    lastActivity: Int64,
+    fallbackReasons: [CatalogSessionFallbackReason] = [],
+    health: CatalogEntryHealth = CatalogEntryHealth(parseStatus: .complete)
 ) -> SessionSummary {
     SessionSummary(
         id: SessionID(rawValue: id),
@@ -88,6 +204,7 @@ private func navigationSession(
         activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: lastActivity),
         fileSize: CatalogFileSize(byteCount: 128),
         metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: profileName),
-        health: CatalogEntryHealth(parseStatus: .complete)
+        fallbackReasons: fallbackReasons,
+        health: health
     )
 }
