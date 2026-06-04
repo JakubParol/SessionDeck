@@ -185,6 +185,43 @@ func codexTranscriptDecoderAttachesStructuredMetadataToToolSegments() throws {
     #expect(failedOutputMetadata.lineCount == 1)
 }
 
+@Test("Codex transcript decoder degrades omitted and unknown tool payloads explicitly")
+func codexTranscriptDecoderDegradesOmittedAndUnknownToolPayloadsExplicitly() throws {
+    let result = try decodeFixture(.toolPayloadDegraded, sessionID: "tool-payload-degraded-session")
+    let orderedSegments = result.orderedSegments
+
+    #expect(result.isPartial)
+    #expect(result.canContinueDecoding)
+    #expect(result.diagnostics.map(\.code) == ["codex.unsupported_event"])
+    #expect(orderedSegments.map(\.kind) == [
+        .userMessage,
+        .toolCall(name: "synthetic_omitted_output_probe", callID: "call_tool_payload_omitted"),
+        .toolOutput(callID: "call_tool_payload_omitted"),
+        .toolCall(name: "synthetic_nested_result_probe", callID: "call_tool_payload_nested"),
+        .toolOutput(callID: "call_tool_payload_nested"),
+        .unknown(eventType: "future_tool_payload"),
+    ])
+
+    let omittedOutputMetadata = try #require(orderedSegments[2].toolMetadata)
+    #expect(orderedSegments[2].text == "Tool output payload unavailable.")
+    #expect(omittedOutputMetadata.status == "failed")
+    #expect(omittedOutputMetadata.bodyAvailability == .omitted)
+    #expect(omittedOutputMetadata.characterCount == nil)
+    #expect(omittedOutputMetadata.byteCount == nil)
+    #expect(omittedOutputMetadata.lineCount == nil)
+
+    let nestedResultMetadata = try #require(orderedSegments[4].toolMetadata)
+    #expect(orderedSegments[4].text == "synthetic_result: synthetic nested result payload")
+    #expect(nestedResultMetadata.bodyAvailability == .available)
+    #expect(nestedResultMetadata.characterCount == 49)
+    #expect(nestedResultMetadata.byteCount == 49)
+    #expect(nestedResultMetadata.lineCount == 1)
+
+    #expect(orderedSegments[5].text == "Unsupported Codex event: future_tool_payload")
+    #expect(orderedSegments[5].metadata["event_type"] == "future_tool_payload")
+    #expect(orderedSegments[5].toolMetadata == nil)
+}
+
 @Test("Codex transcript decoder preserves mixed tool ordering and source metadata")
 func codexTranscriptDecoderPreservesMixedToolOrderingAndSourceMetadata() throws {
     let result = try decodeFixture(.toolActivityMixed, sessionID: "mixed-tool-ordering-session")
