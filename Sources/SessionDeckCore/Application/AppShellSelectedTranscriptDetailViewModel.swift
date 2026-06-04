@@ -17,9 +17,18 @@ public struct AppShellSelectedTranscriptMetadataRow: Equatable, Identifiable, Se
     }
 }
 
+public enum AppShellSelectedTranscriptDisplayMode: Equatable, Sendable {
+    case noSelection
+    case loading
+    case loaded
+    case warning
+    case error
+}
+
 public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public let title: String
     public let statusMessage: String
+    public let displayMode: AppShellSelectedTranscriptDisplayMode
     public let metadataRows: [AppShellSelectedTranscriptMetadataRow]
     public let rows: [AppShellTranscriptSegmentRow]
     public let diagnosticMessages: [String]
@@ -29,6 +38,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public init(
         title: String,
         statusMessage: String,
+        displayMode: AppShellSelectedTranscriptDisplayMode,
         metadataRows: [AppShellSelectedTranscriptMetadataRow],
         rows: [AppShellTranscriptSegmentRow],
         diagnosticMessages: [String],
@@ -37,6 +47,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     ) {
         self.title = title
         self.statusMessage = statusMessage
+        self.displayMode = displayMode
         self.metadataRows = metadataRows
         self.rows = rows
         self.diagnosticMessages = diagnosticMessages
@@ -47,6 +58,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public static let noSelection = AppShellSelectedTranscriptDetailState(
         title: "No session selected",
         statusMessage: "Select a catalog row to load transcript detail.",
+        displayMode: .noSelection,
         metadataRows: [],
         rows: [],
         diagnosticMessages: [],
@@ -58,6 +70,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         AppShellSelectedTranscriptDetailState(
             title: sessionTitle,
             statusMessage: "Loading selected transcript...",
+            displayMode: .loading,
             metadataRows: [],
             rows: [],
             diagnosticMessages: [],
@@ -79,6 +92,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                 errorCount: errorCount,
                 isPartial: readModel.isPartial
             ),
+            displayMode: displayMode(for: severity),
             metadataRows: metadataRows(for: readModel),
             rows: readModel.segments.map(AppShellTranscriptSegmentRow.make(segment:)),
             diagnosticMessages: readModel.diagnostics.map(diagnosticMessage(for:)),
@@ -92,6 +106,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         return AppShellSelectedTranscriptDetailState(
             title: "Transcript unavailable",
             statusMessage: failure.message,
+            displayMode: displayMode(for: failure.severity),
             metadataRows: [],
             rows: [],
             diagnosticMessages: [],
@@ -108,6 +123,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         return AppShellSelectedTranscriptDetailState(
             title: titleLabel(for: session.title ?? ""),
             statusMessage: failure.message,
+            displayMode: displayMode(for: failure.severity),
             metadataRows: metadataRows(for: session),
             rows: [],
             diagnosticMessages: [],
@@ -128,6 +144,19 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         }
 
         return .healthy
+    }
+
+    private static func displayMode(
+        for severity: AppShellCatalogRowSeverity
+    ) -> AppShellSelectedTranscriptDisplayMode {
+        switch severity {
+        case .healthy, .info:
+            return .loaded
+        case .warning:
+            return .warning
+        case .error:
+            return .error
+        }
     }
 
     private static func loadedStatusMessage(

@@ -1,6 +1,57 @@
 import Testing
 @testable import SessionDeckCore
 
+@Test("selected transcript detail state exposes distinct reading surface modes")
+func selectedTranscriptDetailStateExposesDistinctReadingSurfaceModes() throws {
+    let sessionID = SessionID(rawValue: "surface-mode-session")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let healthyReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Healthy selected session",
+            segments: [
+                TranscriptSegment(
+                    id: "user",
+                    kind: .userMessage,
+                    text: "Read this.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+    let warningReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Warning selected session",
+            segments: [],
+            diagnostics: [
+                TranscriptDecodeDiagnostic(
+                    code: "codex.unknown_event",
+                    severity: .warning,
+                    message: "Unknown event was preserved.",
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 2),
+                    allowsDecodingToContinue: true
+                ),
+            ],
+            isPartial: false
+        )
+    )
+
+    #expect(AppShellSelectedTranscriptDetailState.noSelection.displayMode == .noSelection)
+    #expect(AppShellSelectedTranscriptDetailState.loading(sessionTitle: "Loading").displayMode == .loading)
+    #expect(AppShellSelectedTranscriptDetailState.loaded(healthyReadModel).displayMode == .loaded)
+    #expect(AppShellSelectedTranscriptDetailState.loaded(warningReadModel).displayMode == .warning)
+    #expect(AppShellSelectedTranscriptDetailState.failed(
+        SelectedTranscriptLoadingError.transcriptUnreadable(sessionID)
+    ).displayMode == .error)
+}
+
 @Test("selected transcript detail state maps loaded read models into presentation content")
 func selectedTranscriptDetailStateMapsLoadedReadModel() throws {
     let sessionID = SessionID(rawValue: "selected-session")
