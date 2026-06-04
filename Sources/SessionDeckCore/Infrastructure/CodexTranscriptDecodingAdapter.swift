@@ -103,6 +103,14 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         source: TranscriptSegmentSourceReference,
         orderIndex: Int
     ) -> TranscriptSegment? {
+        if event.isToolCall {
+            return toolCallSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+        }
+
+        if event.isToolOutput {
+            return toolOutputSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+        }
+
         guard let role = event.supportedMessageRole,
               let text = event.messageText
         else {
@@ -123,6 +131,60 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
                 "line_number": String(source.lineNumber ?? 0),
                 "role": role,
             ]
+        )
+    }
+
+    private func toolCallSegment(
+        from event: CodexTranscriptJSONEvent,
+        file: CodexTranscriptFile,
+        source: TranscriptSegmentSourceReference,
+        orderIndex: Int
+    ) -> TranscriptSegment {
+        let toolName = event.toolName ?? "unknown_tool"
+        var metadata = baseMetadata(from: event, source: source)
+        metadata["payload_type"] = event.payloadType ?? "function_call"
+        metadata["tool_name"] = toolName
+        if let callID = event.callID {
+            metadata["call_id"] = callID
+        }
+        if let status = event.status {
+            metadata["status"] = status
+        }
+
+        return TranscriptSegment(
+            id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
+            kind: .toolCall(name: toolName, callID: event.callID),
+            text: event.toolCallText ?? "Tool call: \(toolName)",
+            order: TranscriptSegmentOrder(index: orderIndex),
+            source: source,
+            timestampDescription: event.timestamp,
+            metadata: metadata
+        )
+    }
+
+    private func toolOutputSegment(
+        from event: CodexTranscriptJSONEvent,
+        file: CodexTranscriptFile,
+        source: TranscriptSegmentSourceReference,
+        orderIndex: Int
+    ) -> TranscriptSegment {
+        var metadata = baseMetadata(from: event, source: source)
+        metadata["payload_type"] = event.payloadType ?? "function_call_output"
+        if let callID = event.callID {
+            metadata["call_id"] = callID
+        }
+        if let status = event.status {
+            metadata["status"] = status
+        }
+
+        return TranscriptSegment(
+            id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
+            kind: .toolOutput(callID: event.callID),
+            text: event.toolOutputText ?? "Tool output payload unavailable.",
+            order: TranscriptSegmentOrder(index: orderIndex),
+            source: source,
+            timestampDescription: event.timestamp,
+            metadata: metadata
         )
     }
 
@@ -164,87 +226,19 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             ]
         )
     }
+
+    private func baseMetadata(
+        from event: CodexTranscriptJSONEvent,
+        source: TranscriptSegmentSourceReference
+    ) -> [String: String] {
+        [
+            "event_type": event.type,
+            "line_number": String(source.lineNumber ?? 0),
+        ]
+    }
 }
 
 public enum CodexTranscriptDecodingError: Error, Equatable, Sendable {
     case transcriptUnavailable(SessionID)
     case unreadableTranscript(SessionID)
-}
-
-private struct CodexTranscriptJSONEvent {
-    let type: String
-    let timestamp: String?
-    let payload: [String: Any]
-
-    init?(line: String) {
-        guard let data = line.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let type = object["type"] as? String
-        else {
-            return nil
-        }
-
-        self.type = type
-        self.timestamp = object["timestamp"] as? String
-        self.payload = object["payload"] as? [String: Any] ?? [:]
-    }
-
-    var supportedMessageRole: String? {
-        let role = payload["role"] as? String
-        guard role == "user" || role == "assistant" else {
-            return nil
-        }
-
-        if let payloadType = payload["type"] as? String, payloadType != "message" {
-            return nil
-        }
-
-        switch type {
-        case "event_msg", "response_item":
-            return role
-        default:
-            return nil
-        }
-    }
-
-    var messageText: String? {
-        if let content = payload["content"] as? String {
-            return content
-        }
-
-        guard let contentItems = payload["content"] as? [[String: Any]] else {
-            return nil
-        }
-
-        let texts = contentItems.compactMap { item -> String? in
-            guard let text = item["text"] as? String else {
-                return nil
-            }
-
-            switch item["type"] as? String {
-            case "input_text", "output_text", nil:
-                return text
-            default:
-                return nil
-            }
-        }
-
-        guard texts.isEmpty == false else {
-            return nil
-        }
-
-        return texts.joined(separator: "\n")
-    }
-
-    var messageContentType: String {
-        if payload["content"] is String {
-            return "string"
-        }
-
-        return "content_array"
-    }
-
-    func payloadString(_ key: String) -> String? {
-        payload[key] as? String
-    }
 }

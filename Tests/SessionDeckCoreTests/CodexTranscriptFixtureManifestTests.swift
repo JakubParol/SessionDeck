@@ -16,6 +16,8 @@ func codexTranscriptFixtureManifestCoversRequiredFixtureCategories() {
     #expect(hasFixtureCategory("project"))
     #expect(hasFixtureCategory("tool-call"))
     #expect(hasFixtureCategory("tool-output"))
+    #expect(hasFixtureCategory("tool-error"))
+    #expect(hasFixtureCategory("mixed-order"))
     #expect(hasFixtureCategory("malformed-line"))
     #expect(hasFixtureCategory("unknown-event"))
     #expect(hasFixtureCategory("missing-metadata"))
@@ -68,6 +70,18 @@ func codexTranscriptFixturesPreserveDegradedInputExamples() throws {
     let nonProjectChat = try CodexTranscriptFixtureManifest.readFixture(.nonProjectChat)
     #expect(nonProjectChat.contains("\"project\":null"))
     #expect(nonProjectChat.contains("\"cwd\":null"))
+}
+
+@Test("Codex transcript fixtures include mixed tool activity examples")
+func codexTranscriptFixturesIncludeMixedToolActivityExamples() throws {
+    let toolActivity = try CodexTranscriptFixtureManifest.readFixture(.toolActivityMixed)
+    #expect(toolActivity.contains("\"type\":\"function_call\""))
+    #expect(toolActivity.contains("\"type\":\"function_call_output\""))
+    #expect(toolActivity.contains("\"call_id\":\"call_tool_activity_001\""))
+    #expect(toolActivity.contains("\"call_id\":\"call_tool_activity_002\""))
+    #expect(toolActivity.contains("\"status\":\"failed\""))
+    #expect(toolActivity.contains("synthetic failure output"))
+    #expect(toolActivity.contains("synthetic structured failure"))
 }
 
 @Test("Codex transcript fixtures contain only synthetic redacted content")

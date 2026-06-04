@@ -1,0 +1,11 @@
+{"timestamp":"2026-01-03T00:00:00Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000087","title":"Synthetic Tool Activity Session","cwd":"<synthetic-project-root>","project":"SyntheticProject","source":"codex-cli"}}
+{"timestamp":"2026-01-03T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Inspect the synthetic tool activity fixture."}]}}
+{"timestamp":"2026-01-03T00:00:02Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I will call a synthetic fixture tool."}]}}
+{"timestamp":"2026-01-03T00:00:03Z","type":"response_item","payload":{"type":"function_call","name":"synthetic_fixture_probe","call_id":"call_tool_activity_001","arguments":"{\"target\":\"tool-activity\"}"}}
+{"timestamp":"2026-01-03T00:00:04Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_tool_activity_001","output":"synthetic tool output"}}
+{"timestamp":"2026-01-03T00:00:05Z","type":"response_item","payload":{"type":"function_call","name":"synthetic_fixture_failure_probe","call_id":"call_tool_activity_002","arguments":"{}"}}
+{"timestamp":"2026-01-03T00:00:06Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_tool_activity_002","status":"failed","output":"synthetic failure output"}}
+{"timestamp":"2026-01-03T00:00:07Z","type":"response_item","payload":{"type":"function_call","arguments":"{}"}}
+{"timestamp":"2026-01-03T00:00:08Z","type":"response_item","payload":{"type":"function_call_output","status":"failed","error":"synthetic missing call id failure"}}
+{"timestamp":"2026-01-03T00:00:09Z","type":"response_item","payload":{"type":"function_call","name":"synthetic_structured_failure_probe","call_id":"call_tool_activity_003","arguments":"{}"}}
+{"timestamp":"2026-01-03T00:00:10Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_tool_activity_003","status":"failed","error":{"code":"synthetic_error","message":"synthetic structured failure"}}}
