@@ -66,21 +66,41 @@ struct AppShellView: View {
 
             Divider()
 
+            readingSurface
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var readingSurface: some View {
+        HStack(alignment: .top, spacing: 16) {
             AppShellCatalogView(
                 summary: viewModel.catalogSummary,
                 queryControls: viewModel.catalogQueryControls,
                 refreshState: viewModel.refreshState,
-                scopeTitle: viewModel.selectedNavigationTitle,
+                scopeTitle: viewModel.readingSurface.catalogTitle,
                 catalogQueryState: $catalogQueryState,
                 selectedSessionID: $selectedSessionID,
                 onCatalogQueryChange: updateCatalogQuery
+            )
+            .frame(
+                minWidth: viewModel.readingSurface.minimumCatalogPaneWidth,
+                maxWidth: 460,
+                maxHeight: .infinity,
+                alignment: .topLeading
             )
 
             Divider()
 
             AppShellTranscriptDetailView(state: viewModel.selectedTranscriptDetail)
+                .frame(
+                    minWidth: viewModel.readingSurface.minimumTranscriptPaneWidth,
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
+                .layoutPriority(1)
         }
-        .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 

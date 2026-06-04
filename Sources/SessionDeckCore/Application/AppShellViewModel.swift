@@ -90,6 +90,42 @@ public struct AppShellSourceDiscoverySummary: Equatable, Sendable {
     }
 }
 
+public struct AppShellReadingSurfaceState: Equatable, Sendable {
+    public let catalogTitle: String
+    public let detailTitle: String
+    public let detailDisplayMode: AppShellSelectedTranscriptDisplayMode
+    public let minimumCatalogPaneWidth: Double
+    public let minimumTranscriptPaneWidth: Double
+    public let preservesSidebarContext: Bool
+
+    public init(
+        catalogTitle: String,
+        detailTitle: String,
+        detailDisplayMode: AppShellSelectedTranscriptDisplayMode,
+        minimumCatalogPaneWidth: Double = 360,
+        minimumTranscriptPaneWidth: Double = 420,
+        preservesSidebarContext: Bool = true
+    ) {
+        self.catalogTitle = catalogTitle
+        self.detailTitle = detailTitle
+        self.detailDisplayMode = detailDisplayMode
+        self.minimumCatalogPaneWidth = minimumCatalogPaneWidth
+        self.minimumTranscriptPaneWidth = minimumTranscriptPaneWidth
+        self.preservesSidebarContext = preservesSidebarContext
+    }
+
+    public static func make(
+        catalogTitle: String,
+        detailState: AppShellSelectedTranscriptDetailState
+    ) -> AppShellReadingSurfaceState {
+        AppShellReadingSurfaceState(
+            catalogTitle: catalogTitle,
+            detailTitle: detailState.title,
+            detailDisplayMode: detailState.displayMode
+        )
+    }
+}
+
 public struct AppShellViewModel: Equatable, Sendable {
     public let title: String
     public let subtitle: String
@@ -101,6 +137,7 @@ public struct AppShellViewModel: Equatable, Sendable {
     public let navigationSummary: AppShellNavigationSummary
     public let selectedNavigationNodeID: String
     public let selectedNavigationTitle: String
+    public let readingSurface: AppShellReadingSurfaceState
     public let selectedTranscriptDetail: AppShellSelectedTranscriptDetailState
     public let refreshState: AppShellRefreshState
     public let safetyPolicy: LaunchSafetyPolicy
@@ -117,6 +154,7 @@ public struct AppShellViewModel: Equatable, Sendable {
         selectedNavigationNodeID: String = "all-chats",
         selectedNavigationTitle: String = "All Chats",
         selectedTranscriptDetail: AppShellSelectedTranscriptDetailState = .noSelection,
+        readingSurface: AppShellReadingSurfaceState? = nil,
         refreshState: AppShellRefreshState = .idle,
         safetyPolicy: LaunchSafetyPolicy
     ) {
@@ -131,6 +169,10 @@ public struct AppShellViewModel: Equatable, Sendable {
         self.selectedNavigationNodeID = selectedNavigationNodeID
         self.selectedNavigationTitle = selectedNavigationTitle
         self.selectedTranscriptDetail = selectedTranscriptDetail
+        self.readingSurface = readingSurface ?? AppShellReadingSurfaceState.make(
+            catalogTitle: selectedNavigationTitle,
+            detailState: selectedTranscriptDetail
+        )
         self.refreshState = refreshState
         self.safetyPolicy = safetyPolicy
     }
