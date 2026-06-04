@@ -222,6 +222,40 @@ func defaultCodexSourceDiscoverySkipsCandidateSymlinksThatEscapeSourceRoot() thr
     #expect(files.isEmpty)
 }
 
+@Test("default Codex source discovery records large candidate file metadata without parsing")
+func defaultCodexSourceDiscoveryRecordsLargeCandidateFileMetadataWithoutParsing() throws {
+    let fixtureRoot = try makeDiscoveryFixtureRoot(name: "large-candidate")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let homeDirectory = fixtureRoot.url.appending(path: "home", directoryHint: .isDirectory)
+    let sessionsRoot = homeDirectory
+        .appending(path: ".codex", directoryHint: .isDirectory)
+        .appending(path: "sessions", directoryHint: .isDirectory)
+    let candidateURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T10-03-00-large.jsonl")
+    try FileManager.default.createDirectory(
+        at: candidateURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    let largePayload = Data(repeating: 0x7B, count: 1_048_576)
+    try largePayload.write(to: candidateURL)
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: nil)
+
+    let candidate = try #require(files.first)
+    #expect(files.count == 1)
+    #expect(candidate.relativePath == "2026/06/04/rollout-2026-06-04T10-03-00-large.jsonl")
+    #expect(candidate.byteSize == 1_048_576)
+    #expect(candidate.diagnostic == nil)
+}
+
 private func makeDiscoveryFixtureRoot(name: String) throws -> FixtureTempRoot {
     try FixtureTempRoot(
         parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),

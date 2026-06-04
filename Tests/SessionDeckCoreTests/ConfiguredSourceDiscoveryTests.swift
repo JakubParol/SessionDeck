@@ -226,6 +226,45 @@ func configuredSourceDiscoveryReportsDisabledRootsWithoutInspectingThem() throws
     #expect(disabled.counts == .empty)
 }
 
+@Test("configured source discovery enumerates candidate files for a requested source only")
+func configuredSourceDiscoveryEnumeratesCandidateFilesForRequestedSourceOnly() throws {
+    let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "candidate-filter")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let firstRoot = fixtureRoot.url
+        .appending(path: "sources/primary/.codex/sessions", directoryHint: .isDirectory)
+    let secondRoot = fixtureRoot.url
+        .appending(path: "sources/secondary/.codex/sessions", directoryHint: .isDirectory)
+    try installTranscript(at: firstRoot, day: "09", name: "primary")
+    try installTranscript(at: secondRoot, day: "10", name: "secondary")
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-primary"),
+                displayName: "Codex primary",
+                kind: .codex,
+                rootPath: firstRoot.path,
+                isEnabled: true
+            ),
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-secondary"),
+                displayName: "Codex secondary",
+                kind: .codex,
+                rootPath: secondRoot.path,
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: SessionSourceID(rawValue: "codex-secondary"))
+
+    #expect(files.map(\.sourceID.rawValue) == ["codex-secondary"])
+    #expect(files.map(\.relativePath) == ["2026/06/10/rollout-2026-06-10T06-00-00-secondary.jsonl"])
+}
+
 private func makeConfiguredDiscoveryFixtureRoot(name: String) throws -> FixtureTempRoot {
     try FixtureTempRoot(
         parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
