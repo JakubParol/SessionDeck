@@ -230,8 +230,8 @@ func navigationTreeNormalizesSourceProfileNodesWithFallbacksAndDuplicateNames() 
 
     #expect(summary.sourcesNode.count == 3)
     #expect(summary.sourcesNode.children.map(\.id) == [
-        "sources.source.codex-app",
         "sources.source.codex-cli",
+        "sources.source.codex-app",
         "sources.unknown-source",
     ])
     #expect(summary.sourcesNode.children.map(\.title) == ["Codex", "Codex", "Unknown Source"])

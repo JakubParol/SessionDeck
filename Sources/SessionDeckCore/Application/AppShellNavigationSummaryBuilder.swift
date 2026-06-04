@@ -2,6 +2,7 @@ public extension AppShellNavigationSummary {
     static func make(snapshot: CatalogSnapshot) -> AppShellNavigationSummary {
         let orderedSessions = SessionCatalogOrdering.sort(snapshot.sessions)
         let sessionIDs = orderedSessions.map(\.id)
+        let recentlyActiveSessionIDs = AppShellNavigationOrdering.recentlyActiveSessionIDs(from: orderedSessions)
         let problemSessionsNode = problemSessionsNode(snapshot: snapshot)
 
         return AppShellNavigationSummary(
@@ -17,8 +18,8 @@ public extension AppShellNavigationSummary {
             recentlyActiveNode: AppShellNavigationNode(
                 id: "recently-active",
                 title: "Recently Active",
-                count: sessionIDs.count,
-                sessionIDs: sessionIDs
+                count: recentlyActiveSessionIDs.count,
+                sessionIDs: recentlyActiveSessionIDs
             ),
             diagnosticsNode: AppShellNavigationNode(
                 id: "diagnostics",
@@ -64,11 +65,10 @@ public extension AppShellNavigationSummary {
     }
 
     private static func sourcesNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
-        let children = Dictionary(grouping: sessions, by: { SourceProfileNavigationPolicy.sourceMetadata(for: $0).stableID })
-            .map { sourceNode(sessions: $0.value) }
-            .sorted { lhs, rhs in
-                lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
-            }
+        let children = AppShellNavigationOrdering.sortNodesByRecency(
+            Dictionary(grouping: sessions, by: { SourceProfileNavigationPolicy.sourceMetadata(for: $0).stableID })
+                .map { (node: sourceNode(sessions: $0.value), sessions: $0.value) }
+        )
 
         return AppShellNavigationNode(
             id: "sources",
@@ -96,11 +96,10 @@ public extension AppShellNavigationSummary {
     }
 
     private static func profileNodes(sessions: [SessionSummary]) -> [AppShellNavigationNode] {
-        Dictionary(grouping: sessions, by: { SourceProfileNavigationPolicy.profileMetadata(for: $0).stableID })
-            .map { profileNode(sessions: $0.value) }
-            .sorted { lhs, rhs in
-                lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
-            }
+        AppShellNavigationOrdering.sortNodesByRecency(
+            Dictionary(grouping: sessions, by: { SourceProfileNavigationPolicy.profileMetadata(for: $0).stableID })
+                .map { (node: profileNode(sessions: $0.value), sessions: $0.value) }
+        )
     }
 
     private static func profileNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
@@ -153,20 +152,22 @@ public extension AppShellNavigationSummary {
         key: (SessionSummary) -> String,
         title: (SessionSummary) -> String
     ) -> [AppShellNavigationNode] {
-        Dictionary(grouping: sessions, by: key)
-            .map { groupKey, groupSessions in
+        AppShellNavigationOrdering.sortNodesByRecency(
+            Dictionary(grouping: sessions, by: key)
+                .map { groupKey, groupSessions in
                 let orderedGroupSessions = SessionCatalogOrdering.sort(groupSessions)
                 let groupTitle = title(orderedGroupSessions[0])
-                return AppShellNavigationNode(
-                    id: "\(idPrefix).\(groupKey)",
-                    title: groupTitle,
-                    count: orderedGroupSessions.count,
-                    sessionIDs: orderedGroupSessions.map(\.id)
+                return (
+                    node: AppShellNavigationNode(
+                        id: "\(idPrefix).\(groupKey)",
+                        title: groupTitle,
+                        count: orderedGroupSessions.count,
+                        sessionIDs: orderedGroupSessions.map(\.id)
+                    ),
+                    sessions: groupSessions
                 )
             }
-            .sorted { lhs, rhs in
-                lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
-            }
+        )
     }
 
     private static func problemCategoriesBySession(
