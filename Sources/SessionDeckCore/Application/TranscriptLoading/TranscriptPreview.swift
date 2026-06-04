@@ -16,6 +16,38 @@ public enum TranscriptSegmentKind: Equatable, Sendable {
     case metadata(name: String)
 }
 
+public enum TranscriptToolBodyAvailability: Equatable, Sendable {
+    case available
+    case omitted
+    case malformed
+    case truncated
+}
+
+public struct TranscriptToolMetadata: Equatable, Sendable {
+    public let displayLabel: String
+    public let status: String?
+    public let bodyAvailability: TranscriptToolBodyAvailability
+    public let characterCount: Int?
+    public let byteCount: Int?
+    public let lineCount: Int?
+
+    public init(
+        displayLabel: String,
+        status: String?,
+        bodyAvailability: TranscriptToolBodyAvailability,
+        characterCount: Int?,
+        byteCount: Int?,
+        lineCount: Int?
+    ) {
+        self.displayLabel = displayLabel
+        self.status = status
+        self.bodyAvailability = bodyAvailability
+        self.characterCount = characterCount
+        self.byteCount = byteCount
+        self.lineCount = lineCount
+    }
+}
+
 public struct TranscriptSegmentOrder: Comparable, Equatable, Sendable {
     public let index: Int
 
@@ -60,6 +92,7 @@ public struct TranscriptSegment: Equatable, Sendable {
     public let source: TranscriptSegmentSourceReference
     public let timestampDescription: String?
     public let metadata: [String: String]
+    public let toolMetadata: TranscriptToolMetadata?
 
     public var role: TranscriptSegmentRole {
         switch kind {
@@ -83,7 +116,8 @@ public struct TranscriptSegment: Equatable, Sendable {
         order: TranscriptSegmentOrder,
         source: TranscriptSegmentSourceReference,
         timestampDescription: String?,
-        metadata: [String: String] = [:]
+        metadata: [String: String] = [:],
+        toolMetadata: TranscriptToolMetadata? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -92,6 +126,7 @@ public struct TranscriptSegment: Equatable, Sendable {
         self.source = source
         self.timestampDescription = timestampDescription
         self.metadata = metadata
+        self.toolMetadata = toolMetadata
     }
 
     public init(
@@ -107,6 +142,7 @@ public struct TranscriptSegment: Equatable, Sendable {
         self.source = TranscriptSegmentSourceReference(sourceID: nil, relativePath: nil, lineNumber: nil)
         self.timestampDescription = timestampDescription
         self.metadata = [:]
+        self.toolMetadata = nil
     }
 }
 

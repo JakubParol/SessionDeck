@@ -127,6 +127,43 @@ func transcriptSegmentOrderProvidesDeterministicSorting() throws {
     #expect(sorted.map(\.source.lineNumber) == [nil, 10, 99])
 }
 
+@Test("tool transcript segments expose structured metadata for safe rendering")
+func toolTranscriptSegmentsExposeStructuredMetadata() throws {
+    let source = TranscriptSegmentSourceReference(
+        sourceID: SessionSourceID(rawValue: "codex-fixture"),
+        relativePath: "2026/06/04/rollout.jsonl",
+        lineNumber: 15
+    )
+    let metadata = TranscriptToolMetadata(
+        displayLabel: "exec_command",
+        status: "failed",
+        bodyAvailability: .available,
+        characterCount: 27,
+        byteCount: 27,
+        lineCount: 2
+    )
+    let segment = TranscriptSegment(
+        id: "segment-tool-output",
+        kind: .toolOutput(callID: "call-1"),
+        text: "line one\nline two from tool",
+        order: TranscriptSegmentOrder(index: 0),
+        source: source,
+        timestampDescription: nil,
+        metadata: ["legacy": "value"],
+        toolMetadata: metadata
+    )
+
+    #expect(segment.role == .tool)
+    #expect(segment.toolMetadata == metadata)
+    #expect(segment.toolMetadata?.displayLabel == "exec_command")
+    #expect(segment.toolMetadata?.status == "failed")
+    #expect(segment.toolMetadata?.bodyAvailability == .available)
+    #expect(segment.toolMetadata?.characterCount == 27)
+    #expect(segment.toolMetadata?.byteCount == 27)
+    #expect(segment.toolMetadata?.lineCount == 2)
+    #expect(segment.metadata == ["legacy": "value"])
+}
+
 @Test("transcript decode result preserves ordered segments diagnostics and preview projection")
 func transcriptDecodeResultPreservesSegmentsDiagnosticsAndPreviewProjection() throws {
     let sessionID = SessionID(rawValue: "session-1")

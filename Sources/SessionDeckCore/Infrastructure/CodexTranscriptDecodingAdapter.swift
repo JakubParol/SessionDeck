@@ -41,6 +41,7 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         var title = file.fallbackTitle
         var segments: [TranscriptSegment] = []
         var diagnostics: [TranscriptDecodeDiagnostic] = []
+        var toolNamesByCallID: [String: String] = [:]
 
         for (lineIndex, line) in transcriptLines(from: text).enumerated() {
             let lineNumber = lineIndex + 1
@@ -66,7 +67,13 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
                 continue
             }
 
-            if let segment = supportedSegment(from: event, file: file, source: source, orderIndex: segments.count) {
+            if let segment = supportedSegment(
+                from: event,
+                file: file,
+                source: source,
+                orderIndex: segments.count,
+                toolNamesByCallID: &toolNamesByCallID
+            ) {
                 segments.append(segment)
             } else if event.type != "turn_context" {
                 segments.append(
@@ -101,14 +108,26 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         from event: CodexTranscriptJSONEvent,
         file: CodexTranscriptFile,
         source: TranscriptSegmentSourceReference,
-        orderIndex: Int
+        orderIndex: Int,
+        toolNamesByCallID: inout [String: String]
     ) -> TranscriptSegment? {
         if event.isToolCall {
-            return toolCallSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+            let segment = toolCallSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+            if let callID = event.callID {
+                toolNamesByCallID[callID] = event.toolName ?? "unknown_tool"
+            }
+            return segment
         }
 
         if event.isToolOutput {
-            return toolOutputSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+            let displayLabel = event.callID.flatMap { toolNamesByCallID[$0] } ?? "tool output"
+            return toolOutputSegment(
+                from: event,
+                file: file,
+                source: source,
+                orderIndex: orderIndex,
+                displayLabel: displayLabel
+            )
         }
 
         guard let role = event.supportedMessageRole,
@@ -150,15 +169,24 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         if let status = event.status {
             metadata["status"] = status
         }
+        let body = event.toolCallText
+        let availability = body == nil ? TranscriptToolBodyAvailability.omitted : .available
+        metadata["body_availability"] = metadataValue(for: availability)
 
         return TranscriptSegment(
             id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
             kind: .toolCall(name: toolName, callID: event.callID),
-            text: event.toolCallText ?? "Tool call: \(toolName)",
+            text: body ?? "Tool call: \(toolName)",
             order: TranscriptSegmentOrder(index: orderIndex),
             source: source,
             timestampDescription: event.timestamp,
-            metadata: metadata
+            metadata: metadata,
+            toolMetadata: toolMetadata(
+                displayLabel: toolName,
+                status: event.status,
+                bodyAvailability: availability,
+                body: body
+            )
         )
     }
 
@@ -166,7 +194,8 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         from event: CodexTranscriptJSONEvent,
         file: CodexTranscriptFile,
         source: TranscriptSegmentSourceReference,
-        orderIndex: Int
+        orderIndex: Int,
+        displayLabel: String
     ) -> TranscriptSegment {
         var metadata = baseMetadata(from: event, source: source)
         metadata["payload_type"] = event.payloadType ?? "function_call_output"
@@ -176,15 +205,24 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         if let status = event.status {
             metadata["status"] = status
         }
+        let body = event.toolOutputText
+        let availability = body == nil ? TranscriptToolBodyAvailability.omitted : .available
+        metadata["body_availability"] = metadataValue(for: availability)
 
         return TranscriptSegment(
             id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
             kind: .toolOutput(callID: event.callID),
-            text: event.toolOutputText ?? "Tool output payload unavailable.",
+            text: body ?? "Tool output payload unavailable.",
             order: TranscriptSegmentOrder(index: orderIndex),
             source: source,
             timestampDescription: event.timestamp,
-            metadata: metadata
+            metadata: metadata,
+            toolMetadata: toolMetadata(
+                displayLabel: displayLabel,
+                status: event.status,
+                bodyAvailability: availability,
+                body: body
+            )
         )
     }
 
