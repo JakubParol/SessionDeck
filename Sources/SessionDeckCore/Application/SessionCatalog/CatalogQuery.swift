@@ -1,5 +1,3 @@
-import Foundation
-
 public struct CatalogQueryRequest: Equatable, Sendable {
     public let searchText: String
     public let project: CatalogProjectFilter?
@@ -52,111 +50,87 @@ public enum CatalogQuerySort: Equatable, Sendable {
     case lastActivityDescending
 }
 
-public struct QueryCatalogUseCase: Sendable {
-    private let sessionCatalog: any SessionCatalogPort
+public struct CatalogFilterOptions: Equatable, Sendable {
+    public let projectOptions: [CatalogProjectFilterOption]
+    public let sourceOptions: [CatalogSourceFilterOption]
+    public let profileOptions: [CatalogProfileFilterOption]
+    public let parseStatusOptions: [CatalogParseStatusFilterOption]
 
-    public init(sessionCatalog: any SessionCatalogPort) {
-        self.sessionCatalog = sessionCatalog
-    }
-
-    public func query(_ request: CatalogQueryRequest = CatalogQueryRequest()) throws -> [SessionSummary] {
-        let candidates = try sessionCatalog.listSessions(sourceID: request.sourceID)
-
-        return SessionCatalogOrdering.sort(
-            candidates.filter { session in
-                matchesSearch(session, searchText: request.searchText)
-                    && matchesProject(session, filter: request.project)
-                    && matchesProfile(session, filter: request.profile)
-                    && matchesParseStatus(session, filters: request.parseStatuses)
-            }
-        )
-    }
-
-    private func matchesSearch(_ session: SessionSummary, searchText: String) -> Bool {
-        let needle = searchText.trimmedForCatalogQuery.lowercased()
-        guard needle.isEmpty == false else {
-            return true
-        }
-
-        return searchableMetadata(for: session).contains { value in
-            value.lowercased().contains(needle)
-        }
-    }
-
-    private func searchableMetadata(for session: SessionSummary) -> [String] {
-        [
-            session.title,
-            session.fallbackTitle,
-            session.previewText,
-            session.sessionPath,
-            session.sourceLabel.sourceID,
-            session.sourceLabel.displayName,
-            session.sourceLabel.profileName,
-            session.projectHint.cwdPath,
-            session.projectHint.displayName,
-            session.metadata.modelName,
-            session.metadata.agentProfileName,
-        ].compactMap { value in
-            let trimmed = value?.trimmedForCatalogQuery
-            return trimmed?.isEmpty == false ? trimmed : nil
-        }
-    }
-
-    private func matchesProject(_ session: SessionSummary, filter: CatalogProjectFilter?) -> Bool {
-        guard let filter else {
-            return true
-        }
-
-        let group = ProjectGroupingPolicy.resolve(session: session)
-        switch filter {
-        case let .project(id):
-            return group.kind == .project && group.id == id
-        case .nonProject:
-            return group.kind == .nonProject
-        case .unknownProject:
-            return group.kind == .unknownProject
-        }
-    }
-
-    private func matchesProfile(_ session: SessionSummary, filter: CatalogProfileFilter?) -> Bool {
-        guard let filter else {
-            return true
-        }
-
-        let profileMetadata = SourceProfileNavigationPolicy.profileMetadata(for: session)
-        return profileMetadata.stableID == filter.stableID
-            && profileMetadata.sourceID == filter.sourceID
-    }
-
-    private func matchesParseStatus(
-        _ session: SessionSummary,
-        filters: Set<CatalogParseStatusFilter>
-    ) -> Bool {
-        guard filters.isEmpty == false else {
-            return true
-        }
-
-        return filters.contains(CatalogParseStatusFilter(parseStatus: session.health.parseStatus))
+    public init(
+        projectOptions: [CatalogProjectFilterOption],
+        sourceOptions: [CatalogSourceFilterOption],
+        profileOptions: [CatalogProfileFilterOption],
+        parseStatusOptions: [CatalogParseStatusFilterOption]
+    ) {
+        self.projectOptions = projectOptions
+        self.sourceOptions = sourceOptions
+        self.profileOptions = profileOptions
+        self.parseStatusOptions = parseStatusOptions
     }
 }
 
-private extension CatalogParseStatusFilter {
-    init(parseStatus: CatalogParseStatus) {
-        switch parseStatus {
-        case .complete:
-            self = .complete
-        case .missingMetadata:
-            self = .missingMetadata
-        case .malformed:
-            self = .malformed
-        case .unreadable:
-            self = .unreadable
-        }
+public struct CatalogProjectFilterOption: Equatable, Sendable {
+    public let filter: CatalogProjectFilter
+    public let title: String
+    public let sessionCount: Int
+
+    public init(filter: CatalogProjectFilter, title: String, sessionCount: Int) {
+        self.filter = filter
+        self.title = title
+        self.sessionCount = sessionCount
     }
 }
 
-private extension String {
-    var trimmedForCatalogQuery: String {
-        trimmingCharacters(in: .whitespacesAndNewlines)
+public struct CatalogSourceFilterOption: Equatable, Sendable {
+    public let stableID: String
+    public let sourceID: SessionSourceID?
+    public let displayName: String
+    public let isFallback: Bool
+    public let sessionCount: Int
+
+    public init(
+        stableID: String,
+        sourceID: SessionSourceID?,
+        displayName: String,
+        isFallback: Bool,
+        sessionCount: Int
+    ) {
+        self.stableID = stableID
+        self.sourceID = sourceID
+        self.displayName = displayName
+        self.isFallback = isFallback
+        self.sessionCount = sessionCount
+    }
+}
+
+public struct CatalogProfileFilterOption: Equatable, Sendable {
+    public let filter: CatalogProfileFilter
+    public let sourceStableID: String
+    public let displayName: String
+    public let isFallback: Bool
+    public let sessionCount: Int
+
+    public init(
+        filter: CatalogProfileFilter,
+        sourceStableID: String,
+        displayName: String,
+        isFallback: Bool,
+        sessionCount: Int
+    ) {
+        self.filter = filter
+        self.sourceStableID = sourceStableID
+        self.displayName = displayName
+        self.isFallback = isFallback
+        self.sessionCount = sessionCount
+    }
+}
+
+public struct CatalogParseStatusFilterOption: Equatable, Sendable {
+    public let filter: CatalogParseStatusFilter
+    public let sessionCount: Int
+
+    public init(filter: CatalogParseStatusFilter, sessionCount: Int) {
+        self.filter = filter
+        self.sessionCount = sessionCount
     }
 }

@@ -117,6 +117,91 @@ func catalogQueryUseCaseAppliesCombinedExplicitFilters() throws {
     #expect(results.map(\.id.rawValue) == ["matching"])
 }
 
+@Test("catalog query use case derives stable filter options")
+func catalogQueryUseCaseDerivesStableFilterOptions() throws {
+    let project = makeQueryCatalogSummary(
+        id: "project",
+        sourceID: "codex-cli",
+        sourceDisplayName: "Codex CLI",
+        profileName: "Naomi",
+        projectName: "SessionDeck",
+        cwdPath: "/repos/SessionDeck",
+        parseStatus: .complete
+    )
+    let nonProject = makeQueryCatalogSummary(
+        id: "non-project",
+        sourceID: "codex-app",
+        sourceDisplayName: "Codex App",
+        profileName: nil,
+        projectName: nil,
+        cwdPath: nil,
+        parseStatus: .missingMetadata
+    )
+    let unknownProject = makeQueryCatalogSummary(
+        id: "unknown-project",
+        sourceID: "broken-source",
+        sourceDisplayName: "",
+        profileName: nil,
+        projectName: "Scratch",
+        cwdPath: "/private/tmp/scratch",
+        parseStatus: .complete,
+        fallbackReasons: [.unknownSource]
+    )
+    let useCase = QueryCatalogUseCase(
+        sessionCatalog: FakeSessionCatalogPort(sessions: [unknownProject, nonProject, project])
+    )
+
+    let options = try useCase.filterOptions()
+
+    #expect(options.projectOptions.map(\.filter) == [
+        .nonProject,
+        .project(id: "project./repos/SessionDeck"),
+        .unknownProject,
+    ])
+    #expect(options.sourceOptions.map(\.stableID) == [
+        "source.codex-app",
+        "source.codex-cli",
+        SourceProfileNavigationPolicy.unknownSourceStableID,
+    ])
+    #expect(options.profileOptions.map(\.filter.stableID) == [
+        "source.codex-app.profile.unknown-profile",
+        "source.codex-cli.profile.naomi",
+        "unknown-source.profile.unknown-profile",
+    ])
+    #expect(options.parseStatusOptions.map(\.filter) == [.complete, .missingMetadata])
+}
+
+@Test("catalog query use case keeps fallback sessions visible through fallback filters")
+func catalogQueryUseCaseKeepsFallbackSessionsVisibleThroughFallbackFilters() throws {
+    let nonProject = makeQueryCatalogSummary(
+        id: "non-project",
+        projectName: nil,
+        cwdPath: nil,
+        lastActivity: 200,
+        parseStatus: .missingMetadata
+    )
+    let unknownProject = makeQueryCatalogSummary(
+        id: "unknown-project",
+        projectName: "Scratch",
+        cwdPath: "/private/tmp/scratch",
+        lastActivity: 300
+    )
+    let project = makeQueryCatalogSummary(id: "project", lastActivity: 400)
+    let useCase = QueryCatalogUseCase(
+        sessionCatalog: FakeSessionCatalogPort(sessions: [project, unknownProject, nonProject])
+    )
+
+    let nonProjectResults = try useCase.query(CatalogQueryRequest(project: .nonProject))
+    let unknownProjectResults = try useCase.query(CatalogQueryRequest(project: .unknownProject))
+    let unsupportedResults = try useCase.query(
+        CatalogQueryRequest(project: .project(id: "project./missing"))
+    )
+
+    #expect(nonProjectResults.map(\.id.rawValue) == ["non-project"])
+    #expect(unknownProjectResults.map(\.id.rawValue) == ["unknown-project"])
+    #expect(unsupportedResults.isEmpty)
+}
+
 private func makeQueryCatalogSummary(
     id: String,
     sourceID: String = "codex-default",
