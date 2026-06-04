@@ -102,12 +102,12 @@ struct AppShellTranscriptDetailView: View {
 
     private var transcriptRows: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 8) {
                 ForEach(state.rows) { row in
                     transcriptRow(row)
-                    Divider()
                 }
             }
+            .padding(10)
         }
         .frame(minHeight: 220)
         .background(Color(nsColor: .textBackgroundColor))
@@ -119,25 +119,44 @@ struct AppShellTranscriptDetailView: View {
     }
 
     private func transcriptRow(_ row: AppShellTranscriptSegmentRow) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(row.roleLabel)
-                    .font(.caption.bold())
-                    .foregroundStyle(severityColor(row.severity))
-
-                if let timestampLabel = row.timestampLabel {
-                    Text(timestampLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+        HStack {
+            if row.roleStyle == .userTurn {
+                Spacer(minLength: 40)
             }
 
-            Text(row.text)
-                .font(.body)
-                .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(row.roleLabel)
+                        .font(.caption.bold())
+                        .foregroundStyle(roleLabelColor(for: row))
+
+                    if let timestampLabel = row.timestampLabel {
+                        Text(timestampLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text(row.text)
+                    .font(.body)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: row.roleStyle == .supporting ? .infinity : 680, alignment: .leading)
+            .background(rowBackground(for: row))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(rowBorderColor(for: row))
+            )
+
+            if row.roleStyle == .assistantTurn {
+                Spacer(minLength: 40)
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -172,6 +191,39 @@ struct AppShellTranscriptDetailView: View {
             return .orange
         case .error:
             return .red
+        }
+    }
+
+    private func roleLabelColor(for row: AppShellTranscriptSegmentRow) -> Color {
+        switch row.roleStyle {
+        case .userTurn:
+            return .accentColor
+        case .assistantTurn:
+            return .primary
+        case .supporting:
+            return severityColor(row.severity)
+        }
+    }
+
+    private func rowBackground(for row: AppShellTranscriptSegmentRow) -> Color {
+        switch row.roleStyle {
+        case .userTurn:
+            return Color.accentColor.opacity(0.12)
+        case .assistantTurn:
+            return Color(nsColor: .controlBackgroundColor)
+        case .supporting:
+            return Color(nsColor: .textBackgroundColor)
+        }
+    }
+
+    private func rowBorderColor(for row: AppShellTranscriptSegmentRow) -> Color {
+        switch row.roleStyle {
+        case .userTurn:
+            return Color.accentColor.opacity(0.24)
+        case .assistantTurn:
+            return Color(nsColor: .separatorColor)
+        case .supporting:
+            return severityColor(row.severity).opacity(0.35)
         }
     }
 }
