@@ -44,6 +44,37 @@ public struct CatalogSnapshotCounts: Equatable, Sendable {
     }
 }
 
+public enum CatalogSnapshotDiagnosticCode: String, Equatable, Sendable {
+    case duplicateSessionIdentity = "catalog_snapshot.duplicate_session_identity"
+}
+
+public enum CatalogSnapshotDiagnosticSeverity: Equatable, Sendable {
+    case warning
+    case error
+}
+
+public struct CatalogSnapshotDiagnostic: Equatable, Sendable {
+    public let code: CatalogSnapshotDiagnosticCode
+    public let severity: CatalogSnapshotDiagnosticSeverity
+    public let identity: CatalogSessionIdentity
+    public let sessionIDs: [SessionID]
+    public let message: String
+
+    public init(
+        code: CatalogSnapshotDiagnosticCode,
+        severity: CatalogSnapshotDiagnosticSeverity,
+        identity: CatalogSessionIdentity,
+        sessionIDs: [SessionID],
+        message: String
+    ) {
+        self.code = code
+        self.severity = severity
+        self.identity = identity
+        self.sessionIDs = sessionIDs
+        self.message = message
+    }
+}
+
 public struct CatalogSnapshotSourceWarning: Equatable, Sendable {
     public let sourceID: SessionSourceID
     public let displayName: String
@@ -73,6 +104,7 @@ public struct CatalogSnapshot: Equatable, Sendable {
     public let sources: [SessionSourceSummary]
     public let sessions: [SessionSummary]
     public let counts: CatalogSnapshotCounts
+    public let diagnostics: [CatalogSnapshotDiagnostic]
     public let sourceWarnings: [CatalogSnapshotSourceWarning]
     public let refreshErrors: [CatalogSnapshotRefreshError]
 
@@ -80,16 +112,18 @@ public struct CatalogSnapshot: Equatable, Sendable {
         refreshedAt: Date,
         sources: [SessionSourceSummary],
         sessions: [SessionSummary],
+        diagnostics: [CatalogSnapshotDiagnostic] = [],
         sourceWarnings: [CatalogSnapshotSourceWarning] = [],
         refreshErrors: [CatalogSnapshotRefreshError] = []
     ) {
         self.refreshedAt = refreshedAt
         self.sources = sources
         self.sessions = sessions
+        self.diagnostics = diagnostics
         self.counts = CatalogSnapshotCounts(
             totalEntries: sessions.count,
-            healthyEntries: sessions.filter(\.isHealthyCatalogEntry).count,
-            diagnosticEntries: sessions.filter { $0.isHealthyCatalogEntry == false }.count
+            healthyEntries: sessions.filter { $0.isHealthyCatalogEntry && diagnostics.doesNotReference($0.id) }.count,
+            diagnosticEntries: sessions.filter { $0.isHealthyCatalogEntry == false || diagnostics.references($0.id) }.count
         )
         self.sourceWarnings = sourceWarnings
         self.refreshErrors = refreshErrors
@@ -137,15 +171,45 @@ public struct RefreshCatalogSnapshotUseCase: Sendable {
             refreshedAt: clock.now(),
             sources: sources,
             sessions: SessionCatalogOrdering.sort(sessions),
+            diagnostics: Self.duplicateIdentityDiagnostics(for: sessions),
             sourceWarnings: sourceWarnings,
             refreshErrors: refreshErrors
         )
+    }
+
+    private static func duplicateIdentityDiagnostics(for sessions: [SessionSummary]) -> [CatalogSnapshotDiagnostic] {
+        Dictionary(grouping: sessions, by: \.identity)
+            .filter { $0.value.count > 1 }
+            .sorted { $0.key.rawValue < $1.key.rawValue }
+            .map { identity, sessions in
+                let sessionIDs = sessions
+                    .map(\.id)
+                    .sorted { $0.rawValue < $1.rawValue }
+
+                return CatalogSnapshotDiagnostic(
+                    code: .duplicateSessionIdentity,
+                    severity: .warning,
+                    identity: identity,
+                    sessionIDs: sessionIDs,
+                    message: "Duplicate session identity \(identity.rawValue) appears in \(sessionIDs.count) catalog entries."
+                )
+            }
     }
 }
 
 private extension SessionSummary {
     var isHealthyCatalogEntry: Bool {
         health.parseStatus == .complete && health.diagnostics.isEmpty
+    }
+}
+
+private extension [CatalogSnapshotDiagnostic] {
+    func references(_ sessionID: SessionID) -> Bool {
+        contains { $0.sessionIDs.contains(sessionID) }
+    }
+
+    func doesNotReference(_ sessionID: SessionID) -> Bool {
+        references(sessionID) == false
     }
 }
 
