@@ -89,7 +89,7 @@ struct AppShellCatalogView: View {
                     rowTitle(row)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text("\(row.sourceLabel) · \(row.projectHint)")
+                    Text("\(row.sourceLabel) / \(row.projectHint)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
