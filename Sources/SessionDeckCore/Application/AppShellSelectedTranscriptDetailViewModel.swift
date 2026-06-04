@@ -81,7 +81,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             ),
             metadataRows: metadataRows(for: readModel),
             rows: readModel.segments.map(AppShellTranscriptSegmentRow.make(segment:)),
-            diagnosticMessages: readModel.diagnostics.map(\.message),
+            diagnosticMessages: readModel.diagnostics.map(diagnosticMessage(for:)),
             severity: severity,
             isLoading: false
         )
@@ -200,6 +200,28 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
 
     private static func sourceLabel(for readModel: SelectedTranscriptReadModel) -> String {
         sourceLabel(sourceLabel: readModel.sourceLabel, metadata: readModel.metadata)
+    }
+
+    private static func diagnosticMessage(for diagnostic: TranscriptDecodeDiagnostic) -> String {
+        let prefix = diagnosticSeverityLabel(for: diagnostic.severity)
+        guard let lineNumber = diagnostic.source?.lineNumber else {
+            return "\(prefix): \(diagnostic.message)"
+        }
+
+        return "\(prefix) line \(lineNumber): \(diagnostic.message)"
+    }
+
+    private static func diagnosticSeverityLabel(
+        for severity: TranscriptDecodeDiagnosticSeverity
+    ) -> String {
+        switch severity {
+        case .info:
+            return "Info"
+        case .warning:
+            return "Warning"
+        case .error:
+            return "Error"
+        }
     }
 
     private static func failureDescription(for error: Error) -> (

@@ -65,7 +65,7 @@ func selectedTranscriptDetailStateMapsLoadedReadModel() throws {
     #expect(state.metadataRows.allSatisfy { $0.isFallback == false })
     #expect(state.rows.map(\.text) == ["First", "Second"])
     #expect(state.rows.map(\.roleLabel) == ["User", "Assistant"])
-    #expect(state.diagnosticMessages == ["Unknown event was kept as a diagnostic."])
+    #expect(state.diagnosticMessages == ["Warning line 3: Unknown event was kept as a diagnostic."])
 }
 
 @Test("selected transcript rows expose stable role styles for conversation rendering")
