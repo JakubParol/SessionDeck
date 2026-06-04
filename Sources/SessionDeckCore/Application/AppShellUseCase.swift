@@ -39,7 +39,7 @@ public struct AppShellUseCase: Sendable {
                 : discoveryResult.summary.configuredSourceCount,
             sourceDiscoverySummary: discoveryResult.summary,
             catalogSummary: catalogResult.summary,
-            refreshState: discoveryResult.refreshState ?? refreshState,
+            refreshState: discoveryResult.refreshState ?? catalogResult.refreshState ?? refreshState,
             safetyPolicy: configuration.safetyPolicy
         )
     }

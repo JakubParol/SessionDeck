@@ -223,7 +223,7 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
 
     private static func statusMessage(for snapshot: CatalogSnapshot) -> String {
         if snapshot.sessions.isEmpty && snapshot.refreshErrors.isEmpty == false {
-            return "Catalog refresh failed for source(s)."
+            return "Catalog refresh failed for \(sourceCountLabel(snapshot.refreshErrors.count))."
         }
         if snapshot.sessions.isEmpty {
             return "No catalog entries yet."
@@ -240,6 +240,10 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
 
     private static func entryCountLabel(_ count: Int) -> String {
         count == 1 ? "1 entry" : "\(count) entries"
+    }
+
+    private static func sourceCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 source" : "\(count) sources"
     }
 }
 

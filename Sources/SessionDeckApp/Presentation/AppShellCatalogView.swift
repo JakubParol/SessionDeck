@@ -146,7 +146,7 @@ struct AppShellCatalogView: View {
     }
 
     private var countSummary: String {
-        "\(summary.totalCount) row(s), \(summary.diagnosticCount) diagnostic."
+        "\(rowCountLabel(summary.totalCount)), \(diagnosticCountLabel(summary.diagnosticCount))."
     }
 
     private var statusIcon: String {
@@ -226,5 +226,13 @@ struct AppShellCatalogView: View {
         case .error:
             return .red
         }
+    }
+
+    private func rowCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 row" : "\(count) rows"
+    }
+
+    private func diagnosticCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 diagnostic" : "\(count) diagnostics"
     }
 }

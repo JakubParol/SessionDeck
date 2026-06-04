@@ -33,7 +33,7 @@ func catalogSummaryDistinguishesEmptyCatalogFromSourceFailure() {
     #expect(emptySummary.statusMessage == "No catalog entries yet.")
     #expect(failedSummary.rows.isEmpty)
     #expect(failedSummary.sourceFailureCount == 1)
-    #expect(failedSummary.statusMessage == "Catalog refresh failed for source(s).")
+    #expect(failedSummary.statusMessage == "Catalog refresh failed for 1 source.")
 }
 
 @Test("catalog summary maps snapshot diagnostics onto visible rows")

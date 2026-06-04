@@ -206,6 +206,24 @@ func appShellUseCaseMapsCatalogSnapshotRows() {
     ])
 }
 
+@Test("app shell use case marks catalog refresh failure state")
+func appShellUseCaseMarksCatalogRefreshFailureState() {
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase(
+            sourceDiscovery: ThrowingSourceDiscoveryPort(),
+            metadataExtraction: FakeCatalogMetadataExtractionPort(resultsBySourceID: [:])
+        )
+    )
+
+    let viewModel = useCase.makeViewModel()
+
+    #expect(viewModel.catalogSummary.sourceFailureCount == 1)
+    #expect(viewModel.catalogSummary.statusMessage == "Catalog refresh failed before rows could be built.")
+    #expect(viewModel.refreshState == .failed("Catalog refresh failed before rows could be built."))
+}
+
+
 private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvider {
     FakeLaunchConfigurationProvider(
         configuration: AppShellLaunchConfiguration(
@@ -247,4 +265,14 @@ private final class CountingSourceDiscoveryPort: SourceDiscoveryPort, @unchecked
 
         return responses[min(responseIndex, responses.count - 1)]
     }
+}
+
+private struct ThrowingSourceDiscoveryPort: SourceDiscoveryPort {
+    func discoverSources() throws -> [SessionSourceSummary] {
+        throw CatalogRefreshFailure.synthetic
+    }
+}
+
+private enum CatalogRefreshFailure: Error {
+    case synthetic
 }
