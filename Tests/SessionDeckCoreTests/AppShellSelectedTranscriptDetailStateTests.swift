@@ -46,9 +46,65 @@ func selectedTranscriptDetailStateMapsLoadedReadModel() throws {
     #expect(state.title == "Decoded selected session")
     #expect(state.statusMessage == "Loaded 2 transcript segment(s) with 1 warning(s).")
     #expect(state.severity == .warning)
+    #expect(state.metadataRows.map(\.title) == [
+        "Title",
+        "Source",
+        "Project",
+        "Path",
+        "Created",
+        "Last Activity",
+    ])
+    #expect(state.metadataRows.map(\.value) == [
+        "Decoded selected session",
+        "Codex fixture / Fixture",
+        "SessionDeck",
+        "/tmp/sessiondeck/selected-session.jsonl",
+        "1",
+        "2",
+    ])
+    #expect(state.metadataRows.allSatisfy { $0.isFallback == false })
     #expect(state.rows.map(\.text) == ["First", "Second"])
     #expect(state.rows.map(\.roleLabel) == ["User", "Assistant"])
     #expect(state.diagnosticMessages == ["Unknown event was kept as a diagnostic."])
+}
+
+@Test("selected transcript detail state exposes readable metadata fallbacks")
+func selectedTranscriptDetailStateExposesReadableMetadataFallbacks() {
+    let sessionID = SessionID(rawValue: "missing-metadata")
+    let sourceID = SessionSourceID(rawValue: "unknown-source")
+    let readModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(
+            id: sessionID,
+            sourceID: sourceID,
+            sourceLabel: CatalogSourceLabel(sourceID: sourceID.rawValue, displayName: "", profileName: nil),
+            title: nil,
+            projectHint: CatalogProjectHint(cwdPath: nil, displayName: ""),
+            sessionPath: "",
+            activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: nil),
+            metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: nil),
+            health: CatalogEntryHealth(parseStatus: .missingMetadata)
+        ),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "",
+            segments: [],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+
+    let state = AppShellSelectedTranscriptDetailState.loaded(readModel)
+
+    #expect(state.title == "Untitled session")
+    #expect(state.metadataRows.map(\.value) == [
+        "Untitled session",
+        "Unknown source",
+        "Project unavailable",
+        "Path unavailable",
+        "Created time unavailable",
+        "Last activity unavailable",
+    ])
+    #expect(state.metadataRows.allSatisfy { $0.isFallback })
 }
 
 @Test("selected transcript detail state maps typed loading failures to user-actionable copy")
@@ -69,21 +125,37 @@ func selectedTranscriptDetailStateMapsTypedFailures() {
     #expect(unavailable.severity == .warning)
 }
 
-private func selectedTranscriptSession(id: SessionID, sourceID: SessionSourceID) -> SessionSummary {
-    SessionSummary(
+private func selectedTranscriptSession(
+    id: SessionID,
+    sourceID: SessionSourceID,
+    sourceLabel: CatalogSourceLabel? = nil,
+    title: String? = "Selected fixture",
+    projectHint: CatalogProjectHint = CatalogProjectHint(cwdPath: "/tmp/sessiondeck", displayName: "SessionDeck"),
+    sessionPath: String = "/tmp/sessiondeck/selected-session.jsonl",
+    activity: CatalogActivityTimestamps = CatalogActivityTimestamps(
+        createdAtEpochSeconds: 1,
+        lastActivityEpochSeconds: 2
+    ),
+    metadata: CatalogSessionMetadata = CatalogSessionMetadata(modelName: nil, agentProfileName: nil),
+    health: CatalogEntryHealth = CatalogEntryHealth(parseStatus: .complete)
+) -> SessionSummary {
+    let resolvedSourceLabel = sourceLabel ?? CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex fixture",
+        profileName: "Fixture"
+    )
+
+    return SessionSummary(
         id: id,
         sourceID: sourceID,
-        sourceLabel: CatalogSourceLabel(
-            sourceID: sourceID.rawValue,
-            displayName: "Codex fixture",
-            profileName: "Fixture"
-        ),
-        title: "Selected fixture",
-        projectHint: CatalogProjectHint(cwdPath: "/tmp/sessiondeck", displayName: "SessionDeck"),
-        sessionPath: "/tmp/sessiondeck/selected-session.jsonl",
-        activity: CatalogActivityTimestamps(createdAtEpochSeconds: 1, lastActivityEpochSeconds: 2),
+        sourceLabel: resolvedSourceLabel,
+        title: title,
+        projectHint: projectHint,
+        sessionPath: sessionPath,
+        activity: activity,
         fileSize: CatalogFileSize(byteCount: 128),
-        health: CatalogEntryHealth(parseStatus: .complete)
+        metadata: metadata,
+        health: health
     )
 }
 

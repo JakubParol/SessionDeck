@@ -9,6 +9,8 @@ struct AppShellTranscriptDetailView: View {
             HStack {
                 Label(state.title, systemImage: titleIcon)
                     .font(.title3.bold())
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Spacer()
 
@@ -21,6 +23,10 @@ struct AppShellTranscriptDetailView: View {
             Label(state.statusMessage, systemImage: statusIcon)
                 .font(.callout)
                 .foregroundStyle(statusColor)
+
+            if state.metadataRows.isEmpty == false {
+                metadataSection
+            }
 
             if state.diagnosticMessages.isEmpty == false {
                 diagnostics
@@ -39,6 +45,28 @@ struct AppShellTranscriptDetailView: View {
         } else {
             transcriptRows
         }
+    }
+
+    private var metadataSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(state.metadataRows) { row in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(row.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 86, alignment: .leading)
+
+                    Text(row.value)
+                        .font(.caption)
+                        .foregroundStyle(row.isFallback ? .secondary : .primary)
+                        .lineLimit(row.id == "path" ? 2 : 1)
+                        .truncationMode(row.id == "path" ? .middle : .tail)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var diagnostics: some View {

@@ -15,6 +15,7 @@ public struct SelectedTranscriptReadModel: Equatable, Sendable {
     public let sourceLabel: CatalogSourceLabel
     public let projectHint: CatalogProjectHint
     public let sessionPath: String
+    public let activity: CatalogActivityTimestamps
     public let segments: [TranscriptSegment]
     public let diagnostics: [TranscriptDecodeDiagnostic]
     public let isPartial: Bool
@@ -27,6 +28,7 @@ public struct SelectedTranscriptReadModel: Equatable, Sendable {
         self.sourceLabel = session.sourceLabel
         self.projectHint = session.projectHint
         self.sessionPath = session.sessionPath
+        self.activity = session.activity
         self.segments = decodeResult.orderedSegments
         self.diagnostics = decodeResult.diagnostics
         self.isPartial = decodeResult.isPartial
