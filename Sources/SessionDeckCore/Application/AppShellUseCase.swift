@@ -2,54 +2,64 @@ public struct AppShellUseCase: Sendable {
     private let launchConfigurationProvider: any LaunchConfigurationProviding
     private let discoverSessionSources: DiscoverSessionSourcesUseCase?
     private let refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase?
+    private let loadSelectedTranscript: LoadSelectedTranscriptUseCase?
 
     public init(
         launchConfigurationProvider: any LaunchConfigurationProviding,
         discoverSessionSources: DiscoverSessionSourcesUseCase? = nil,
-        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase? = nil
+        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase? = nil,
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase? = nil
     ) {
         self.launchConfigurationProvider = launchConfigurationProvider
         self.discoverSessionSources = discoverSessionSources
         self.refreshCatalogSnapshot = refreshCatalogSnapshot
+        self.loadSelectedTranscript = loadSelectedTranscript
     }
 
     public func makeViewModel(
         selectedNavigationNodeID: String? = nil,
-        catalogQuery: AppShellCatalogQueryState = .empty
+        catalogQuery: AppShellCatalogQueryState = .empty,
+        selectedSessionID: SessionID? = nil
     ) -> AppShellViewModel {
         makeViewModel(
             refreshState: .idle,
             selectedNavigationNodeID: selectedNavigationNodeID,
-            catalogQuery: catalogQuery
+            catalogQuery: catalogQuery,
+            selectedSessionID: selectedSessionID
         )
     }
 
     public func refreshingViewModel(
         selectedNavigationNodeID: String? = nil,
-        catalogQuery: AppShellCatalogQueryState = .empty
+        catalogQuery: AppShellCatalogQueryState = .empty,
+        selectedSessionID: SessionID? = nil
     ) -> AppShellViewModel {
         makeViewModel(
             refreshState: .refreshing,
             selectedNavigationNodeID: selectedNavigationNodeID,
-            catalogQuery: catalogQuery
+            catalogQuery: catalogQuery,
+            selectedSessionID: selectedSessionID
         )
     }
 
     public func refreshViewModel(
         selectedNavigationNodeID: String? = nil,
-        catalogQuery: AppShellCatalogQueryState = .empty
+        catalogQuery: AppShellCatalogQueryState = .empty,
+        selectedSessionID: SessionID? = nil
     ) -> AppShellViewModel {
         makeViewModel(
             refreshState: .idle,
             selectedNavigationNodeID: selectedNavigationNodeID,
-            catalogQuery: catalogQuery
+            catalogQuery: catalogQuery,
+            selectedSessionID: selectedSessionID
         )
     }
 
     private func makeViewModel(
         refreshState: AppShellRefreshState,
         selectedNavigationNodeID: String?,
-        catalogQuery: AppShellCatalogQueryState
+        catalogQuery: AppShellCatalogQueryState,
+        selectedSessionID: SessionID?
     ) -> AppShellViewModel {
         let configuration = launchConfigurationProvider.loadConfiguration()
         let discoveryResult = sourceDiscoverySummary()
@@ -71,6 +81,10 @@ public struct AppShellUseCase: Sendable {
             navigationSummary: catalogResult.navigation,
             selectedNavigationNodeID: catalogResult.selectedNode.id,
             selectedNavigationTitle: catalogResult.selectedNode.title,
+            selectedTranscriptDetail: selectedTranscriptDetail(
+                selectedSessionID: selectedSessionID,
+                sessions: catalogResult.scopedSessions
+            ),
             refreshState: discoveryResult.refreshState ?? catalogResult.refreshState ?? refreshState,
             safetyPolicy: configuration.safetyPolicy
         )
@@ -100,11 +114,12 @@ public struct AppShellUseCase: Sendable {
         queryControls: AppShellCatalogQueryControls,
         navigation: AppShellNavigationSummary,
         selectedNode: AppShellNavigationNode,
+        scopedSessions: [SessionSummary],
         refreshState: AppShellRefreshState?
     ) {
         guard let refreshCatalogSnapshot else {
             let navigation = AppShellNavigationSummary.placeholder
-            return (.placeholder, .placeholder, navigation, navigation.allChatsNode, nil)
+            return (.placeholder, .placeholder, navigation, navigation.allChatsNode, [], nil)
         }
 
         do {
@@ -132,12 +147,33 @@ public struct AppShellUseCase: Sendable {
                 queryControls,
                 navigation,
                 selectedNode,
+                scopedSessions,
                 nil
             )
         } catch {
             let message = "Catalog refresh failed before rows could be built."
             let navigation = AppShellNavigationSummary.placeholder
-            return (.failed(message: message), .placeholder, navigation, navigation.allChatsNode, .failed(message))
+            return (.failed(message: message), .placeholder, navigation, navigation.allChatsNode, [], .failed(message))
+        }
+    }
+
+    private func selectedTranscriptDetail(
+        selectedSessionID: SessionID?,
+        sessions: [SessionSummary]
+    ) -> AppShellSelectedTranscriptDetailState {
+        guard let selectedSessionID else {
+            return .noSelection
+        }
+        guard let selectedSession = sessions.first(where: { $0.id == selectedSessionID }),
+              let loadSelectedTranscript
+        else {
+            return .failed(SelectedTranscriptLoadingError.transcriptUnavailable(selectedSessionID))
+        }
+
+        do {
+            return .loaded(try loadSelectedTranscript.loadTranscript(for: selectedSession))
+        } catch {
+            return .failed(error)
         }
     }
 

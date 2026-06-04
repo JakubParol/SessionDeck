@@ -29,6 +29,9 @@ struct AppShellView: View {
         .onChange(of: selectedNavigationNodeID) { _, newValue in
             selectNavigationNode(newValue)
         }
+        .onChange(of: selectedSessionID) { _, newValue in
+            selectSession(newValue)
+        }
     }
 
     private var detailContent: some View {
@@ -72,6 +75,10 @@ struct AppShellView: View {
                 selectedSessionID: $selectedSessionID,
                 onCatalogQueryChange: updateCatalogQuery
             )
+
+            Divider()
+
+            AppShellTranscriptDetailView(state: viewModel.selectedTranscriptDetail)
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -124,11 +131,13 @@ struct AppShellView: View {
     private func refreshSources() {
         viewModel = appShellUseCase.refreshingViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
-            catalogQuery: catalogQueryState
+            catalogQuery: catalogQueryState,
+            selectedSessionID: selectedSessionID
         )
         let refreshedViewModel = appShellUseCase.refreshViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
-            catalogQuery: catalogQueryState
+            catalogQuery: catalogQueryState,
+            selectedSessionID: selectedSessionID
         )
         apply(refreshedViewModel)
     }
@@ -136,7 +145,8 @@ struct AppShellView: View {
     private func selectNavigationNode(_ nodeID: String?) {
         let selectedViewModel = appShellUseCase.makeViewModel(
             selectedNavigationNodeID: nodeID,
-            catalogQuery: catalogQueryState
+            catalogQuery: catalogQueryState,
+            selectedSessionID: selectedSessionID
         )
         apply(selectedViewModel)
     }
@@ -144,15 +154,34 @@ struct AppShellView: View {
     private func updateCatalogQuery(_ queryState: AppShellCatalogQueryState) {
         let queriedViewModel = appShellUseCase.makeViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
-            catalogQuery: queryState
+            catalogQuery: queryState,
+            selectedSessionID: selectedSessionID
         )
         apply(queriedViewModel)
     }
 
+    private func selectSession(_ sessionID: SessionID?) {
+        let selectedViewModel = appShellUseCase.makeViewModel(
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: catalogQueryState,
+            selectedSessionID: sessionID
+        )
+        apply(selectedViewModel)
+    }
+
     private func apply(_ updatedViewModel: AppShellViewModel) {
         selectedNavigationNodeID = updatedViewModel.selectedNavigationNodeID
-        selectedSessionID = updatedViewModel.catalogSummary.rows.first?.id
+        selectedSessionID = selectedSessionID(in: updatedViewModel)
         catalogQueryState = updatedViewModel.catalogQueryControls.queryState
         viewModel = updatedViewModel
+    }
+
+    private func selectedSessionID(in updatedViewModel: AppShellViewModel) -> SessionID? {
+        let rowIDs = Set(updatedViewModel.catalogSummary.rows.map(\.id))
+        if let selectedSessionID, rowIDs.contains(selectedSessionID) {
+            return selectedSessionID
+        }
+
+        return updatedViewModel.catalogSummary.rows.first?.id
     }
 }

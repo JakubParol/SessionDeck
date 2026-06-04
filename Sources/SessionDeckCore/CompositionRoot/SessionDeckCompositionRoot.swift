@@ -25,19 +25,20 @@ public enum SessionDeckCompositionRoot {
             sourceDiscovery: sourceDiscoveryAdapter,
             metadataExtraction: sessionCatalogAdapter
         )
+        let loadSelectedTranscript = LoadSelectedTranscriptUseCase(
+            selectedTranscriptLoading: CodexSelectedTranscriptLoadingAdapter()
+        )
         let appShellUseCase = AppShellUseCase(
             launchConfigurationProvider: PlaceholderLaunchConfigurationProvider(),
             discoverSessionSources: discoverSessionSources,
-            refreshCatalogSnapshot: refreshCatalogSnapshot
+            refreshCatalogSnapshot: refreshCatalogSnapshot,
+            loadSelectedTranscript: loadSelectedTranscript
         )
         let loadTranscriptPreview = LoadTranscriptPreviewUseCase(
             transcriptLoading: PlaceholderTranscriptLoadingAdapter()
         )
         let loadTranscriptSegments = LoadTranscriptSegmentsUseCase(
             transcriptDecoding: PlaceholderTranscriptDecodingAdapter()
-        )
-        let loadSelectedTranscript = LoadSelectedTranscriptUseCase(
-            selectedTranscriptLoading: CodexSelectedTranscriptLoadingAdapter()
         )
 
         return SessionDeckApplicationComposition(
