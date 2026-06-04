@@ -18,6 +18,7 @@ public struct EnvironmentHomeDirectoryProvider: HomeDirectoryProviding, Sendable
 
 public protocol CodexSourceFileSystemChecking: Sendable {
     func directoryExists(at url: URL) -> Bool
+    func isReadableDirectory(at url: URL) -> Bool
     func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts
     func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile]
 }
@@ -35,6 +36,10 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
         var isDirectory: ObjCBool = false
         let exists = fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
         return exists && isDirectory.boolValue
+    }
+
+    public func isReadableDirectory(at url: URL) -> Bool {
+        fileManager.isReadableFile(atPath: url.path)
     }
 
     public func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts {
@@ -262,12 +267,38 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             )
         }
 
+        guard fileSystem.isReadableDirectory(at: rootURL) else {
+            return summary(
+                definition: definition,
+                rootURL: rootURL,
+                availability: .inaccessible,
+                diagnostic: SessionSourceDiagnostic(
+                    code: .codexSessionsRootPermissionDenied,
+                    severity: .error,
+                    message: "Configured Codex sessions root exists but the current process does not have read permission."
+                ),
+                counts: .empty
+            )
+        }
+
         do {
             let counts = try fileSystem.sourceCounts(at: rootURL)
+            let diagnostic: SessionSourceDiagnostic?
+            if counts == .empty {
+                diagnostic = SessionSourceDiagnostic(
+                    code: .codexSessionsRootEmpty,
+                    severity: .info,
+                    message: "Configured Codex sessions root is readable but contains no candidate session files yet."
+                )
+            } else {
+                diagnostic = nil
+            }
+
             return summary(
                 definition: definition,
                 rootURL: rootURL,
                 availability: .available,
+                diagnostic: diagnostic,
                 counts: counts
             )
         } catch {
@@ -277,6 +308,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
                 availability: .inaccessible,
                 diagnostic: SessionSourceDiagnostic(
                     code: .codexSessionsRootUnreadable,
+                    severity: .error,
                     message: "Configured Codex sessions root exists but could not be inspected."
                 ),
                 counts: .empty

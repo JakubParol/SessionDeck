@@ -262,6 +262,93 @@ func configuredSourceDiscoveryReportsDisabledRootsWithoutInspectingThem() throws
     #expect(disabled.counts == .empty)
 }
 
+@Test("configured source discovery reports permission denied roots distinctly")
+func configuredSourceDiscoveryReportsPermissionDeniedRootsDistinctly() throws {
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        fileSystem: FakeCodexSourceFileSystem(
+            directoryExists: true,
+            isReadableDirectory: false,
+            countsResult: .success(SessionSourceCounts(sessionBucketDirectoryCount: 0, transcriptFileCount: 0))
+        ),
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-denied"),
+                displayName: "Codex denied",
+                kind: .codex,
+                rootPath: "/tmp/sessiondeck-denied/.codex/sessions",
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let source = try #require(try adapter.discoverSources().first)
+
+    #expect(source.availability == .inaccessible)
+    #expect(source.isEnabled == false)
+    #expect(source.diagnostic?.code == .codexSessionsRootPermissionDenied)
+    #expect(source.diagnostic?.severity == .error)
+    #expect(source.diagnostic?.allowsDiscoveryToContinue == true)
+    #expect(source.counts == .empty)
+}
+
+@Test("configured source discovery reports unreadable roots distinctly from permission denied")
+func configuredSourceDiscoveryReportsUnreadableRootsDistinctly() throws {
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        fileSystem: FakeCodexSourceFileSystem(
+            directoryExists: true,
+            isReadableDirectory: true,
+            countsResult: .failure(FakeCodexSourceFileSystemError.unreadableDirectory)
+        ),
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-unreadable"),
+                displayName: "Codex unreadable",
+                kind: .codex,
+                rootPath: "/tmp/sessiondeck-unreadable/.codex/sessions",
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let source = try #require(try adapter.discoverSources().first)
+
+    #expect(source.availability == .inaccessible)
+    #expect(source.isEnabled == false)
+    #expect(source.diagnostic?.code == .codexSessionsRootUnreadable)
+    #expect(source.diagnostic?.severity == .error)
+    #expect(source.diagnostic?.allowsDiscoveryToContinue == true)
+    #expect(source.counts == .empty)
+}
+
+@Test("configured source discovery reports empty readable roots as available")
+func configuredSourceDiscoveryReportsEmptyReadableRootsAsAvailable() throws {
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        fileSystem: FakeCodexSourceFileSystem(
+            directoryExists: true,
+            isReadableDirectory: true,
+            countsResult: .success(.empty)
+        ),
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-empty"),
+                displayName: "Codex empty",
+                kind: .codex,
+                rootPath: "/tmp/sessiondeck-empty/.codex/sessions",
+                isEnabled: true
+            ),
+        ]
+    )
+
+    let source = try #require(try adapter.discoverSources().first)
+
+    #expect(source.availability == .available)
+    #expect(source.isEnabled == true)
+    #expect(source.diagnostic?.code == .codexSessionsRootEmpty)
+    #expect(source.diagnostic?.severity == .info)
+    #expect(source.diagnostic?.allowsDiscoveryToContinue == true)
+    #expect(source.counts == .empty)
+}
+
 @Test("configured source discovery enumerates candidate files for a requested source only")
 func configuredSourceDiscoveryEnumeratesCandidateFilesForRequestedSourceOnly() throws {
     let fixtureRoot = try makeConfiguredDiscoveryFixtureRoot(name: "candidate-filter")
@@ -318,4 +405,30 @@ private func installTranscript(at sessionsRoot: URL, day: String, name: String) 
         withIntermediateDirectories: true
     )
     try #"{"type":"session_meta"}"#.write(to: transcriptURL, atomically: true, encoding: .utf8)
+}
+
+private struct FakeCodexSourceFileSystem: CodexSourceFileSystemChecking {
+    let directoryExists: Bool
+    let isReadableDirectory: Bool
+    let countsResult: Result<SessionSourceCounts, Error>
+
+    func directoryExists(at url: URL) -> Bool {
+        directoryExists
+    }
+
+    func isReadableDirectory(at url: URL) -> Bool {
+        isReadableDirectory
+    }
+
+    func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts {
+        try countsResult.get()
+    }
+
+    func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile] {
+        []
+    }
+}
+
+private enum FakeCodexSourceFileSystemError: Error {
+    case unreadableDirectory
 }
