@@ -27,6 +27,76 @@ func navigationTreeExposesRequiredStableTopLevelSectionsWhenEmpty() {
     #expect(summary.sectionNodes.allSatisfy { $0.count == 0 })
 }
 
+@Test("navigation tree groups populated catalog sessions by project source and recency")
+func navigationTreeGroupsPopulatedCatalogSessionsByProjectSourceAndRecency() {
+    let codexSourceID = SessionSourceID(rawValue: "codex-local")
+    let hermesSourceID = SessionSourceID(rawValue: "hermes-local")
+    let codexLabel = CatalogSourceLabel(
+        sourceID: codexSourceID.rawValue,
+        displayName: "Codex",
+        profileName: "Naomi"
+    )
+    let hermesLabel = CatalogSourceLabel(
+        sourceID: hermesSourceID.rawValue,
+        displayName: "Hermes",
+        profileName: "Jim"
+    )
+    let snapshot = CatalogSnapshot(
+        refreshedAt: Date(timeIntervalSince1970: 1_770_300_050),
+        sources: [
+            navigationSource(id: codexSourceID, displayName: "Codex"),
+            navigationSource(id: hermesSourceID, displayName: "Hermes"),
+        ],
+        sessions: [
+            navigationSession(
+                id: "alpha-new",
+                sourceID: codexSourceID,
+                sourceLabel: codexLabel,
+                projectHint: CatalogProjectHint(cwdPath: "/tmp/work/Alpha", displayName: "Alpha"),
+                lastActivity: 30
+            ),
+            navigationSession(
+                id: "alpha-old",
+                sourceID: codexSourceID,
+                sourceLabel: codexLabel,
+                projectHint: CatalogProjectHint(cwdPath: "/tmp/work/Alpha", displayName: "Alpha"),
+                lastActivity: 10
+            ),
+            navigationSession(
+                id: "loose-chat",
+                sourceID: codexSourceID,
+                sourceLabel: codexLabel,
+                projectHint: .unavailable,
+                lastActivity: 20
+            ),
+            navigationSession(
+                id: "beta-chat",
+                sourceID: hermesSourceID,
+                sourceLabel: hermesLabel,
+                projectHint: CatalogProjectHint(cwdPath: "/tmp/work/Beta", displayName: "Beta"),
+                lastActivity: 40
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+
+    #expect(summary.projectsNode.count == 3)
+    #expect(summary.projectsNode.children.map(\.title) == ["Alpha", "Beta"])
+    #expect(summary.projectsNode.children.map(\.count) == [2, 1])
+    #expect(summary.nonProjectChatsNode.count == 1)
+    #expect(summary.nonProjectChatsNode.sessionIDs.map(\.rawValue) == ["loose-chat"])
+    #expect(summary.sourcesNode.count == 4)
+    #expect(summary.sourcesNode.children.map(\.title) == ["Codex / Naomi", "Hermes / Jim"])
+    #expect(summary.sourcesNode.children.map(\.count) == [3, 1])
+    #expect(summary.recentlyActiveNode.sessionIDs.map(\.rawValue) == [
+        "beta-chat",
+        "alpha-new",
+        "loose-chat",
+        "alpha-old",
+    ])
+}
+
 @Test("navigation summary keeps problem sessions in all chats and diagnostic categories")
 func navigationSummaryKeepsProblemSessionsVisibleInDiagnostics() {
     let snapshot = CatalogSnapshot(
@@ -155,10 +225,13 @@ func navigationMapsUnreadablePermissionDiagnosticsToPermissionDenied() {
     #expect(categories == [.permissionDenied])
 }
 
-private func navigationSource() -> SessionSourceSummary {
+private func navigationSource(
+    id: SessionSourceID = SessionSourceID(rawValue: "codex-navigation"),
+    displayName: String = "Codex navigation"
+) -> SessionSourceSummary {
     SessionSourceSummary(
-        id: SessionSourceID(rawValue: "codex-navigation"),
-        displayName: "Codex navigation",
+        id: id,
+        displayName: displayName,
         kind: .codex,
         locationDescription: "/tmp/sessiondeck/.codex/sessions",
         isEnabled: true,
@@ -169,23 +242,26 @@ private func navigationSource() -> SessionSourceSummary {
 
 private func navigationSession(
     id: String,
+    sourceID: SessionSourceID = SessionSourceID(rawValue: "codex-navigation"),
+    sourceLabel: CatalogSourceLabel? = nil,
+    projectHint: CatalogProjectHint = CatalogProjectHint(cwdPath: "/tmp/SessionDeck", displayName: "SessionDeck"),
+    lastActivity: Int64 = 1,
     sessionPath: String? = nil,
     fallbackReasons: [CatalogSessionFallbackReason] = [],
     health: CatalogEntryHealth = CatalogEntryHealth(parseStatus: .complete)
 ) -> SessionSummary {
-    let sourceID = SessionSourceID(rawValue: "codex-navigation")
     return SessionSummary(
         id: SessionID(rawValue: id),
         sourceID: sourceID,
-        sourceLabel: CatalogSourceLabel(
+        sourceLabel: sourceLabel ?? CatalogSourceLabel(
             sourceID: sourceID.rawValue,
             displayName: "Codex navigation",
             profileName: nil
         ),
         title: "Session \(id)",
-        projectHint: CatalogProjectHint(cwdPath: "/tmp/SessionDeck", displayName: "SessionDeck"),
+        projectHint: projectHint,
         sessionPath: sessionPath ?? "/tmp/sessiondeck/\(id).jsonl",
-        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: 1),
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: lastActivity),
         fileSize: CatalogFileSize(byteCount: 128),
         fallbackReasons: fallbackReasons,
         health: health
