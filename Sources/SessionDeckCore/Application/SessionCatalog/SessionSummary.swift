@@ -12,6 +12,7 @@ public struct SessionSummary: Equatable, Sendable {
     public let sourceID: SessionSourceID
     public let sourceLabel: CatalogSourceLabel
     public let title: String?
+    public let previewText: String?
     public let fallbackTitle: String
     public let projectHint: CatalogProjectHint
     public let sessionPath: String
@@ -27,6 +28,7 @@ public struct SessionSummary: Equatable, Sendable {
         sourceID: SessionSourceID,
         sourceLabel: CatalogSourceLabel,
         title: String?,
+        previewText: String? = nil,
         fallbackTitle: String? = nil,
         projectHint: CatalogProjectHint,
         sessionPath: String,
@@ -41,6 +43,7 @@ public struct SessionSummary: Equatable, Sendable {
         self.sourceID = sourceID
         self.sourceLabel = sourceLabel
         self.title = title
+        self.previewText = previewText
         self.fallbackTitle = fallbackTitle ?? "Session \(id.rawValue)"
         self.projectHint = projectHint
         self.sessionPath = sessionPath
