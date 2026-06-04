@@ -89,7 +89,6 @@ struct AppShellView: View {
     }
 
     private func refreshSources() {
-        viewModel = appShellUseCase.refreshingViewModel()
         viewModel = appShellUseCase.refreshViewModel()
     }
 }
