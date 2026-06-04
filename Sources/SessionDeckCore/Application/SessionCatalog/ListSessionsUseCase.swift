@@ -10,21 +10,20 @@ public struct ListSessionsUseCase: Sendable {
     }
 
     public func listSessions(scope: CatalogSessionScope) throws -> [SessionSummary] {
-        let sessions: [SessionSummary]
+        let candidates: [SessionSummary]
         switch scope {
         case .all:
-            sessions = try sessionCatalog.listSessions(sourceID: nil)
-        case let .sessionIDs(sessionIDs):
-            let selectedIDs = Set(sessionIDs)
-            sessions = try sessionCatalog.listSessions(sourceID: nil).filter { selectedIDs.contains($0.id) }
+            candidates = try sessionCatalog.listSessions(sourceID: nil)
+        case .sessionIDs:
+            candidates = try sessionCatalog.listSessions(sourceID: nil)
         case let .source(sourceMetadata):
-            sessions = try sessionCatalog.listSessions(sourceID: sourceMetadata.sourceID)
-                .filter { SourceProfileNavigationPolicy.session($0, matches: sourceMetadata) }
+            candidates = try sessionCatalog.listSessions(sourceID: sourceMetadata.sourceID)
         case let .profile(profileMetadata):
-            sessions = try sessionCatalog.listSessions(sourceID: profileMetadata.sourceID)
-                .filter { SourceProfileNavigationPolicy.session($0, matches: profileMetadata) }
+            candidates = try sessionCatalog.listSessions(sourceID: profileMetadata.sourceID)
         }
 
-        return SessionCatalogOrdering.sort(sessions)
+        return SessionCatalogOrdering.sort(
+            SourceProfileNavigationPolicy.filter(sessions: candidates, scope: scope)
+        )
     }
 }

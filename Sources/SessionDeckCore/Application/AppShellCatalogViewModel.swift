@@ -209,6 +209,19 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
         )
     }
 
+    public static func make(snapshot: CatalogSnapshot, scope: CatalogSessionScope) -> AppShellCatalogSummary {
+        let scopedSnapshot = CatalogSnapshot(
+            refreshedAt: snapshot.refreshedAt,
+            sources: snapshot.sources,
+            sessions: SourceProfileNavigationPolicy.filter(sessions: snapshot.sessions, scope: scope),
+            diagnostics: snapshot.diagnostics,
+            sourceWarnings: snapshot.sourceWarnings,
+            refreshErrors: snapshot.refreshErrors
+        )
+
+        return make(snapshot: scopedSnapshot)
+    }
+
     public static func failed(message: String) -> AppShellCatalogSummary {
         AppShellCatalogSummary(
             rows: [],

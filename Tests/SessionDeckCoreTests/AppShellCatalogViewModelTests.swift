@@ -71,6 +71,42 @@ func catalogSummaryMapsSnapshotDiagnosticsOntoRows() {
     #expect(summary.rows.first?.severity == .warning)
 }
 
+@Test("catalog summary scopes rows from source profile navigation selections")
+func catalogSummaryScopesRowsFromSourceProfileNavigationSelections() throws {
+    let snapshot = SourceProfileNavigationFixtureCatalog.snapshot()
+    let navigationSummary = AppShellNavigationSummary.make(snapshot: snapshot)
+    let cliSourceNode = try #require(
+        navigationSummary.sourcesNode.children.first { $0.id == "sources.source.codex-cli" }
+    )
+    let viewerProfileNode = try #require(
+        navigationSummary.sourcesNode.children
+            .flatMap(\.children)
+            .first { $0.id == "sources.source.codex-app.profile.viewer" }
+    )
+    let unknownSourceNode = try #require(
+        navigationSummary.sourcesNode.children.first { $0.id == "sources.unknown-source" }
+    )
+
+    let allSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: .all)
+    let cliSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: cliSourceNode.catalogScope)
+    let viewerSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: viewerProfileNode.catalogScope)
+    let unknownSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: unknownSourceNode.catalogScope)
+
+    #expect(allSummary.rows.map(\.id.rawValue) == [
+        "cli-sessiondeck-default",
+        "cli-cracker-default",
+        "app-sessiondeck-viewer",
+        "automation-sessiondeck",
+        "unknown-non-project",
+    ])
+    #expect(cliSummary.rows.map(\.id.rawValue) == [
+        "cli-sessiondeck-default",
+        "cli-cracker-default",
+    ])
+    #expect(viewerSummary.rows.map(\.id.rawValue) == ["app-sessiondeck-viewer"])
+    #expect(unknownSummary.rows.map(\.id.rawValue) == ["unknown-non-project"])
+}
+
 private func catalogViewModelSource(id: SessionSourceID) -> SessionSourceSummary {
     SessionSourceSummary(
         id: id,

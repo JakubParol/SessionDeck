@@ -87,8 +87,10 @@ func navigationTreeGroupsPopulatedCatalogSessionsByProjectSourceAndRecency() {
     #expect(summary.nonProjectChatsNode.count == 1)
     #expect(summary.nonProjectChatsNode.sessionIDs.map(\.rawValue) == ["loose-chat"])
     #expect(summary.sourcesNode.count == 4)
-    #expect(summary.sourcesNode.children.map(\.title) == ["Codex / Naomi", "Hermes / Jim"])
+    #expect(summary.sourcesNode.children.map(\.title) == ["Codex", "Hermes"])
     #expect(summary.sourcesNode.children.map(\.count) == [3, 1])
+    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.title) == ["Naomi", "Jim"])
+    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.count) == [3, 1])
     #expect(summary.recentlyActiveNode.sessionIDs.map(\.rawValue) == [
         "beta-chat",
         "alpha-new",

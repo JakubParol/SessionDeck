@@ -61,6 +61,23 @@ public enum SourceProfileNavigationPolicy {
         self.profileMetadata(for: session).stableID == profileMetadata.stableID
     }
 
+    public static func filter(
+        sessions: [SessionSummary],
+        scope: CatalogSessionScope
+    ) -> [SessionSummary] {
+        switch scope {
+        case .all:
+            return sessions
+        case let .sessionIDs(sessionIDs):
+            let selectedIDs = Set(sessionIDs)
+            return sessions.filter { selectedIDs.contains($0.id) }
+        case let .source(sourceMetadata):
+            return sessions.filter { session($0, matches: sourceMetadata) }
+        case let .profile(profileMetadata):
+            return sessions.filter { session($0, matches: profileMetadata) }
+        }
+    }
+
     private static func profileDisplayName(for session: SessionSummary) -> String? {
         if let profileName = session.sourceLabel.profileName?.trimmedForNavigation,
            profileName.isEmpty == false {
