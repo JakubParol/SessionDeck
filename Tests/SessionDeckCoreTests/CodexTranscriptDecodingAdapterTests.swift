@@ -156,6 +156,35 @@ func codexTranscriptDecoderMapsToolOutputsAndFailuresIntoDistinctSegments() thro
     #expect(orderedSegments[9].metadata["call_id"] == "call_tool_activity_003")
 }
 
+@Test("Codex transcript decoder attaches structured metadata to tool segments")
+func codexTranscriptDecoderAttachesStructuredMetadataToToolSegments() throws {
+    let result = try decodeFixture(.toolActivityMixed, sessionID: "tool-metadata-session")
+    let orderedSegments = result.orderedSegments
+    let toolCallMetadata = try #require(orderedSegments[2].toolMetadata)
+    let toolOutputMetadata = try #require(orderedSegments[3].toolMetadata)
+    let failedOutputMetadata = try #require(orderedSegments[5].toolMetadata)
+
+    #expect(toolCallMetadata.displayLabel == "synthetic_fixture_probe")
+    #expect(toolCallMetadata.status == nil)
+    #expect(toolCallMetadata.bodyAvailability == .available)
+    #expect(toolCallMetadata.characterCount == 26)
+    #expect(toolCallMetadata.byteCount == 26)
+    #expect(toolCallMetadata.lineCount == 1)
+
+    #expect(toolOutputMetadata.displayLabel == "tool output")
+    #expect(toolOutputMetadata.status == nil)
+    #expect(toolOutputMetadata.bodyAvailability == .available)
+    #expect(toolOutputMetadata.characterCount == 21)
+    #expect(toolOutputMetadata.byteCount == 21)
+    #expect(toolOutputMetadata.lineCount == 1)
+
+    #expect(failedOutputMetadata.status == "failed")
+    #expect(failedOutputMetadata.bodyAvailability == .available)
+    #expect(failedOutputMetadata.characterCount == 24)
+    #expect(failedOutputMetadata.byteCount == 24)
+    #expect(failedOutputMetadata.lineCount == 1)
+}
+
 @Test("Codex transcript decoder preserves mixed tool ordering and source metadata")
 func codexTranscriptDecoderPreservesMixedToolOrderingAndSourceMetadata() throws {
     let result = try decodeFixture(.toolActivityMixed, sessionID: "mixed-tool-ordering-session")
