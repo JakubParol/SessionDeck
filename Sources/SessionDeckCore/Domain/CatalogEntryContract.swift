@@ -65,12 +65,49 @@ public enum CatalogParseStatus: Equatable, Sendable {
     case unreadable(reason: String)
 }
 
+public enum CatalogEntryDiagnosticCode: String, Equatable, Sendable {
+    case malformedJSONL = "catalog.malformed_jsonl"
+    case missingMetadata = "catalog.missing_metadata"
+    case permissionDenied = "catalog.permission_denied"
+    case unreadableFile = "catalog.unreadable_file"
+    case unknownEventShape = "catalog.unknown_event_shape"
+    case boundedReadTruncated = "catalog.bounded_read_truncated"
+}
+
+public enum CatalogEntryDiagnosticSeverity: Equatable, Sendable {
+    case info
+    case warning
+    case error
+}
+
+public struct CatalogEntryDiagnostic: Equatable, Sendable {
+    public let code: CatalogEntryDiagnosticCode
+    public let severity: CatalogEntryDiagnosticSeverity
+    public let message: String
+
+    public init(
+        code: CatalogEntryDiagnosticCode,
+        severity: CatalogEntryDiagnosticSeverity,
+        message: String
+    ) {
+        self.code = code
+        self.severity = severity
+        self.message = message
+    }
+}
+
 public struct CatalogEntryHealth: Equatable, Sendable {
     public let parseStatus: CatalogParseStatus
+    public let diagnostics: [CatalogEntryDiagnostic]
     public let allowsListing: Bool
 
-    public init(parseStatus: CatalogParseStatus, allowsListing: Bool = true) {
+    public init(
+        parseStatus: CatalogParseStatus,
+        diagnostics: [CatalogEntryDiagnostic] = [],
+        allowsListing: Bool = true
+    ) {
         self.parseStatus = parseStatus
+        self.diagnostics = diagnostics
         self.allowsListing = allowsListing
     }
 }
