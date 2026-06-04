@@ -32,6 +32,8 @@ public struct AppShellNavigationNode: Equatable, Identifiable, Sendable {
     public let title: String
     public let count: Int
     public let sessionIDs: [SessionID]
+    public let catalogScope: CatalogSessionScope
+    public let sourceProfileMetadata: AppShellSourceProfileNavigationMetadata?
     public let problemCategory: AppShellNavigationProblemCategory?
     public let children: [AppShellNavigationNode]
 
@@ -40,6 +42,8 @@ public struct AppShellNavigationNode: Equatable, Identifiable, Sendable {
         title: String,
         count: Int,
         sessionIDs: [SessionID],
+        catalogScope: CatalogSessionScope? = nil,
+        sourceProfileMetadata: AppShellSourceProfileNavigationMetadata? = nil,
         problemCategory: AppShellNavigationProblemCategory? = nil,
         children: [AppShellNavigationNode] = []
     ) {
@@ -47,6 +51,8 @@ public struct AppShellNavigationNode: Equatable, Identifiable, Sendable {
         self.title = title
         self.count = count
         self.sessionIDs = sessionIDs
+        self.catalogScope = catalogScope ?? .sessionIDs(sessionIDs)
+        self.sourceProfileMetadata = sourceProfileMetadata
         self.problemCategory = problemCategory
         self.children = children
     }
