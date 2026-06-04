@@ -13,22 +13,25 @@ public struct AppShellUseCase: Sendable {
         self.refreshCatalogSnapshot = refreshCatalogSnapshot
     }
 
-    public func makeViewModel() -> AppShellViewModel {
-        makeViewModel(refreshState: .idle)
+    public func makeViewModel(selectedNavigationNodeID: String? = nil) -> AppShellViewModel {
+        makeViewModel(refreshState: .idle, selectedNavigationNodeID: selectedNavigationNodeID)
     }
 
-    public func refreshingViewModel() -> AppShellViewModel {
-        makeViewModel(refreshState: .refreshing)
+    public func refreshingViewModel(selectedNavigationNodeID: String? = nil) -> AppShellViewModel {
+        makeViewModel(refreshState: .refreshing, selectedNavigationNodeID: selectedNavigationNodeID)
     }
 
-    public func refreshViewModel() -> AppShellViewModel {
-        makeViewModel(refreshState: .idle)
+    public func refreshViewModel(selectedNavigationNodeID: String? = nil) -> AppShellViewModel {
+        makeViewModel(refreshState: .idle, selectedNavigationNodeID: selectedNavigationNodeID)
     }
 
-    private func makeViewModel(refreshState: AppShellRefreshState) -> AppShellViewModel {
+    private func makeViewModel(
+        refreshState: AppShellRefreshState,
+        selectedNavigationNodeID: String?
+    ) -> AppShellViewModel {
         let configuration = launchConfigurationProvider.loadConfiguration()
         let discoveryResult = sourceDiscoverySummary()
-        let catalogResult = catalogAndNavigationSummary()
+        let catalogResult = catalogAndNavigationSummary(selectedNavigationNodeID: selectedNavigationNodeID)
 
         return AppShellViewModel(
             title: configuration.title,
@@ -40,6 +43,8 @@ public struct AppShellUseCase: Sendable {
             sourceDiscoverySummary: discoveryResult.summary,
             catalogSummary: catalogResult.summary,
             navigationSummary: catalogResult.navigation,
+            selectedNavigationNodeID: catalogResult.selectedNode.id,
+            selectedNavigationTitle: catalogResult.selectedNode.title,
             refreshState: discoveryResult.refreshState ?? catalogResult.refreshState ?? refreshState,
             safetyPolicy: configuration.safetyPolicy
         )
@@ -61,21 +66,42 @@ public struct AppShellUseCase: Sendable {
         }
     }
 
-    private func catalogAndNavigationSummary() -> (
+    private func catalogAndNavigationSummary(selectedNavigationNodeID: String?) -> (
         summary: AppShellCatalogSummary,
         navigation: AppShellNavigationSummary,
+        selectedNode: AppShellNavigationNode,
         refreshState: AppShellRefreshState?
     ) {
         guard let refreshCatalogSnapshot else {
-            return (.placeholder, .placeholder, nil)
+            let navigation = AppShellNavigationSummary.placeholder
+            return (.placeholder, navigation, navigation.allChatsNode, nil)
         }
 
         do {
             let snapshot = try refreshCatalogSnapshot.refreshSnapshot()
-            return (.make(snapshot: snapshot), .make(snapshot: snapshot), nil)
+            let navigation = AppShellNavigationSummary.make(snapshot: snapshot)
+            let selectedNode = selectedNode(
+                in: navigation,
+                matching: selectedNavigationNodeID
+            )
+            return (.make(snapshot: snapshot, scope: selectedNode.catalogScope), navigation, selectedNode, nil)
         } catch {
             let message = "Catalog refresh failed before rows could be built."
-            return (.failed(message: message), .placeholder, .failed(message))
+            let navigation = AppShellNavigationSummary.placeholder
+            return (.failed(message: message), navigation, navigation.allChatsNode, .failed(message))
         }
+    }
+
+    private func selectedNode(
+        in navigation: AppShellNavigationSummary,
+        matching selectedNavigationNodeID: String?
+    ) -> AppShellNavigationNode {
+        guard let selectedNavigationNodeID,
+              let selectedNode = navigation.node(id: selectedNavigationNodeID)
+        else {
+            return navigation.allChatsNode
+        }
+
+        return selectedNode
     }
 }

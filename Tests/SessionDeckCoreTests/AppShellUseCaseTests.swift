@@ -223,6 +223,85 @@ func appShellUseCaseMarksCatalogRefreshFailureState() {
     #expect(viewModel.refreshState == .failed("Catalog refresh failed before rows could be built."))
 }
 
+@Test("app shell view model scopes catalog rows to the selected navigation node")
+func appShellViewModelScopesCatalogRowsToSelectedNavigationNode() {
+    let sourceID = SessionSourceID(rawValue: "codex-selection")
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase(
+            sourceDiscovery: FakeSourceDiscoveryPort(
+                sources: [catalogSource(id: sourceID, displayName: "Codex selection")]
+            ),
+            metadataExtraction: FakeCatalogMetadataExtractionPort(resultsBySourceID: [
+                sourceID: CatalogSourceExtractionResult(
+                    sourceID: sourceID,
+                    sessions: [
+                        selectionSession(
+                            id: "project-session",
+                            sourceID: sourceID,
+                            title: "Project Session",
+                            projectHint: CatalogProjectHint(
+                                cwdPath: "/tmp/SessionDeck",
+                                displayName: "SessionDeck"
+                            )
+                        ),
+                        selectionSession(
+                            id: "loose-chat",
+                            sourceID: sourceID,
+                            title: "Loose Chat",
+                            projectHint: .unavailable
+                        ),
+                    ]
+                ),
+            ]),
+            clock: FixedCatalogRefreshClock(now: Date(timeIntervalSince1970: 1_770_100_100))
+        )
+    )
+
+    let viewModel = useCase.makeViewModel(selectedNavigationNodeID: "non-project-chats")
+
+    #expect(viewModel.selectedNavigationNodeID == "non-project-chats")
+    #expect(viewModel.selectedNavigationTitle == "Non-project Chats")
+    #expect(viewModel.catalogSummary.rows.map(\.id.rawValue) == ["loose-chat"])
+    #expect(viewModel.catalogSummary.totalCount == 1)
+}
+
+@Test("app shell view model falls back to all chats when a preserved navigation selection disappears")
+func appShellViewModelFallsBackToAllChatsWhenPreservedSelectionDisappears() {
+    let sourceID = SessionSourceID(rawValue: "codex-selection-fallback")
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase(
+            sourceDiscovery: FakeSourceDiscoveryPort(
+                sources: [catalogSource(id: sourceID, displayName: "Codex selection fallback")]
+            ),
+            metadataExtraction: FakeCatalogMetadataExtractionPort(resultsBySourceID: [
+                sourceID: CatalogSourceExtractionResult(
+                    sourceID: sourceID,
+                    sessions: [
+                        selectionSession(
+                            id: "only-session",
+                            sourceID: sourceID,
+                            title: "Only Session",
+                            projectHint: CatalogProjectHint(
+                                cwdPath: "/tmp/SessionDeck",
+                                displayName: "SessionDeck"
+                            )
+                        ),
+                    ]
+                ),
+            ]),
+            clock: FixedCatalogRefreshClock(now: Date(timeIntervalSince1970: 1_770_100_101))
+        )
+    )
+
+    let viewModel = useCase.refreshViewModel(selectedNavigationNodeID: "projects.no-longer-present")
+
+    #expect(viewModel.selectedNavigationNodeID == "all-chats")
+    #expect(viewModel.selectedNavigationTitle == "All Chats")
+    #expect(viewModel.catalogSummary.rows.map(\.id.rawValue) == ["only-session"])
+}
+
 
 private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvider {
     FakeLaunchConfigurationProvider(
@@ -233,6 +312,30 @@ private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvide
             configuredSourceCount: 0,
             safetyPolicy: .placeholderSafe
         )
+    )
+}
+
+private func selectionSession(
+    id: String,
+    sourceID: SessionSourceID,
+    title: String,
+    projectHint: CatalogProjectHint
+) -> SessionSummary {
+    SessionSummary(
+        id: SessionID(rawValue: id),
+        identity: CatalogSessionIdentity(rawValue: id),
+        sourceID: sourceID,
+        sourceLabel: CatalogSourceLabel(
+            sourceID: sourceID.rawValue,
+            displayName: "Codex selection",
+            profileName: nil
+        ),
+        title: title,
+        projectHint: projectHint,
+        sessionPath: "/tmp/sessiondeck/\(id).jsonl",
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: 1_770_100_100),
+        fileSize: CatalogFileSize(byteCount: 512),
+        health: CatalogEntryHealth(parseStatus: .complete)
     )
 }
 
