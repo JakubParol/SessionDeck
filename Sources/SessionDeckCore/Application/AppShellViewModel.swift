@@ -96,6 +96,7 @@ public struct AppShellViewModel: Equatable, Sendable {
     public let statusMessage: String
     public let configuredSourceCount: Int
     public let sourceDiscoverySummary: AppShellSourceDiscoverySummary
+    public let catalogSummary: AppShellCatalogSummary
     public let refreshState: AppShellRefreshState
     public let safetyPolicy: LaunchSafetyPolicy
 
@@ -105,6 +106,7 @@ public struct AppShellViewModel: Equatable, Sendable {
         statusMessage: String,
         configuredSourceCount: Int,
         sourceDiscoverySummary: AppShellSourceDiscoverySummary = .placeholder,
+        catalogSummary: AppShellCatalogSummary = .placeholder,
         refreshState: AppShellRefreshState = .idle,
         safetyPolicy: LaunchSafetyPolicy
     ) {
@@ -113,6 +115,7 @@ public struct AppShellViewModel: Equatable, Sendable {
         self.statusMessage = statusMessage
         self.configuredSourceCount = configuredSourceCount
         self.sourceDiscoverySummary = sourceDiscoverySummary
+        self.catalogSummary = catalogSummary
         self.refreshState = refreshState
         self.safetyPolicy = safetyPolicy
     }

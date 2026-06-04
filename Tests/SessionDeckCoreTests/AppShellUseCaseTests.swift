@@ -143,6 +143,87 @@ func refreshViewModelRerunsSourceDiscovery() {
     #expect(refreshedViewModel.sourceDiscoverySummary.candidateFileCount == 2)
 }
 
+@Test("app shell use case maps catalog snapshot DTOs into display rows")
+func appShellUseCaseMapsCatalogSnapshotRows() {
+    let sourceID = SessionSourceID(rawValue: "codex-catalog")
+    let diagnosticSession = SessionSummary(
+        id: SessionID(rawValue: "diagnostic-session"),
+        sourceID: sourceID,
+        sourceLabel: CatalogSourceLabel(
+            sourceID: sourceID.rawValue,
+            displayName: "Codex catalog",
+            profileName: "naomi"
+        ),
+        title: nil,
+        fallbackTitle: "Recovered session",
+        projectHint: CatalogProjectHint(cwdPath: nil, displayName: "Non-project Chat"),
+        sessionPath: "/tmp/sessiondeck/diagnostic.jsonl",
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: nil),
+        fileSize: CatalogFileSize(byteCount: 2_048),
+        metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: nil),
+        health: CatalogEntryHealth(
+            parseStatus: .missingMetadata,
+            diagnostics: [
+                CatalogEntryDiagnostic(
+                    code: .missingMetadata,
+                    severity: .warning,
+                    message: "Session metadata was incomplete."
+                )
+            ]
+        )
+    )
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase(
+            sourceDiscovery: FakeSourceDiscoveryPort(
+                sources: [catalogSource(id: sourceID, displayName: "Codex catalog")]
+            ),
+            metadataExtraction: FakeCatalogMetadataExtractionPort(resultsBySourceID: [
+                sourceID: CatalogSourceExtractionResult(sourceID: sourceID, sessions: [diagnosticSession])
+            ]),
+            clock: FixedCatalogRefreshClock(now: Date(timeIntervalSince1970: 1_770_100_000))
+        )
+    )
+
+    let catalogSummary = useCase.makeViewModel().catalogSummary
+
+    #expect(catalogSummary.totalCount == 1)
+    #expect(catalogSummary.healthyCount == 0)
+    #expect(catalogSummary.diagnosticCount == 1)
+    #expect(catalogSummary.statusMessage == "Catalog shows 1 entry with diagnostics.")
+    #expect(catalogSummary.rows == [
+        AppShellCatalogRow(
+            id: SessionID(rawValue: "diagnostic-session"),
+            title: "Recovered session",
+            sourceLabel: "Codex catalog / naomi",
+            projectHint: "Non-project Chat",
+            lastActivityLabel: "Last activity unknown",
+            sizeLabel: "2 KB",
+            statusLabel: "Missing metadata",
+            diagnosticSummary: "Session metadata was incomplete.",
+            severity: .warning
+        )
+    ])
+}
+
+@Test("app shell use case marks catalog refresh failure state")
+func appShellUseCaseMarksCatalogRefreshFailureState() {
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase(
+            sourceDiscovery: ThrowingSourceDiscoveryPort(),
+            metadataExtraction: FakeCatalogMetadataExtractionPort(resultsBySourceID: [:])
+        )
+    )
+
+    let viewModel = useCase.makeViewModel()
+
+    #expect(viewModel.catalogSummary.sourceFailureCount == 1)
+    #expect(viewModel.catalogSummary.statusMessage == "Catalog refresh failed before rows could be built.")
+    #expect(viewModel.refreshState == .failed("Catalog refresh failed before rows could be built."))
+}
+
+
 private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvider {
     FakeLaunchConfigurationProvider(
         configuration: AppShellLaunchConfiguration(
@@ -152,6 +233,18 @@ private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvide
             configuredSourceCount: 0,
             safetyPolicy: .placeholderSafe
         )
+    )
+}
+
+private func catalogSource(id: SessionSourceID, displayName: String) -> SessionSourceSummary {
+    SessionSourceSummary(
+        id: id,
+        displayName: displayName,
+        kind: .codex,
+        locationDescription: "/tmp/sessiondeck/.codex/sessions",
+        isEnabled: true,
+        availability: .available,
+        counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 1)
     )
 }
 
@@ -172,4 +265,14 @@ private final class CountingSourceDiscoveryPort: SourceDiscoveryPort, @unchecked
 
         return responses[min(responseIndex, responses.count - 1)]
     }
+}
+
+private struct ThrowingSourceDiscoveryPort: SourceDiscoveryPort {
+    func discoverSources() throws -> [SessionSourceSummary] {
+        throw CatalogRefreshFailure.synthetic
+    }
+}
+
+private enum CatalogRefreshFailure: Error {
+    case synthetic
 }

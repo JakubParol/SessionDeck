@@ -11,10 +11,6 @@ public enum SessionDeckCompositionRoot {
             sourceDiscovery: sourceDiscoveryAdapter,
             candidateFileEnumeration: sourceDiscoveryAdapter
         )
-        let appShellUseCase = AppShellUseCase(
-            launchConfigurationProvider: PlaceholderLaunchConfigurationProvider(),
-            discoverSessionSources: discoverSessionSources
-        )
         let enumerateCandidateSessionFiles = EnumerateCandidateSessionFilesUseCase(
             candidateFileEnumeration: sourceDiscoveryAdapter
         )
@@ -28,6 +24,11 @@ public enum SessionDeckCompositionRoot {
         let refreshCatalogSnapshot = RefreshCatalogSnapshotUseCase(
             sourceDiscovery: sourceDiscoveryAdapter,
             metadataExtraction: sessionCatalogAdapter
+        )
+        let appShellUseCase = AppShellUseCase(
+            launchConfigurationProvider: PlaceholderLaunchConfigurationProvider(),
+            discoverSessionSources: discoverSessionSources,
+            refreshCatalogSnapshot: refreshCatalogSnapshot
         )
         let loadTranscriptPreview = LoadTranscriptPreviewUseCase(
             transcriptLoading: PlaceholderTranscriptLoadingAdapter()
