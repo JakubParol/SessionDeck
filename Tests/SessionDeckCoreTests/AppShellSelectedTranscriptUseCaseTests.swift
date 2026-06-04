@@ -57,6 +57,32 @@ func appShellUseCaseRendersUnavailableDetailForMissingSelection() {
     #expect(viewModel.selectedTranscriptDetail.severity == .warning)
 }
 
+@Test("app shell use case keeps selected session identifiable when transcript loading fails")
+func appShellUseCaseKeepsSelectedSessionIdentifiableWhenTranscriptLoadingFails() {
+    let session = selectedCatalogSession()
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: selectedTranscriptLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: selectedTranscriptCatalogSnapshot(sessions: [session]),
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase(
+            selectedTranscriptLoading: FakeSelectedTranscriptLoadingPort(
+                errorsBySessionID: [
+                    session.id: SelectedTranscriptLoadingError.transcriptUnreadable(session.id)
+                ]
+            )
+        )
+    )
+
+    let viewModel = useCase.makeViewModel(selectedSessionID: session.id)
+
+    #expect(viewModel.selectedTranscriptDetail.title == "Selected fixture")
+    #expect(viewModel.selectedTranscriptDetail.statusMessage == "The selected transcript file cannot be read.")
+    #expect(viewModel.selectedTranscriptDetail.severity == .error)
+    #expect(viewModel.selectedTranscriptDetail.metadataRows.map(\.title).contains("Path"))
+    #expect(viewModel.selectedTranscriptDetail.metadataRows.map(\.value).contains(
+        "/tmp/sessiondeck-fixture/.codex/sessions/selected.jsonl"
+    ))
+}
+
 private func selectedTranscriptLaunchConfigurationProvider() -> LaunchConfigurationProviding {
     SelectedTranscriptLaunchConfigurationProvider()
 }

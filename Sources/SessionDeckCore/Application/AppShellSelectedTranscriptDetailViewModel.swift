@@ -100,6 +100,22 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         )
     }
 
+    public static func failed(
+        _ error: Error,
+        session: SessionSummary
+    ) -> AppShellSelectedTranscriptDetailState {
+        let failure = failureDescription(for: error)
+        return AppShellSelectedTranscriptDetailState(
+            title: titleLabel(for: session.title ?? ""),
+            statusMessage: failure.message,
+            metadataRows: metadataRows(for: session),
+            rows: [],
+            diagnosticMessages: [],
+            severity: failure.severity,
+            isLoading: false
+        )
+    }
+
     private static func loadedSeverity(
         errorCount: Int,
         warningCount: Int
@@ -182,42 +198,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         ]
     }
 
-    private static func titleLabel(for title: String) -> String {
-        title.isEmpty ? "Untitled session" : title
-    }
-
     private static func sourceLabel(for readModel: SelectedTranscriptReadModel) -> String {
-        let sourceDisplayName = readModel.sourceLabel.displayName
-        guard sourceDisplayName.isEmpty == false else {
-            return "Unknown source"
-        }
-
-        let profileName = readModel.sourceLabel.profileName ?? readModel.metadata.agentProfileName
-        guard let profileName, profileName.isEmpty == false else {
-            return sourceDisplayName
-        }
-
-        return "\(sourceDisplayName) / \(profileName)"
-    }
-
-    private static func projectLabel(for projectHint: CatalogProjectHint) -> String {
-        guard projectHint.displayName.isEmpty == false else {
-            return "Project unavailable"
-        }
-
-        return projectHint.displayName
-    }
-
-    private static func pathLabel(for sessionPath: String) -> String {
-        sessionPath.isEmpty ? "Path unavailable" : sessionPath
-    }
-
-    private static func timestampLabel(for epochSeconds: Int64?, fallback: String) -> String {
-        guard let epochSeconds else {
-            return fallback
-        }
-
-        return "\(epochSeconds)"
+        sourceLabel(sourceLabel: readModel.sourceLabel, metadata: readModel.metadata)
     }
 
     private static func failureDescription(for error: Error) -> (
