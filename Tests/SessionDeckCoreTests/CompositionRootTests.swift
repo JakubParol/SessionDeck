@@ -74,7 +74,11 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
         at: transcriptURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
     )
-    try #"{"timestamp":"2026-06-03T06:00:00Z","type":"session_meta","payload":{"id":"composition-session","title":"Composition Catalog","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}"#
+    try """
+    {"timestamp":"2026-06-03T06:00:00Z","type":"session_meta","payload":{"id":"composition-session","title":"Composition Catalog","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+    {"timestamp":"2026-06-03T06:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Open the selected fixture."}]}}
+    {"timestamp":"2026-06-03T06:00:02Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The selected fixture is open."}]}}
+    """
         .write(to: transcriptURL, atomically: true, encoding: .utf8)
     try #"{"type":"session_meta"}"#.write(to: unreadableTranscriptURL, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadableTranscriptURL.path)
@@ -119,6 +123,14 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
     #expect(snapshot.sources.map(\.id.rawValue) == ["codex-configured"])
     #expect(snapshot.sessions.map(\.id.rawValue).contains("composition-session"))
     #expect(snapshot.counts.totalEntries == 2)
+
+    let selectedTranscript = try composition.loadSelectedTranscript.loadTranscript(for: compositionSession)
+    #expect(selectedTranscript.title == "Composition Catalog")
+    #expect(selectedTranscript.segments.map(\.text) == [
+        "Open the selected fixture.",
+        "The selected fixture is open.",
+    ])
+    #expect(selectedTranscript.diagnostics.isEmpty)
 
     let report = try composition.discoverSessionSources.discoveryReport()
     #expect(report.candidateDiagnostics.map(\.candidate.relativePath) == [

@@ -153,6 +153,11 @@ final class FixtureHarnessApplicationSmoke {
             ),
             loadTranscriptSegments: LoadTranscriptSegmentsUseCase(
                 transcriptDecoding: FakeTranscriptDecodingPort(results: transcriptResults)
+            ),
+            loadSelectedTranscript: LoadSelectedTranscriptUseCase(
+                selectedTranscriptLoading: FakeSelectedTranscriptLoadingPort(
+                    results: Dictionary(uniqueKeysWithValues: transcriptResults.map { ($0.sessionID, $0) })
+                )
             )
         )
     }
