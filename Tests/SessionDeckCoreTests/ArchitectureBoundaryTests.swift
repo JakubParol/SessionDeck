@@ -38,6 +38,7 @@ func presentationDoesNotConstructInfrastructure() throws {
         "PlaceholderLaunchConfigurationProvider(",
         "PlaceholderSourceDiscoveryAdapter(",
         "DefaultCodexSourceDiscoveryAdapter(",
+        "CodexSessionCatalogAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
         "Infrastructure",
@@ -67,6 +68,7 @@ func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
         "PlaceholderLaunchConfigurationProvider(",
         "PlaceholderSourceDiscoveryAdapter(",
         "DefaultCodexSourceDiscoveryAdapter(",
+        "CodexSessionCatalogAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
     ]
