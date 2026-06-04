@@ -81,7 +81,7 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
             )
         }
 
-        guard let data = boundedData(at: candidate.absolutePath) else {
+        guard let boundedRead = boundedData(at: candidate.absolutePath) else {
             return CodexCatalogScanResult(
                 metadata: CodexCatalogMetadata(),
                 createdAtEpochSeconds: candidate.modifiedAt.map(epochSeconds),
@@ -90,15 +90,18 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
             )
         }
 
-        let content = String(decoding: data, as: UTF8.self)
+        let content = String(decoding: boundedRead.data, as: UTF8.self)
+        let lines = Array(content.split(separator: "\n", omittingEmptySubsequences: true).prefix(scanLimits.maximumLines))
         var metadata = CodexCatalogMetadata()
         var createdAtEpochSeconds: Int64?
         var lastActivityEpochSeconds: Int64?
         var encounteredMalformedLine = false
 
-        for line in content.split(separator: "\n", omittingEmptySubsequences: true).prefix(scanLimits.maximumLines) {
+        for (index, line) in lines.enumerated() {
             guard let event = decodeEvent(line: String(line)) else {
-                encounteredMalformedLine = true
+                if !isFinalByteLimitFragment(index: index, lineCount: lines.count, content: content, read: boundedRead) {
+                    encounteredMalformedLine = true
+                }
                 continue
             }
 
@@ -120,7 +123,7 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
         )
     }
 
-    private func boundedData(at path: String) -> Data? {
+    private func boundedData(at path: String) -> CodexCatalogBoundedRead? {
         guard scanLimits.maximumBytes > 0,
               let fileHandle = FileHandle(forReadingAtPath: path)
         else {
@@ -129,7 +132,19 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
         defer {
             try? fileHandle.close()
         }
-        return try? fileHandle.read(upToCount: scanLimits.maximumBytes)
+        guard let data = try? fileHandle.read(upToCount: scanLimits.maximumBytes) else {
+            return nil
+        }
+        return CodexCatalogBoundedRead(data: data, reachedByteLimit: data.count == scanLimits.maximumBytes)
+    }
+
+    private func isFinalByteLimitFragment(
+        index: Int,
+        lineCount: Int,
+        content: String,
+        read: CodexCatalogBoundedRead
+    ) -> Bool {
+        read.reachedByteLimit && index == lineCount - 1 && !content.hasSuffix("\n")
     }
 
     private func decodeEvent(line: String) -> CodexCatalogEvent? {
@@ -190,6 +205,11 @@ private struct CodexCatalogScanResult {
     let createdAtEpochSeconds: Int64?
     let lastActivityEpochSeconds: Int64?
     let parseStatus: CatalogParseStatus
+}
+
+private struct CodexCatalogBoundedRead {
+    let data: Data
+    let reachedByteLimit: Bool
 }
 
 private struct CodexCatalogEvent {
