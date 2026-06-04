@@ -1,5 +1,40 @@
 import Foundation
 
+public enum AppShellCatalogResultState: Equatable, Sendable {
+    case notRun
+    case empty
+    case matches
+    case noMatches
+    case warning
+    case failure
+}
+
+public struct AppShellCatalogDiagnosticSummary: Equatable, Sendable {
+    public static let none = AppShellCatalogDiagnosticSummary(
+        entryDiagnosticCount: 0,
+        sourceWarningCount: 0,
+        sourceFailureCount: 0,
+        primaryMessage: nil
+    )
+
+    public let entryDiagnosticCount: Int
+    public let sourceWarningCount: Int
+    public let sourceFailureCount: Int
+    public let primaryMessage: String?
+
+    public init(
+        entryDiagnosticCount: Int,
+        sourceWarningCount: Int,
+        sourceFailureCount: Int,
+        primaryMessage: String?
+    ) {
+        self.entryDiagnosticCount = entryDiagnosticCount
+        self.sourceWarningCount = sourceWarningCount
+        self.sourceFailureCount = sourceFailureCount
+        self.primaryMessage = primaryMessage
+    }
+}
+
 public struct AppShellCatalogSummary: Equatable, Sendable {
     public static let placeholder = AppShellCatalogSummary(
         rows: [],
@@ -8,6 +43,8 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
         diagnosticCount: 0,
         sourceWarningCount: 0,
         sourceFailureCount: 0,
+        resultState: .notRun,
+        diagnosticSummary: AppShellCatalogDiagnosticSummary.none,
         statusMessage: "Catalog has not run yet."
     )
 
@@ -19,6 +56,8 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
     public let sourceFailureCount: Int
     public let unfilteredTotalCount: Int
     public let isFiltered: Bool
+    public let resultState: AppShellCatalogResultState
+    public let diagnosticSummary: AppShellCatalogDiagnosticSummary
     public let statusMessage: String
 
     public init(
@@ -30,16 +69,34 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
         sourceFailureCount: Int,
         unfilteredTotalCount: Int? = nil,
         isFiltered: Bool = false,
+        resultState: AppShellCatalogResultState? = nil,
+        diagnosticSummary: AppShellCatalogDiagnosticSummary? = nil,
         statusMessage: String
     ) {
+        let resolvedUnfilteredTotalCount = unfilteredTotalCount ?? totalCount
+
         self.rows = rows
         self.totalCount = totalCount
         self.healthyCount = healthyCount
         self.diagnosticCount = diagnosticCount
         self.sourceWarningCount = sourceWarningCount
         self.sourceFailureCount = sourceFailureCount
-        self.unfilteredTotalCount = unfilteredTotalCount ?? totalCount
+        self.unfilteredTotalCount = resolvedUnfilteredTotalCount
         self.isFiltered = isFiltered
+        self.resultState = resultState ?? Self.resultState(
+            totalCount: totalCount,
+            diagnosticCount: diagnosticCount,
+            sourceWarningCount: sourceWarningCount,
+            sourceFailureCount: sourceFailureCount,
+            unfilteredTotalCount: resolvedUnfilteredTotalCount,
+            isFiltered: isFiltered
+        )
+        self.diagnosticSummary = diagnosticSummary ?? Self.diagnosticSummary(
+            entryDiagnosticCount: diagnosticCount,
+            sourceWarningCount: sourceWarningCount,
+            sourceFailureCount: sourceFailureCount,
+            primaryMessage: statusMessage
+        )
         self.statusMessage = statusMessage
     }
 
@@ -148,6 +205,48 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
 
     private static func sourceCountLabel(_ count: Int) -> String {
         count == 1 ? "1 source" : "\(count) sources"
+    }
+
+    private static func resultState(
+        totalCount: Int,
+        diagnosticCount: Int,
+        sourceWarningCount: Int,
+        sourceFailureCount: Int,
+        unfilteredTotalCount: Int,
+        isFiltered: Bool
+    ) -> AppShellCatalogResultState {
+        if sourceFailureCount > 0 && totalCount == 0 {
+            return .failure
+        }
+        if isFiltered && totalCount == 0 && unfilteredTotalCount > 0 {
+            return .noMatches
+        }
+        if totalCount == 0 {
+            return .empty
+        }
+        if diagnosticCount > 0 || sourceWarningCount > 0 || sourceFailureCount > 0 {
+            return .warning
+        }
+
+        return .matches
+    }
+
+    private static func diagnosticSummary(
+        entryDiagnosticCount: Int,
+        sourceWarningCount: Int,
+        sourceFailureCount: Int,
+        primaryMessage: String
+    ) -> AppShellCatalogDiagnosticSummary {
+        guard entryDiagnosticCount > 0 || sourceWarningCount > 0 || sourceFailureCount > 0 else {
+            return .none
+        }
+
+        return AppShellCatalogDiagnosticSummary(
+            entryDiagnosticCount: entryDiagnosticCount,
+            sourceWarningCount: sourceWarningCount,
+            sourceFailureCount: sourceFailureCount,
+            primaryMessage: primaryMessage
+        )
     }
 
     private static func sourceIDs(

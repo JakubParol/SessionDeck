@@ -36,6 +36,64 @@ func catalogSummaryDistinguishesEmptyCatalogFromSourceFailure() {
     #expect(failedSummary.statusMessage == "Catalog refresh failed for 1 source.")
 }
 
+@Test("catalog summary exposes explicit result state and diagnostic summary")
+func catalogSummaryExposesExplicitResultStateAndDiagnosticSummary() {
+    let sourceID = SessionSourceID(rawValue: "codex-result-state")
+    let source = catalogViewModelSource(id: sourceID)
+    let session = catalogViewModelSession(
+        id: SessionID(rawValue: "healthy-session"),
+        identity: CatalogSessionIdentity(rawValue: "healthy-session"),
+        sourceID: sourceID,
+        title: "Healthy Session"
+    )
+    let healthySnapshot = CatalogSnapshot(
+        refreshedAt: Date(timeIntervalSince1970: 1_770_200_005),
+        sources: [source],
+        sessions: [session]
+    )
+    let noMatchSummary = AppShellCatalogSummary.make(
+        snapshot: healthySnapshot,
+        scope: .all,
+        queryRequest: CatalogQueryRequest(searchText: "not-present"),
+        isFiltered: true
+    )
+    let mixedWarningSummary = AppShellCatalogSummary.make(
+        snapshot: CatalogSnapshot(
+            refreshedAt: Date(timeIntervalSince1970: 1_770_200_006),
+            sources: [source],
+            sessions: [session],
+            sourceWarnings: [
+                CatalogSnapshotSourceWarning(
+                    sourceID: sourceID,
+                    displayName: "Codex result state",
+                    message: "Source metadata is incomplete."
+                )
+            ],
+            refreshErrors: [
+                CatalogSnapshotRefreshError(
+                    sourceID: sourceID,
+                    displayName: "Codex result state",
+                    message: "Catalog extraction failed."
+                )
+            ]
+        )
+    )
+
+    #expect(AppShellCatalogSummary.make(snapshot: healthySnapshot).resultState == .matches)
+    #expect(noMatchSummary.resultState == .noMatches)
+    #expect(noMatchSummary.diagnosticSummary == .none)
+    #expect(mixedWarningSummary.resultState == .warning)
+    #expect(mixedWarningSummary.rows.map(\.id.rawValue) == ["healthy-session"])
+    #expect(
+        mixedWarningSummary.diagnosticSummary == AppShellCatalogDiagnosticSummary(
+            entryDiagnosticCount: 0,
+            sourceWarningCount: 1,
+            sourceFailureCount: 1,
+            primaryMessage: "Catalog loaded with source diagnostics."
+        )
+    )
+}
+
 @Test("catalog summary maps snapshot diagnostics onto visible rows")
 func catalogSummaryMapsSnapshotDiagnosticsOntoRows() {
     let sourceID = SessionSourceID(rawValue: "codex-duplicates")
