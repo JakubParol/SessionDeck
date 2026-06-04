@@ -4,6 +4,7 @@ import SwiftUI
 struct AppShellView: View {
     let appShellUseCase: AppShellUseCase
     @State private var viewModel: AppShellViewModel
+    @State private var selectedSessionID: SessionID?
 
     init(viewModel: AppShellViewModel, appShellUseCase: AppShellUseCase) {
         self.appShellUseCase = appShellUseCase
@@ -39,9 +40,17 @@ struct AppShellView: View {
                 Label(safetySummary, systemImage: "lock.shield")
             }
             .font(.body)
+
+            Divider()
+
+            AppShellCatalogView(
+                summary: viewModel.catalogSummary,
+                refreshState: viewModel.refreshState,
+                selectedSessionID: $selectedSessionID
+            )
         }
         .padding(32)
-        .frame(minWidth: 640, minHeight: 360, alignment: .leading)
+        .frame(minWidth: 760, minHeight: 520, alignment: .leading)
     }
 
     private var sourceCountSummary: String {
@@ -89,6 +98,7 @@ struct AppShellView: View {
     }
 
     private func refreshSources() {
+        viewModel = appShellUseCase.refreshingViewModel()
         viewModel = appShellUseCase.refreshViewModel()
     }
 }
