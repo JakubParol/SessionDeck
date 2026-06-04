@@ -1,0 +1,263 @@
+public extension AppShellNavigationSummary {
+    static func make(snapshot: CatalogSnapshot) -> AppShellNavigationSummary {
+        let orderedSessions = SessionCatalogOrdering.sort(snapshot.sessions)
+        let sessionIDs = orderedSessions.map(\.id)
+        let problemSessionsNode = problemSessionsNode(snapshot: snapshot)
+
+        return AppShellNavigationSummary(
+            allChatsNode: AppShellNavigationNode(
+                id: "all-chats",
+                title: "All Chats",
+                count: sessionIDs.count,
+                sessionIDs: sessionIDs
+            ),
+            projectsNode: projectsNode(sessions: orderedSessions),
+            nonProjectChatsNode: nonProjectChatsNode(sessions: orderedSessions),
+            sourcesNode: sourcesNode(sessions: orderedSessions),
+            recentlyActiveNode: AppShellNavigationNode(
+                id: "recently-active",
+                title: "Recently Active",
+                count: sessionIDs.count,
+                sessionIDs: sessionIDs
+            ),
+            diagnosticsNode: AppShellNavigationNode(
+                id: "diagnostics",
+                title: "Diagnostics",
+                count: problemSessionsNode.count,
+                sessionIDs: problemSessionsNode.sessionIDs,
+                children: [problemSessionsNode]
+            )
+        )
+    }
+
+    private static func projectsNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
+        let projectSessions = sessions.filter { $0.projectHint.cwdPath != nil }
+        let children = groupNodes(
+            sessions: projectSessions,
+            idPrefix: "projects",
+            key: { $0.projectHint.stableNavigationKey },
+            title: \.projectDisplayName
+        )
+
+        return AppShellNavigationNode(
+            id: "projects",
+            title: "Projects",
+            count: projectSessions.count,
+            sessionIDs: projectSessions.map(\.id),
+            children: children
+        )
+    }
+
+    private static func nonProjectChatsNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
+        let nonProjectSessions = sessions.filter { $0.projectHint.cwdPath == nil }
+
+        return AppShellNavigationNode(
+            id: "non-project-chats",
+            title: "Non-project Chats",
+            count: nonProjectSessions.count,
+            sessionIDs: nonProjectSessions.map(\.id)
+        )
+    }
+
+    private static func sourcesNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
+        let children = groupNodes(
+            sessions: sessions,
+            idPrefix: "sources",
+            key: { $0.sourceStableNavigationKey },
+            title: { $0.navigationSourceDisplayName }
+        )
+
+        return AppShellNavigationNode(
+            id: "sources",
+            title: "Sources / Profiles",
+            count: sessions.count,
+            sessionIDs: sessions.map(\.id),
+            children: children
+        )
+    }
+
+    private static func problemSessionsNode(snapshot: CatalogSnapshot) -> AppShellNavigationNode {
+        let problemGroups = problemCategoriesBySession(snapshot: snapshot)
+        let problemSessionIDs = problemGroups.values
+            .flatMap { $0 }
+            .uniqueSortedByRawValue()
+        let categoryNodes: [AppShellNavigationNode] = AppShellNavigationProblemCategory.navigationOrder.compactMap {
+            category in
+            guard let categorySessionIDs = problemGroups[category], categorySessionIDs.isEmpty == false else {
+                return nil
+            }
+
+            return AppShellNavigationNode(
+                id: "diagnostics.problem-sessions.\(category.rawValue)",
+                title: category.label,
+                count: categorySessionIDs.count,
+                sessionIDs: categorySessionIDs.uniqueSortedByRawValue(),
+                problemCategory: category
+            )
+        }
+
+        return AppShellNavigationNode(
+            id: "diagnostics.problem-sessions",
+            title: "Problem Sessions",
+            count: problemSessionIDs.count,
+            sessionIDs: problemSessionIDs,
+            children: categoryNodes
+        )
+    }
+
+    private static func groupNodes(
+        sessions: [SessionSummary],
+        idPrefix: String,
+        key: (SessionSummary) -> String,
+        title: (SessionSummary) -> String
+    ) -> [AppShellNavigationNode] {
+        Dictionary(grouping: sessions, by: key)
+            .map { groupKey, groupSessions in
+                let orderedGroupSessions = SessionCatalogOrdering.sort(groupSessions)
+                let groupTitle = title(orderedGroupSessions[0])
+                return AppShellNavigationNode(
+                    id: "\(idPrefix).\(groupKey)",
+                    title: groupTitle,
+                    count: orderedGroupSessions.count,
+                    sessionIDs: orderedGroupSessions.map(\.id)
+                )
+            }
+            .sorted { lhs, rhs in
+                lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
+            }
+    }
+
+    private static func problemCategoriesBySession(
+        snapshot: CatalogSnapshot
+    ) -> [AppShellNavigationProblemCategory: [SessionID]] {
+        var groups: [AppShellNavigationProblemCategory: [SessionID]] = [:]
+        let diagnosticsBySessionID = Dictionary(
+            grouping: snapshot.diagnostics.flatMap { diagnostic in
+                diagnostic.sessionIDs.map { (sessionID: $0, diagnostic: diagnostic) }
+            },
+            by: \.sessionID
+        )
+
+        for session in snapshot.sessions {
+            let categories = problemCategories(
+                for: session,
+                snapshotDiagnostics: diagnosticsBySessionID[session.id]?.map(\.diagnostic) ?? []
+            )
+
+            for category in categories {
+                groups[category, default: []].append(session.id)
+            }
+        }
+
+        return groups
+    }
+
+    private static func problemCategories(
+        for session: SessionSummary,
+        snapshotDiagnostics: [CatalogSnapshotDiagnostic]
+    ) -> [AppShellNavigationProblemCategory] {
+        var categories: [AppShellNavigationProblemCategory] = []
+
+        if session.sessionPath.isEmpty || session.fallbackReasons.contains(.missingPath) {
+            categories.append(.missingPath)
+        }
+        if session.fallbackReasons.contains(.unknownSource) {
+            categories.append(.unknownSource)
+        }
+        if session.fallbackReasons.contains(.ambiguousProject) {
+            categories.append(.ambiguousProject)
+        }
+
+        let hasPermissionDiagnostic = session.health.diagnostics.contains {
+            $0.problemCategories.contains(.permissionDenied)
+        }
+        switch session.health.parseStatus {
+        case .complete:
+            break
+        case .missingMetadata:
+            categories.append(.missingMetadata)
+        case .malformed:
+            categories.append(.malformedMetadata)
+        case let .unreadable(reason) where reason.localizedCaseInsensitiveContains("permission"):
+            categories.append(.permissionDenied)
+        case .unreadable where hasPermissionDiagnostic:
+            break
+        case .unreadable:
+            categories.append(.parseWarning)
+        }
+
+        for diagnostic in session.health.diagnostics {
+            categories.append(contentsOf: diagnostic.problemCategories)
+        }
+        if snapshotDiagnostics.isEmpty == false {
+            categories.append(.parseWarning)
+        }
+
+        return categories.uniquePreservingOrder()
+    }
+}
+
+private extension CatalogProjectHint {
+    var stableNavigationKey: String {
+        cwdPath ?? displayName
+    }
+}
+
+private extension SessionSummary {
+    var navigationSourceDisplayName: String {
+        let profileName = sourceLabel.profileName ?? metadata.agentProfileName
+        guard let profileName, profileName.isEmpty == false else {
+            return sourceLabel.displayName
+        }
+
+        return "\(sourceLabel.displayName) / \(profileName)"
+    }
+
+    var sourceStableNavigationKey: String {
+        "\(sourceID.rawValue)|\(navigationSourceDisplayName)"
+    }
+}
+
+private extension AppShellNavigationProblemCategory {
+    static let navigationOrder: [AppShellNavigationProblemCategory] = [
+        .missingPath,
+        .permissionDenied,
+        .missingMetadata,
+        .malformedMetadata,
+        .parseWarning,
+        .unknownSource,
+        .ambiguousProject,
+    ]
+}
+
+private extension CatalogEntryDiagnostic {
+    var problemCategories: [AppShellNavigationProblemCategory] {
+        switch code {
+        case .permissionDenied:
+            return [.permissionDenied]
+        case .missingMetadata:
+            return [.missingMetadata]
+        case .malformedJSONL:
+            return [.malformedMetadata]
+        case .unreadableFile where message.localizedCaseInsensitiveContains("permission"):
+            return [.permissionDenied]
+        case .unknownEventShape, .boundedReadTruncated, .unreadableFile:
+            return [.parseWarning]
+        }
+    }
+}
+
+private extension Array where Element == AppShellNavigationProblemCategory {
+    func uniquePreservingOrder() -> [AppShellNavigationProblemCategory] {
+        var seen: Set<AppShellNavigationProblemCategory> = []
+        return filter { seen.insert($0).inserted }
+    }
+}
+
+private extension Array where Element == SessionID {
+    func uniqueSortedByRawValue() -> [SessionID] {
+        var seen: Set<SessionID> = []
+        return filter { seen.insert($0).inserted }
+            .sorted { $0.rawValue < $1.rawValue }
+    }
+}
