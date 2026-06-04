@@ -190,3 +190,37 @@ func transcriptDecodeResultPreservesSegmentsDiagnosticsAndPreviewProjection() th
     #expect(preview.segments.map(\.id) == ["segment-1", "segment-2"])
     #expect(preview.isTruncated)
 }
+
+@Test("transcript decode result separates blocking diagnostics from recoverable diagnostics")
+func transcriptDecodeResultSeparatesBlockingDiagnostics() throws {
+    let source = TranscriptSegmentSourceReference(
+        sourceID: SessionSourceID(rawValue: "codex-fixture"),
+        relativePath: "2026/06/04/rollout.jsonl",
+        lineNumber: 3
+    )
+    let result = TranscriptDecodeResult(
+        sessionID: SessionID(rawValue: "session-1"),
+        title: "Fixture session",
+        segments: [],
+        diagnostics: [
+            TranscriptDecodeDiagnostic(
+                code: "unknown_event",
+                severity: .warning,
+                message: "Unknown event preserved for diagnostics.",
+                source: source,
+                allowsDecodingToContinue: true
+            ),
+            TranscriptDecodeDiagnostic(
+                code: "unreadable_transcript",
+                severity: .error,
+                message: "Transcript could not be read.",
+                source: source.withLineNumber(nil),
+                allowsDecodingToContinue: false
+            ),
+        ],
+        isPartial: true
+    )
+
+    #expect(result.canContinueDecoding == false)
+    #expect(result.blockingDiagnostics.map(\.code) == ["unreadable_transcript"])
+}

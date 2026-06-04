@@ -41,6 +41,7 @@ func presentationDoesNotConstructInfrastructure() throws {
         "CodexSessionCatalogAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
+        "PlaceholderTranscriptDecodingAdapter(",
         "Infrastructure",
         "FileManager.default",
         "Process(",
@@ -132,6 +133,7 @@ func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
         "CodexSessionCatalogAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
+        "PlaceholderTranscriptDecodingAdapter(",
     ]
 
     for file in sourceFiles {

@@ -170,6 +170,10 @@ public struct TranscriptDecodeResult: Equatable, Sendable {
         diagnostics.allSatisfy(\.allowsDecodingToContinue)
     }
 
+    public var blockingDiagnostics: [TranscriptDecodeDiagnostic] {
+        diagnostics.filter { $0.allowsDecodingToContinue == false }
+    }
+
     public init(
         sessionID: SessionID,
         title: String,
