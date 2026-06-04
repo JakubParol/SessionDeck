@@ -85,6 +85,31 @@ enum FakeTranscriptDecodingError: Error, Equatable {
     case resultNotFound(SessionID)
 }
 
+struct FakeSelectedTranscriptLoadingPort: SelectedTranscriptLoadingPort {
+    let resultsBySessionID: [SessionID: TranscriptDecodeResult]
+    let errorsBySessionID: [SessionID: Error]
+
+    init(
+        results: [SessionID: TranscriptDecodeResult] = [:],
+        errorsBySessionID: [SessionID: Error] = [:]
+    ) {
+        self.resultsBySessionID = results
+        self.errorsBySessionID = errorsBySessionID
+    }
+
+    func loadSelectedTranscript(for session: SessionSummary) throws -> TranscriptDecodeResult {
+        if let error = errorsBySessionID[session.id] {
+            throw error
+        }
+
+        guard let result = resultsBySessionID[session.id] else {
+            throw SelectedTranscriptLoadingError.transcriptUnavailable(session.id)
+        }
+
+        return result
+    }
+}
+
 struct FakeCatalogMetadataExtractionPort: CatalogMetadataExtractionPort {
     let resultsBySourceID: [SessionSourceID: CatalogSourceExtractionResult]
     let errorsBySourceID: [SessionSourceID: Error]
