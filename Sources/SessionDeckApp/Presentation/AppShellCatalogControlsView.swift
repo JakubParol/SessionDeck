@@ -46,7 +46,7 @@ struct AppShellCatalogControlsView: View {
                 }
             }
 
-            if controls.activeFilterLabels.isEmpty == false {
+            if controls.activeFilters.isEmpty == false {
                 activeFilterLabels
             }
         }
@@ -54,14 +54,17 @@ struct AppShellCatalogControlsView: View {
 
     private var activeFilterLabels: some View {
         HStack(spacing: 6) {
-            ForEach(controls.activeFilterLabels, id: \.self) { label in
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+            ForEach(controls.activeFilters) { filter in
+                Button(action: { clear(filter) }) {
+                    Label(filter.title, systemImage: "xmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -151,27 +154,13 @@ struct AppShellCatalogControlsView: View {
         update(queryState.cleared())
     }
 
+    private func clear(_ filter: AppShellCatalogActiveFilter) {
+        update(queryState.clearing(activeFilter: filter))
+    }
+
     private func update(_ nextState: AppShellCatalogQueryState) {
         queryState = nextState
         onQueryChange(nextState)
-    }
-}
-
-private extension AppShellCatalogQueryState {
-    func replacing(
-        searchText: String? = nil,
-        projectOptionID: String?? = nil,
-        sourceOptionID: String?? = nil,
-        profileOptionID: String?? = nil,
-        parseStatusOptionIDs: Set<String>? = nil
-    ) -> AppShellCatalogQueryState {
-        AppShellCatalogQueryState(
-            searchText: searchText ?? self.searchText,
-            selectedProjectOptionID: projectOptionID ?? selectedProjectOptionID,
-            selectedSourceOptionID: sourceOptionID ?? selectedSourceOptionID,
-            selectedProfileOptionID: profileOptionID ?? selectedProfileOptionID,
-            selectedParseStatusOptionIDs: parseStatusOptionIDs ?? selectedParseStatusOptionIDs
-        )
     }
 }
 

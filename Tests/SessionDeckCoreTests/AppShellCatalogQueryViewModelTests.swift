@@ -30,7 +30,7 @@ func appShellCatalogQueryControlsFilterRowsThroughApplicationState() throws {
                 projectName: "SessionDeck",
                 cwdPath: "/tmp/SessionDeck",
                 lastActivity: 400,
-                parseStatus: .malformed(reason: "Fixture malformed line.")
+                parseStatus: .unreadable(reason: "Fixture permission denied.")
             ),
             catalogQuerySession(
                 id: "other-project",
@@ -62,7 +62,7 @@ func appShellCatalogQueryControlsFilterRowsThroughApplicationState() throws {
 
     let filtered = useCase.makeViewModel(
         catalogQuery: AppShellCatalogQueryState(
-            searchText: "sprint",
+            searchText: "search controls",
             selectedProjectOptionID: projectID,
             selectedSourceOptionID: sourceIDOption,
             selectedProfileOptionID: profileID,
@@ -74,11 +74,24 @@ func appShellCatalogQueryControlsFilterRowsThroughApplicationState() throws {
     #expect(filtered.catalogSummary.totalCount == 1)
     #expect(filtered.catalogSummary.unfilteredTotalCount == 3)
     #expect(filtered.catalogQueryControls.activeFilterLabels == [
-        "Search: sprint",
+        "Search: search controls",
         "SessionDeck",
         "Codex Query",
         "Naomi",
         "Healthy",
+    ])
+
+    let parseStatusFilter = try #require(
+        filtered.catalogQueryControls.activeFilters.first { $0.kind == .parseStatus }
+    )
+    let parseStatusCleared = useCase.makeViewModel(
+        catalogQuery: filtered.catalogQueryControls.queryState.clearing(activeFilter: parseStatusFilter)
+    )
+
+    #expect(parseStatusCleared.catalogQueryControls.queryState.selectedParseStatusOptionIDs.isEmpty)
+    #expect(parseStatusCleared.catalogSummary.rows.map(\.id.rawValue) == [
+        "sessiondeck-diagnostic",
+        "sessiondeck-naomi",
     ])
 }
 
