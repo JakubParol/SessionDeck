@@ -3,8 +3,8 @@ import SessionDeckCore
 
 final class FixtureHarnessApplicationSmoke {
     private let parentDirectory: URL
-    private let store: TempCodexSessionStore
-    private var sources: [FixtureHarnessApplicationSource] = []
+    let store: TempCodexSessionStore
+    var sources: [FixtureHarnessApplicationSource] = []
 
     var rootPath: String {
         store.rootURL.path
@@ -94,81 +94,13 @@ final class FixtureHarnessApplicationSmoke {
         )
     }
 
-    func makeApplicationComposition() throws -> SessionDeckApplicationComposition {
-        let sourceSummaries = sources.map { source in
-            SessionSourceSummary(
-                id: source.id,
-                displayName: "\(source.tempSource.label) (\(source.tempSource.profile))",
-                kind: .codex,
-                locationDescription: source.tempSource.sessionsRootURL.path,
-                isEnabled: true
-            )
-        }
-        let sessionFiles = store.sessionFiles
-        let sessionSummaries = try sessionFiles.map(sessionSummary)
-        let extractionResultsBySourceID = Dictionary(
-            uniqueKeysWithValues: Dictionary(grouping: sessionSummaries, by: \.sourceID).map { sourceID, sessions in
-                (
-                    sourceID,
-                    CatalogSourceExtractionResult(sourceID: sourceID, sessions: sessions)
-                )
-            }
-        )
-        let transcriptPreviews = try sessionFiles.map(transcriptPreview)
-        let transcriptResults = transcriptPreviews.map { preview in
-            TranscriptDecodeResult(
-                sessionID: preview.sessionID,
-                title: preview.title,
-                segments: preview.segments,
-                diagnostics: [],
-                isPartial: preview.isTruncated
-            )
-        }
-        let discoverSessionSources = DiscoverSessionSourcesUseCase(
-            sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries)
-        )
-        let appShellUseCase = AppShellUseCase(
-            launchConfigurationProvider: FixtureHarnessLaunchConfigurationProvider(
-                configuredSourceCount: sourceSummaries.count
-            ),
-            discoverSessionSources: discoverSessionSources
-        )
-
-        return SessionDeckApplicationComposition(
-            appShellUseCase: appShellUseCase,
-            appShellViewModel: appShellUseCase.makeViewModel(),
-            discoverSessionSources: discoverSessionSources,
-            enumerateCandidateSessionFiles: EnumerateCandidateSessionFilesUseCase(
-                candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(files: [])
-            ),
-            listSessions: ListSessionsUseCase(
-                sessionCatalog: FakeSessionCatalogPort(sessions: sessionSummaries)
-            ),
-            refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase(
-                sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries),
-                metadataExtraction: FakeCatalogMetadataExtractionPort(resultsBySourceID: extractionResultsBySourceID)
-            ),
-            loadTranscriptPreview: LoadTranscriptPreviewUseCase(
-                transcriptLoading: FakeTranscriptLoadingPort(previews: transcriptPreviews)
-            ),
-            loadTranscriptSegments: LoadTranscriptSegmentsUseCase(
-                transcriptDecoding: FakeTranscriptDecodingPort(results: transcriptResults)
-            ),
-            loadSelectedTranscript: LoadSelectedTranscriptUseCase(
-                selectedTranscriptLoading: FakeSelectedTranscriptLoadingPort(
-                    results: Dictionary(uniqueKeysWithValues: transcriptResults.map { ($0.sessionID, $0) })
-                )
-            )
-        )
-    }
-
     private func applicationSession(
         from sessionFile: TempCodexSessionFile
     ) throws -> FixtureHarnessApplicationSession {
         FixtureHarnessApplicationSession(id: SessionID(rawValue: sessionFile.sessionID), file: sessionFile)
     }
 
-    private func sessionSummary(from sessionFile: TempCodexSessionFile) throws -> SessionSummary {
+    func sessionSummary(from sessionFile: TempCodexSessionFile) throws -> SessionSummary {
         let metadata = try readMetadata(from: sessionFile)
         let sourceID = sourceID(for: sessionFile.source)
         return SessionSummary(
@@ -195,7 +127,7 @@ final class FixtureHarnessApplicationSmoke {
         )
     }
 
-    private func transcriptPreview(from sessionFile: TempCodexSessionFile) throws -> TranscriptPreview {
+    func transcriptPreview(from sessionFile: TempCodexSessionFile) throws -> TranscriptPreview {
         let metadata = try readMetadata(from: sessionFile)
         let allSegments = try transcriptSegments(from: sessionFile)
         let previewSegments = Array(allSegments.prefix(3))
