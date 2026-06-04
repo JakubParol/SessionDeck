@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import SessionDeckCore
 
@@ -38,4 +39,137 @@ func appShellUseCaseUsesInjectedProvider() {
     #expect(viewModel.safetyPolicy.permitsNetworkCalls == false)
     #expect(viewModel.safetyPolicy.permitsCommandExecution == false)
     #expect(viewModel.safetyPolicy.permitsSessionMutation == false)
+}
+
+@Test("app shell use case renders launch source discovery summary from application DTOs")
+func appShellUseCaseRendersLaunchSourceDiscoverySummary() {
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        discoverSessionSources: DiscoverSessionSourcesUseCase(
+            sourceDiscovery: FakeSourceDiscoveryPort(
+                sources: [
+                    SessionSourceSummary(
+                        id: sourceID,
+                        displayName: "Codex fixture",
+                        kind: .codex,
+                        locationDescription: "/tmp/sessiondeck-fixture/.codex/sessions",
+                        isEnabled: true,
+                        availability: .available,
+                        counts: SessionSourceCounts(sessionBucketDirectoryCount: 2, transcriptFileCount: 3)
+                    ),
+                ]
+            )
+        )
+    )
+
+    let viewModel = useCase.makeViewModel()
+
+    #expect(viewModel.sourceDiscoverySummary.configuredSourceCount == 1)
+    #expect(viewModel.sourceDiscoverySummary.availableSourceCount == 1)
+    #expect(viewModel.sourceDiscoverySummary.candidateFileCount == 3)
+    #expect(viewModel.sourceDiscoverySummary.warningCount == 0)
+    #expect(viewModel.sourceDiscoverySummary.errorCount == 0)
+    #expect(viewModel.sourceDiscoverySummary.statusMessage == "Source discovery found 1 available source(s).")
+}
+
+@Test("composition root reports missing default source without reading real home data")
+func appShellUseCaseReportsMissingDefaultSourceWithTempHome() throws {
+    let fixtureRoot = try FixtureTempRoot(
+        parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
+        name: "sessiondeck-missing-source-\(UUID().uuidString)",
+        pathGuard: FixturePathGuard(forbiddenHomeDirectories: [FileManager.default.homeDirectoryForCurrentUser])
+    )
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let composition = SessionDeckCompositionRoot.makeApplicationComposition(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: fixtureRoot.url)
+    )
+
+    let summary = composition.appShellViewModel.sourceDiscoverySummary
+    #expect(summary.configuredSourceCount == 1)
+    #expect(summary.availableSourceCount == 0)
+    #expect(summary.candidateFileCount == 0)
+    #expect(summary.warningCount == 1)
+    #expect(summary.errorCount == 0)
+    #expect(summary.statusMessage == "Source discovery completed with warnings.")
+}
+
+@Test("refresh view model reruns source discovery through the application use case")
+func refreshViewModelRerunsSourceDiscovery() {
+    let sourceID = SessionSourceID(rawValue: "codex-refresh")
+    let sourceDiscovery = CountingSourceDiscoveryPort(
+        responses: [
+            [
+                SessionSourceSummary(
+                    id: sourceID,
+                    displayName: "Codex refresh",
+                    kind: .codex,
+                    locationDescription: "/tmp/sessiondeck-refresh/.codex/sessions",
+                    isEnabled: true,
+                    availability: .missing,
+                    diagnostic: SessionSourceDiagnostic(
+                        code: .codexSessionsRootMissing,
+                        message: "Configured Codex sessions root was not found."
+                    )
+                ),
+            ],
+            [
+                SessionSourceSummary(
+                    id: sourceID,
+                    displayName: "Codex refresh",
+                    kind: .codex,
+                    locationDescription: "/tmp/sessiondeck-refresh/.codex/sessions",
+                    isEnabled: true,
+                    availability: .available,
+                    counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 2)
+                ),
+            ],
+        ]
+    )
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        discoverSessionSources: DiscoverSessionSourcesUseCase(sourceDiscovery: sourceDiscovery)
+    )
+
+    let initialViewModel = useCase.makeViewModel()
+    let refreshedViewModel = useCase.refreshViewModel()
+
+    #expect(sourceDiscovery.callCount == 2)
+    #expect(initialViewModel.sourceDiscoverySummary.availableSourceCount == 0)
+    #expect(refreshedViewModel.sourceDiscoverySummary.availableSourceCount == 1)
+    #expect(refreshedViewModel.sourceDiscoverySummary.candidateFileCount == 2)
+}
+
+private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvider {
+    FakeLaunchConfigurationProvider(
+        configuration: AppShellLaunchConfiguration(
+            title: "Fake SessionDeck",
+            subtitle: "Injected application state",
+            statusMessage: "Loaded from a fake provider.",
+            configuredSourceCount: 0,
+            safetyPolicy: .placeholderSafe
+        )
+    )
+}
+
+private final class CountingSourceDiscoveryPort: SourceDiscoveryPort, @unchecked Sendable {
+    private let responses: [[SessionSourceSummary]]
+    private var responseIndex = 0
+    private(set) var callCount = 0
+
+    init(responses: [[SessionSourceSummary]]) {
+        self.responses = responses
+    }
+
+    func discoverSources() throws -> [SessionSourceSummary] {
+        defer {
+            callCount += 1
+            responseIndex += 1
+        }
+
+        return responses[min(responseIndex, responses.count - 1)]
+    }
 }

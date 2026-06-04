@@ -7,7 +7,10 @@ struct SessionDeckApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppShellView(viewModel: composition.appShellViewModel)
+            AppShellView(
+                viewModel: composition.appShellViewModel,
+                appShellUseCase: composition.appShellUseCase
+            )
         }
         .windowResizability(.contentSize)
     }
