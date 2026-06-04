@@ -2,6 +2,7 @@ import Foundation
 
 enum CodexTranscriptFixtureID: String, CaseIterable {
     case projectSession = "project-session"
+    case toolActivityMixed = "tool-activity-mixed"
     case minimalConversationTurns = "minimal-conversation-turns"
     case multiTurnConversation = "multi-turn-conversation"
     case malformedLine = "malformed-line"
@@ -29,6 +30,12 @@ enum CodexTranscriptFixtureManifest {
             filename: "project-session.jsonl",
             summary: "Valid synthetic project session with user, assistant, tool call, and tool output events.",
             categories: ["valid", "project", "tool-call", "tool-output"]
+        ),
+        CodexTranscriptFixture(
+            id: .toolActivityMixed,
+            filename: "tool-activity-mixed.jsonl",
+            summary: "Synthetic transcript with ordered user, assistant, tool call, tool output, and failed tool output events.",
+            categories: ["valid", "conversation", "tool-call", "tool-output", "tool-error", "mixed-order"]
         ),
         CodexTranscriptFixture(
             id: .minimalConversationTurns,
