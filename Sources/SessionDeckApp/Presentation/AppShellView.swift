@@ -4,14 +4,32 @@ import SwiftUI
 struct AppShellView: View {
     let appShellUseCase: AppShellUseCase
     @State private var viewModel: AppShellViewModel
+    @State private var selectedNavigationNodeID: String?
     @State private var selectedSessionID: SessionID?
 
     init(viewModel: AppShellViewModel, appShellUseCase: AppShellUseCase) {
         self.appShellUseCase = appShellUseCase
         self._viewModel = State(initialValue: viewModel)
+        self._selectedNavigationNodeID = State(initialValue: viewModel.selectedNavigationNodeID)
     }
 
     var body: some View {
+        NavigationSplitView {
+            AppShellNavigationView(
+                summary: viewModel.navigationSummary,
+                selectedNavigationNodeID: $selectedNavigationNodeID
+            )
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
+        } detail: {
+            detailContent
+        }
+        .frame(minWidth: 900, minHeight: 560)
+        .onChange(of: selectedNavigationNodeID) { _, newValue in
+            selectNavigationNode(newValue)
+        }
+    }
+
+    private var detailContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 Text(viewModel.title)
@@ -43,21 +61,15 @@ struct AppShellView: View {
 
             Divider()
 
-            AppShellNavigationView(
-                summary: viewModel.navigationSummary,
-                selectedSessionID: $selectedSessionID
-            )
-
-            Divider()
-
             AppShellCatalogView(
                 summary: viewModel.catalogSummary,
                 refreshState: viewModel.refreshState,
+                scopeTitle: viewModel.selectedNavigationTitle,
                 selectedSessionID: $selectedSessionID
             )
         }
         .padding(32)
-        .frame(minWidth: 760, minHeight: 520, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var sourceCountSummary: String {
@@ -105,7 +117,16 @@ struct AppShellView: View {
     }
 
     private func refreshSources() {
-        viewModel = appShellUseCase.refreshingViewModel()
-        viewModel = appShellUseCase.refreshViewModel()
+        viewModel = appShellUseCase.refreshingViewModel(selectedNavigationNodeID: selectedNavigationNodeID)
+        let refreshedViewModel = appShellUseCase.refreshViewModel(selectedNavigationNodeID: selectedNavigationNodeID)
+        selectedNavigationNodeID = refreshedViewModel.selectedNavigationNodeID
+        viewModel = refreshedViewModel
+    }
+
+    private func selectNavigationNode(_ nodeID: String?) {
+        let selectedViewModel = appShellUseCase.makeViewModel(selectedNavigationNodeID: nodeID)
+        selectedNavigationNodeID = selectedViewModel.selectedNavigationNodeID
+        selectedSessionID = selectedViewModel.catalogSummary.rows.first?.id
+        viewModel = selectedViewModel
     }
 }

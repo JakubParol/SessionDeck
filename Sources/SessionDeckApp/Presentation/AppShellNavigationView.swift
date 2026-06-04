@@ -3,60 +3,51 @@ import SwiftUI
 
 struct AppShellNavigationView: View {
     let summary: AppShellNavigationSummary
-    @Binding var selectedSessionID: SessionID?
-
-    private let columns = [
-        GridItem(.adaptive(minimum: 190), alignment: .topLeading),
-    ]
+    @Binding var selectedNavigationNodeID: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Navigation", systemImage: "sidebar.left")
-                .font(.title3.bold())
+        List(selection: $selectedNavigationNodeID) {
+            ForEach(summary.sectionNodes) { sectionNode in
+                Section {
+                    navigationRow(sectionNode, level: 0)
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
-                ForEach(summary.sectionNodes) { sectionNode in
-                    VStack(alignment: .leading, spacing: 6) {
-                        nodeButton(sectionNode, systemImage: sectionIcon(sectionNode))
-
-                        ForEach(sectionNode.children) { childNode in
-                            VStack(alignment: .leading, spacing: 5) {
-                                nodeButton(childNode, systemImage: childIcon(childNode))
-                                    .padding(.leading, 18)
-
-                                ForEach(childNode.children) { nestedNode in
-                                    nodeButton(nestedNode, systemImage: childIcon(nestedNode))
-                                        .padding(.leading, 36)
-                                }
-                            }
-                        }
+                    ForEach(flattenedChildren(of: sectionNode)) { row in
+                        navigationRow(row.node, level: row.level)
                     }
+                } header: {
+                    Text(sectionNode.title)
                 }
             }
-            .font(.callout)
         }
+        .listStyle(.sidebar)
+        .navigationTitle("Navigation")
     }
 
-    private func nodeButton(_ node: AppShellNavigationNode, systemImage: String) -> some View {
-        Button(action: { selectedSessionID = node.sessionIDs.first }) {
-            Label {
-                nodeText(node)
-            } icon: {
-                Image(systemName: systemImage)
-            }
-            .contentShape(Rectangle())
+    private func navigationRow(_ node: AppShellNavigationNode, level: Int) -> some View {
+        Label {
+            nodeText(node)
+        } icon: {
+            Image(systemName: level == 0 ? sectionIcon(node) : childIcon(node))
         }
-        .buttonStyle(.plain)
-        .disabled(node.sessionIDs.isEmpty)
+        .padding(.leading, CGFloat(level) * 12)
+        .tag(node.id)
     }
 
     private func nodeText(_ node: AppShellNavigationNode) -> some View {
-        HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(node.title)
                 .lineLimit(1)
             Text(node.countLabel)
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+        }
+    }
+
+    private func flattenedChildren(of node: AppShellNavigationNode) -> [NavigationSidebarRow] {
+        node.children.flatMap { childNode in
+            [NavigationSidebarRow(node: childNode, level: 1)]
+                + childNode.children.map { NavigationSidebarRow(node: $0, level: 2) }
         }
     }
 
@@ -90,5 +81,14 @@ struct AppShellNavigationView: View {
         case nil:
             return node.children.isEmpty ? "folder" : "folder.badge.questionmark"
         }
+    }
+}
+
+private struct NavigationSidebarRow: Identifiable {
+    let node: AppShellNavigationNode
+    let level: Int
+
+    var id: String {
+        node.id
     }
 }
