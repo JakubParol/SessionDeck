@@ -82,15 +82,15 @@ func navigationTreeGroupsPopulatedCatalogSessionsByProjectSourceAndRecency() {
     let summary = AppShellNavigationSummary.make(snapshot: snapshot)
 
     #expect(summary.projectsNode.count == 3)
-    #expect(summary.projectsNode.children.map(\.title) == ["Alpha", "Beta"])
-    #expect(summary.projectsNode.children.map(\.count) == [2, 1])
+    #expect(summary.projectsNode.children.map(\.title) == ["Beta", "Alpha"])
+    #expect(summary.projectsNode.children.map(\.count) == [1, 2])
     #expect(summary.nonProjectChatsNode.count == 1)
     #expect(summary.nonProjectChatsNode.sessionIDs.map(\.rawValue) == ["loose-chat"])
     #expect(summary.sourcesNode.count == 4)
-    #expect(summary.sourcesNode.children.map(\.title) == ["Codex", "Hermes"])
-    #expect(summary.sourcesNode.children.map(\.count) == [3, 1])
-    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.title) == ["Naomi", "Jim"])
-    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.count) == [3, 1])
+    #expect(summary.sourcesNode.children.map(\.title) == ["Hermes", "Codex"])
+    #expect(summary.sourcesNode.children.map(\.count) == [1, 3])
+    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.title) == ["Jim", "Naomi"])
+    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.count) == [1, 3])
     #expect(summary.recentlyActiveNode.sessionIDs.map(\.rawValue) == [
         "beta-chat",
         "alpha-new",

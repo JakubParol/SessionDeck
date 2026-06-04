@@ -112,6 +112,33 @@ func projectGroupingKeepsDuplicateDisplayNamesDistinctByCWD() {
     #expect(firstGroup.id != secondGroup.id)
 }
 
+@Test("project grouping orders groups by newest child activity")
+func projectGroupingOrdersGroupsByNewestChildActivity() {
+    let olderAlpha = projectGroupingSession(
+        id: "older-alpha",
+        projectHint: CatalogProjectHint(cwdPath: "/Users/kuba/Repos/Alpha", displayName: "Alpha"),
+        lastActivity: 10
+    )
+    let newerBeta = projectGroupingSession(
+        id: "newer-beta",
+        projectHint: CatalogProjectHint(cwdPath: "/Users/kuba/Repos/Beta", displayName: "Beta"),
+        lastActivity: 30
+    )
+    let unknownGamma = projectGroupingSession(
+        id: "unknown-gamma",
+        projectHint: CatalogProjectHint(cwdPath: "/Users/kuba/Repos/Gamma", displayName: "Gamma"),
+        lastActivity: nil
+    )
+
+    let groups = ProjectGroupingPolicy.resolve(sessions: [olderAlpha, unknownGamma, newerBeta])
+
+    #expect(groups.map(\.id) == [
+        "project./Users/kuba/Repos/Beta",
+        "project./Users/kuba/Repos/Alpha",
+        "project./Users/kuba/Repos/Gamma",
+    ])
+}
+
 @Test("project grouping preserves every mixed synthetic catalog session")
 func projectGroupingPreservesEveryMixedSyntheticCatalogSession() {
     let sessions = [
@@ -179,6 +206,7 @@ func projectGroupingPreservesEveryMixedSyntheticCatalogSession() {
 private func projectGroupingSession(
     id: String,
     projectHint: CatalogProjectHint,
+    lastActivity: Int64? = nil,
     fallbackReasons: [CatalogSessionFallbackReason] = [],
     health: CatalogEntryHealth = CatalogEntryHealth(parseStatus: .complete)
 ) -> SessionSummary {
@@ -194,7 +222,7 @@ private func projectGroupingSession(
         title: "Session \(id)",
         projectHint: projectHint,
         sessionPath: "/tmp/sessiondeck/\(id).jsonl",
-        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: nil),
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: lastActivity),
         fileSize: CatalogFileSize(byteCount: 128),
         fallbackReasons: fallbackReasons,
         health: health
