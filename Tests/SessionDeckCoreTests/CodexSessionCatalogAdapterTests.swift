@@ -43,6 +43,7 @@ func codexCatalogAdapterExtractsBoundedMetadataFromCandidateFiles() throws {
     #expect(summary.activity.createdAtEpochSeconds == 1_767_225_600)
     #expect(summary.activity.lastActivityEpochSeconds == 1_767_225_605)
     #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.isEmpty)
 }
 
 @Test("Codex catalog adapter ignores byte-limit truncation after metadata")
@@ -75,6 +76,7 @@ func codexCatalogAdapterIgnoresByteLimitTruncationAfterMetadata() throws {
     #expect(summary.id == SessionID(rawValue: "large-session"))
     #expect(summary.displayTitle == "Large Output Catalog")
     #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.map(\.code) == [.boundedReadTruncated])
     #expect(summary.displayTitle.contains(String(repeating: "x", count: 16)) == false)
 }
 
@@ -104,6 +106,7 @@ func codexCatalogAdapterReportsMalformedLinesInsideScanBounds() throws {
 
     #expect(summary.id == SessionID(rawValue: "malformed-session"))
     #expect(summary.health.parseStatus == .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata."))
+    #expect(summary.health.diagnostics.map(\.code) == [.malformedJSONL])
     #expect(summary.health.allowsListing)
 }
 
@@ -135,6 +138,7 @@ func codexCatalogAdapterReportsExactLimitMalformedFinalLines() throws {
     let summary = try #require(try adapter.listSessions(sourceID: nil).first)
 
     #expect(summary.health.parseStatus == .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata."))
+    #expect(summary.health.diagnostics.map(\.code) == [.malformedJSONL])
 }
 
 @Test("Codex catalog adapter keeps missing-metadata sessions visible without mutating fixtures")
@@ -165,8 +169,73 @@ func codexCatalogAdapterKeepsMissingMetadataSessionsVisibleWithoutMutation() thr
     #expect(summary.id == SessionID(rawValue: "missing-meta"))
     #expect(summary.projectHint == .unavailable)
     #expect(summary.health.parseStatus == .missingMetadata)
+    #expect(summary.health.diagnostics.map(\.code) == [.missingMetadata, .unknownEventShape])
     #expect(summary.activity.createdAtEpochSeconds == 1_767_225_780)
     #expect(after == before)
+}
+
+@Test("Codex catalog adapter records unknown event warnings without hiding known metadata")
+func codexCatalogAdapterRecordsUnknownEventWarningsWithoutHidingMetadata() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "unknown-event")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-01-01T00:04:00Z","type":"session_meta","payload":{"id":"unknown-event","title":"Unknown Event Catalog","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+        {"timestamp":"2026-01-01T00:04:01Z","type":"codex_future_event","payload":{"private_text":"fixture body must not leak"}}
+
+        """,
+        source: source,
+        sessionID: "unknown-event",
+        placement: .project("SessionDeck"),
+        timestamp: "2026-01-01T00:04:00Z"
+    )
+    let adapter = try makeCatalogAdapter(source: source, transcript: transcript)
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.id == SessionID(rawValue: "unknown-event"))
+    #expect(summary.displayTitle == "Unknown Event Catalog")
+    #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.map(\.code) == [.unknownEventShape])
+    #expect(summary.health.diagnostics.first?.message.contains("fixture body") == false)
+}
+
+@Test("Codex catalog adapter maps unreadable candidates to visible diagnostic entries")
+func codexCatalogAdapterMapsUnreadableCandidatesToVisibleDiagnosticEntries() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "candidate-diagnostic")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        #"{"type":"session_meta"}"#,
+        source: source,
+        sessionID: "candidate-diagnostic",
+        placement: .project("SessionDeck"),
+        timestamp: "2026-01-01T00:05:00Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        diagnostic: CandidateSessionFileDiagnostic(
+            code: .codexCandidateFileUnreadable,
+            severity: .warning,
+            allowsDiscoveryToContinue: true,
+            message: "Candidate transcript file is not readable."
+        )
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.id == SessionID(rawValue: "rollout-2026-01-01T00-05-00Z-candidate-diagnostic"))
+    #expect(summary.health.parseStatus == .unreadable(reason: "Candidate transcript file is not readable."))
+    #expect(summary.health.diagnostics.map(\.code) == [.unreadableFile])
+    #expect(summary.health.allowsListing)
 }
 
 private func makeCatalogFixtureRoot(name: String) throws -> FixtureTempRoot {
@@ -182,7 +251,8 @@ private func makeCatalogAdapter(
     source: TempCodexSessionSource,
     transcript: TempCodexSessionFile,
     modifiedAt: Date? = nil,
-    scanLimits: CodexCatalogScanLimits = CodexCatalogScanLimits()
+    scanLimits: CodexCatalogScanLimits = CodexCatalogScanLimits(),
+    diagnostic: CandidateSessionFileDiagnostic? = nil
 ) throws -> CodexSessionCatalogAdapter {
     let sourceID = defaultCatalogSourceID()
     return CodexSessionCatalogAdapter(
@@ -207,7 +277,7 @@ private func makeCatalogAdapter(
                     modifiedAt: modifiedAt,
                     confidence: .high,
                     reason: "test",
-                    diagnostic: nil
+                    diagnostic: diagnostic
                 ),
             ]
         ),
