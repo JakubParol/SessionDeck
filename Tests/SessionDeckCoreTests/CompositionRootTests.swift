@@ -42,6 +42,13 @@ func compositionRootWiresDefaultSourceDiscoveryWithoutPresentationIO() throws {
     } catch let error as PlaceholderTranscriptLoadingError {
         #expect(error == .previewUnavailable(missingSessionID))
     }
+
+    do {
+        _ = try composition.loadTranscriptSegments.loadTranscript(sessionID: missingSessionID)
+        Issue.record("Placeholder transcript decoding must not synthesize or read transcript content")
+    } catch let error as PlaceholderTranscriptDecodingError {
+        #expect(error == .transcriptUnavailable(missingSessionID))
+    }
 }
 
 @Test("composition root passes configured source definitions through one boundary")

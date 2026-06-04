@@ -33,6 +33,9 @@ public enum SessionDeckCompositionRoot {
         let loadTranscriptPreview = LoadTranscriptPreviewUseCase(
             transcriptLoading: PlaceholderTranscriptLoadingAdapter()
         )
+        let loadTranscriptSegments = LoadTranscriptSegmentsUseCase(
+            transcriptDecoding: PlaceholderTranscriptDecodingAdapter()
+        )
 
         return SessionDeckApplicationComposition(
             appShellUseCase: appShellUseCase,
@@ -41,7 +44,8 @@ public enum SessionDeckCompositionRoot {
             enumerateCandidateSessionFiles: enumerateCandidateSessionFiles,
             listSessions: listSessions,
             refreshCatalogSnapshot: refreshCatalogSnapshot,
-            loadTranscriptPreview: loadTranscriptPreview
+            loadTranscriptPreview: loadTranscriptPreview,
+            loadTranscriptSegments: loadTranscriptSegments
         )
     }
 
