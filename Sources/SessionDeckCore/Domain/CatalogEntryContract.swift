@@ -58,6 +58,12 @@ public struct CatalogSessionMetadata: Equatable, Sendable {
     }
 }
 
+public enum CatalogSessionFallbackReason: String, Equatable, Sendable {
+    case missingPath = "catalog.fallback.missing_path"
+    case unknownSource = "catalog.fallback.unknown_source"
+    case ambiguousProject = "catalog.fallback.ambiguous_project"
+}
+
 public enum CatalogParseStatus: Equatable, Sendable {
     case complete
     case missingMetadata
