@@ -66,7 +66,7 @@ func defaultCodexSourceDiscoveryReportsMissingTempHomeRoot() throws {
     let source = try #require(sources.first)
     #expect(source.availability == .missing)
     #expect(source.isEnabled == false)
-    #expect(source.diagnostic?.code == "codex.sessions_root_missing")
+    #expect(source.diagnostic?.code == .codexSessionsRootMissing)
     #expect(source.locationDescription.hasPrefix(homeDirectory.path))
     #expect(source.locationDescription.contains(NSHomeDirectory()) == false)
     #expect(source.counts == .empty)
@@ -190,7 +190,7 @@ func defaultCodexSourceDiscoveryRecordsUnreadableCandidateDiagnosticsAndContinue
         "2026/06/04/rollout-2026-06-04T10-01-00-unreadable.jsonl",
     ])
     #expect(files.first?.diagnostic == nil)
-    #expect(files.last?.diagnostic?.code == "codex.candidate_file_unreadable")
+    #expect(files.last?.diagnostic?.code == .codexCandidateFileUnreadable)
 }
 
 @Test("default Codex source discovery skips candidate symlinks that escape the source root")

@@ -94,7 +94,7 @@ func configuredSourceDiscoveryReportsDuplicateEquivalentPaths() throws {
     #expect(duplicate.availability == .duplicate)
     #expect(duplicate.isEnabled == false)
     #expect(duplicate.locationDescription == sessionsRoot.standardizedFileURL.path)
-    #expect(duplicate.diagnostic?.code == "source_root_duplicate")
+    #expect(duplicate.diagnostic?.code == .sourceRootDuplicate)
     #expect(duplicate.counts == .empty)
 }
 
@@ -178,7 +178,7 @@ func configuredSourceDiscoveryReportsSymlinkEquivalentPathsAsDuplicates() throws
 
     let duplicate = try #require(sources.last)
     #expect(duplicate.availability == .duplicate)
-    #expect(duplicate.diagnostic?.code == "source_root_duplicate")
+    #expect(duplicate.diagnostic?.code == .sourceRootDuplicate)
     #expect(duplicate.locationDescription == symlinkRoot.standardizedFileURL.path)
 }
 
@@ -222,7 +222,7 @@ func configuredSourceDiscoveryReportsUnsupportedKindsAndContinues() throws {
     let supported = try #require(sources.last)
     #expect(unsupported.availability == .unsupported)
     #expect(unsupported.isEnabled == false)
-    #expect(unsupported.diagnostic?.code == "source_kind_unsupported")
+    #expect(unsupported.diagnostic?.code == .sourceKindUnsupported)
     #expect(unsupported.counts == .empty)
     #expect(supported.id.rawValue == "codex-supported")
     #expect(supported.availability == .available)
@@ -258,7 +258,7 @@ func configuredSourceDiscoveryReportsDisabledRootsWithoutInspectingThem() throws
     #expect(disabled.id.rawValue == "codex-disabled")
     #expect(disabled.availability == .disabled)
     #expect(disabled.isEnabled == false)
-    #expect(disabled.diagnostic?.code == "source_root_disabled")
+    #expect(disabled.diagnostic?.code == .sourceRootDisabled)
     #expect(disabled.counts == .empty)
 }
 

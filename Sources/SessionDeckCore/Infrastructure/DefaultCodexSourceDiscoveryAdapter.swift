@@ -105,7 +105,7 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
                 diagnostic = nil
             } else {
                 diagnostic = CandidateSessionFileDiagnostic(
-                    code: "codex.candidate_file_unreadable",
+                    code: .codexCandidateFileUnreadable,
                     message: "Candidate transcript file could not be read by the current process."
                 )
             }
@@ -255,7 +255,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
                 rootURL: rootURL,
                 availability: .missing,
                 diagnostic: SessionSourceDiagnostic(
-                    code: "codex.sessions_root_missing",
+                    code: .codexSessionsRootMissing,
                     message: "Configured Codex sessions root was not found."
                 ),
                 counts: .empty
@@ -276,7 +276,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
                 rootURL: rootURL,
                 availability: .inaccessible,
                 diagnostic: SessionSourceDiagnostic(
-                    code: "codex.sessions_root_inaccessible",
+                    code: .codexSessionsRootUnreadable,
                     message: "Configured Codex sessions root exists but could not be inspected."
                 ),
                 counts: .empty
@@ -315,7 +315,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             rootURL: rootURL,
             availability: .duplicate,
             diagnostic: SessionSourceDiagnostic(
-                code: "source_root_duplicate",
+                code: .sourceRootDuplicate,
                 message: "Configured source root duplicates an earlier source root."
             ),
             counts: .empty
@@ -331,7 +331,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             rootURL: rootURL,
             availability: .disabled,
             diagnostic: SessionSourceDiagnostic(
-                code: "source_root_disabled",
+                code: .sourceRootDisabled,
                 message: "Configured source root is disabled."
             ),
             counts: .empty
@@ -347,7 +347,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             rootURL: rootURL,
             availability: .unsupported,
             diagnostic: SessionSourceDiagnostic(
-                code: "source_kind_unsupported",
+                code: .sourceKindUnsupported,
                 message: "Configured source kind is not supported by this discovery adapter."
             ),
             counts: .empty

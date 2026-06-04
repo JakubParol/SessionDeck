@@ -55,6 +55,21 @@ func candidateFileEnumerationUseCaseUsesFakePort() throws {
     #expect(files == [candidate])
 }
 
+@Test("source diagnostics expose typed codes for application and presentation DTOs")
+func sourceDiagnosticsExposeTypedCodes() throws {
+    let sourceDiagnostic = SessionSourceDiagnostic(
+        code: .codexSessionsRootMissing,
+        message: "Configured Codex sessions root was not found."
+    )
+    let candidateDiagnostic = CandidateSessionFileDiagnostic(
+        code: .codexCandidateFileUnreadable,
+        message: "Candidate transcript file could not be read by the current process."
+    )
+
+    #expect(sourceDiagnostic.code == .codexSessionsRootMissing)
+    #expect(candidateDiagnostic.code == .codexCandidateFileUnreadable)
+}
+
 @Test("session catalog use case filters session summaries through an injected fake port")
 func sessionCatalogUseCaseUsesFakePort() throws {
     let codexSourceID = SessionSourceID(rawValue: "codex-default")
