@@ -57,6 +57,32 @@ func presentationDoesNotConstructInfrastructure() throws {
     }
 }
 
+@Test("catalog result-state presentation remains local and command-free")
+func catalogResultStatePresentationRemainsLocalAndCommandFree() throws {
+    let files = [
+        repositoryRoot().appending(path: "Sources/SessionDeckCore/Application/AppShellCatalogResultStateViewModel.swift"),
+        repositoryRoot().appending(path: "Sources/SessionDeckCore/Application/AppShellCatalogSummaryViewModel.swift"),
+        repositoryRoot().appending(path: "Sources/SessionDeckApp/Presentation/AppShellCatalogView.swift"),
+    ]
+    let bannedTokens = [
+        "URLSession",
+        "URLRequest",
+        "Process(",
+        "NSWorkspace",
+        "FileManager.default",
+    ]
+
+    for file in files {
+        let contents = try String(contentsOf: file, encoding: .utf8)
+        for token in bannedTokens {
+            #expect(
+                contents.contains(token) == false,
+                "\(file.lastPathComponent) should keep result-state rendering local and command-free"
+            )
+        }
+    }
+}
+
 @Test("Presentation renders navigation sections from the application DTO")
 func presentationRendersNavigationSectionsFromApplicationDTO() throws {
     let navigationView = repositoryRoot()
