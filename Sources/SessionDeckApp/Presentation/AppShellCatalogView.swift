@@ -3,9 +3,12 @@ import SwiftUI
 
 struct AppShellCatalogView: View {
     let summary: AppShellCatalogSummary
+    let queryControls: AppShellCatalogQueryControls
     let refreshState: AppShellRefreshState
     let scopeTitle: String
+    @Binding var catalogQueryState: AppShellCatalogQueryState
     @Binding var selectedSessionID: SessionID?
+    let onCatalogQueryChange: (AppShellCatalogQueryState) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -23,6 +26,12 @@ struct AppShellCatalogView: View {
             Label(summary.statusMessage, systemImage: statusIcon)
                 .font(.callout)
                 .foregroundStyle(statusColor)
+
+            AppShellCatalogControlsView(
+                controls: queryControls,
+                queryState: $catalogQueryState,
+                onQueryChange: onCatalogQueryChange
+            )
 
             content
         }
@@ -176,11 +185,19 @@ struct AppShellCatalogView: View {
     }
 
     private var emptyMessage: String {
-        summary.sourceFailureCount > 0 ? "Catalog source failed" : "No catalog rows"
+        if summary.isFiltered && summary.unfilteredTotalCount > 0 {
+            return "No matching catalog rows"
+        }
+
+        return summary.sourceFailureCount > 0 ? "Catalog source failed" : "No catalog rows"
     }
 
     private var emptyDetail: String {
-        summary.sourceFailureCount > 0
+        if summary.isFiltered && summary.unfilteredTotalCount > 0 {
+            return "Active filters hide \(rowCountLabel(summary.unfilteredTotalCount))."
+        }
+
+        return summary.sourceFailureCount > 0
             ? "Source diagnostics are available above; no rows were hidden."
             : "No lightweight session metadata is available from configured sources yet."
     }

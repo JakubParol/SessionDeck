@@ -6,11 +6,13 @@ struct AppShellView: View {
     @State private var viewModel: AppShellViewModel
     @State private var selectedNavigationNodeID: String?
     @State private var selectedSessionID: SessionID?
+    @State private var catalogQueryState: AppShellCatalogQueryState
 
     init(viewModel: AppShellViewModel, appShellUseCase: AppShellUseCase) {
         self.appShellUseCase = appShellUseCase
         self._viewModel = State(initialValue: viewModel)
         self._selectedNavigationNodeID = State(initialValue: viewModel.selectedNavigationNodeID)
+        self._catalogQueryState = State(initialValue: viewModel.catalogQueryControls.queryState)
     }
 
     var body: some View {
@@ -63,9 +65,12 @@ struct AppShellView: View {
 
             AppShellCatalogView(
                 summary: viewModel.catalogSummary,
+                queryControls: viewModel.catalogQueryControls,
                 refreshState: viewModel.refreshState,
                 scopeTitle: viewModel.selectedNavigationTitle,
-                selectedSessionID: $selectedSessionID
+                catalogQueryState: $catalogQueryState,
+                selectedSessionID: $selectedSessionID,
+                onCatalogQueryChange: updateCatalogQuery
             )
         }
         .padding(32)
@@ -117,16 +122,37 @@ struct AppShellView: View {
     }
 
     private func refreshSources() {
-        viewModel = appShellUseCase.refreshingViewModel(selectedNavigationNodeID: selectedNavigationNodeID)
-        let refreshedViewModel = appShellUseCase.refreshViewModel(selectedNavigationNodeID: selectedNavigationNodeID)
-        selectedNavigationNodeID = refreshedViewModel.selectedNavigationNodeID
-        viewModel = refreshedViewModel
+        viewModel = appShellUseCase.refreshingViewModel(
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: catalogQueryState
+        )
+        let refreshedViewModel = appShellUseCase.refreshViewModel(
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: catalogQueryState
+        )
+        apply(refreshedViewModel)
     }
 
     private func selectNavigationNode(_ nodeID: String?) {
-        let selectedViewModel = appShellUseCase.makeViewModel(selectedNavigationNodeID: nodeID)
-        selectedNavigationNodeID = selectedViewModel.selectedNavigationNodeID
-        selectedSessionID = selectedViewModel.catalogSummary.rows.first?.id
-        viewModel = selectedViewModel
+        let selectedViewModel = appShellUseCase.makeViewModel(
+            selectedNavigationNodeID: nodeID,
+            catalogQuery: catalogQueryState
+        )
+        apply(selectedViewModel)
+    }
+
+    private func updateCatalogQuery(_ queryState: AppShellCatalogQueryState) {
+        let queriedViewModel = appShellUseCase.makeViewModel(
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: queryState
+        )
+        apply(queriedViewModel)
+    }
+
+    private func apply(_ updatedViewModel: AppShellViewModel) {
+        selectedNavigationNodeID = updatedViewModel.selectedNavigationNodeID
+        selectedSessionID = updatedViewModel.catalogSummary.rows.first?.id
+        catalogQueryState = updatedViewModel.catalogQueryControls.queryState
+        viewModel = updatedViewModel
     }
 }
