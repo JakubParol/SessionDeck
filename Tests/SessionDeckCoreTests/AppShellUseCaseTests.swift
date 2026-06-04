@@ -223,7 +223,6 @@ func appShellUseCaseMarksCatalogRefreshFailureState() {
     #expect(viewModel.refreshState == .failed("Catalog refresh failed before rows could be built."))
 }
 
-
 private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvider {
     FakeLaunchConfigurationProvider(
         configuration: AppShellLaunchConfiguration(

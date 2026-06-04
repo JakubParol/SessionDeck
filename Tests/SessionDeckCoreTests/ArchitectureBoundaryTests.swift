@@ -69,6 +69,29 @@ func presentationRendersNavigationSectionsFromApplicationDTO() throws {
     )
 }
 
+@Test("Presentation uses native sidebar selection to scope catalog content")
+func presentationUsesNativeSidebarSelectionToScopeCatalogContent() throws {
+    let appShellView = repositoryRoot()
+        .appending(path: "Sources/SessionDeckApp/Presentation/AppShellView.swift")
+    let navigationView = repositoryRoot()
+        .appending(path: "Sources/SessionDeckApp/Presentation/AppShellNavigationView.swift")
+    let appShellContents = try String(contentsOf: appShellView, encoding: .utf8)
+    let navigationContents = try String(contentsOf: navigationView, encoding: .utf8)
+
+    #expect(
+        appShellContents.contains("NavigationSplitView"),
+        "AppShellView should use a native macOS sidebar-detail layout"
+    )
+    #expect(
+        appShellContents.contains("$selectedNavigationNodeID"),
+        "AppShellView should own stable navigation selection state"
+    )
+    #expect(
+        navigationContents.contains("List(selection: $selectedNavigationNodeID)"),
+        "AppShellNavigationView should use native list selection instead of a disabled button grid"
+    )
+}
+
 @Test("concrete adapters are only constructed in the composition root")
 func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
     let sourcesDirectory = repositoryRoot().appending(path: "Sources")

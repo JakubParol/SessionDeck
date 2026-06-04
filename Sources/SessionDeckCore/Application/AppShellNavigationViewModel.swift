@@ -66,6 +66,12 @@ public struct AppShellNavigationSummary: Equatable, Sendable {
             )
     }
 
+    public var selectableNodes: [AppShellNavigationNode] {
+        sectionNodes.flatMap { node in
+            [node] + node.descendantNodes
+        }
+    }
+
     public init(
         allChatsNode: AppShellNavigationNode,
         projectsNode: AppShellNavigationNode,
@@ -82,4 +88,18 @@ public struct AppShellNavigationSummary: Equatable, Sendable {
         self.diagnosticsNode = diagnosticsNode
     }
 
+}
+
+public extension AppShellNavigationSummary {
+    func node(id: String) -> AppShellNavigationNode? {
+        selectableNodes.first { $0.id == id }
+    }
+}
+
+private extension AppShellNavigationNode {
+    var descendantNodes: [AppShellNavigationNode] {
+        children.flatMap { node in
+            [node] + node.descendantNodes
+        }
+    }
 }

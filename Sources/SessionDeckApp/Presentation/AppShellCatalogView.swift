@@ -4,12 +4,13 @@ import SwiftUI
 struct AppShellCatalogView: View {
     let summary: AppShellCatalogSummary
     let refreshState: AppShellRefreshState
+    let scopeTitle: String
     @Binding var selectedSessionID: SessionID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Catalog", systemImage: "list.bullet.rectangle")
+                Label(scopeTitle, systemImage: "list.bullet.rectangle")
                     .font(.title3.bold())
 
                 Spacer()

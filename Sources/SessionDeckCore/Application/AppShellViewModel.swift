@@ -98,6 +98,8 @@ public struct AppShellViewModel: Equatable, Sendable {
     public let sourceDiscoverySummary: AppShellSourceDiscoverySummary
     public let catalogSummary: AppShellCatalogSummary
     public let navigationSummary: AppShellNavigationSummary
+    public let selectedNavigationNodeID: String
+    public let selectedNavigationTitle: String
     public let refreshState: AppShellRefreshState
     public let safetyPolicy: LaunchSafetyPolicy
 
@@ -109,6 +111,8 @@ public struct AppShellViewModel: Equatable, Sendable {
         sourceDiscoverySummary: AppShellSourceDiscoverySummary = .placeholder,
         catalogSummary: AppShellCatalogSummary = .placeholder,
         navigationSummary: AppShellNavigationSummary = .placeholder,
+        selectedNavigationNodeID: String = "all-chats",
+        selectedNavigationTitle: String = "All Chats",
         refreshState: AppShellRefreshState = .idle,
         safetyPolicy: LaunchSafetyPolicy
     ) {
@@ -119,6 +123,8 @@ public struct AppShellViewModel: Equatable, Sendable {
         self.sourceDiscoverySummary = sourceDiscoverySummary
         self.catalogSummary = catalogSummary
         self.navigationSummary = navigationSummary
+        self.selectedNavigationNodeID = selectedNavigationNodeID
+        self.selectedNavigationTitle = selectedNavigationTitle
         self.refreshState = refreshState
         self.safetyPolicy = safetyPolicy
     }
