@@ -33,6 +33,10 @@ public struct AppShellCatalogDiagnosticSummary: Equatable, Sendable {
         self.sourceFailureCount = sourceFailureCount
         self.primaryMessage = primaryMessage
     }
+
+    public var hasDiagnostics: Bool {
+        entryDiagnosticCount > 0 || sourceWarningCount > 0 || sourceFailureCount > 0
+    }
 }
 
 public struct AppShellCatalogEmptyState: Equatable, Sendable {

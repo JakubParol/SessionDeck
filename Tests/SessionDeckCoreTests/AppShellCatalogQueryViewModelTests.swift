@@ -129,6 +129,7 @@ func appShellCatalogQueryExposesNoResultAndClearBehavior() {
     #expect(noResult.catalogSummary.statusMessage == "No catalog rows match active filters.")
     #expect(noResult.catalogQueryControls.hasActiveFilters)
     #expect(restored.catalogQueryControls.queryState == .empty)
+    #expect(restored.catalogSummary.resultState == .matches)
     #expect(restored.catalogSummary.rows.map(\.id.rawValue) == ["first", "second"])
 }
 

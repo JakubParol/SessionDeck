@@ -88,6 +88,7 @@ func catalogSummaryExposesExplicitResultStateAndDiagnosticSummary() {
     #expect(AppShellCatalogSummary.make(snapshot: healthySnapshot).resultState == .matches)
     #expect(noMatchSummary.resultState == .noMatches)
     #expect(noMatchSummary.diagnosticSummary == .none)
+    #expect(noMatchSummary.diagnosticSummary.hasDiagnostics == false)
     #expect(
         noMatchSummary.emptyState == AppShellCatalogEmptyState(
             title: "No matching catalog rows",
@@ -95,6 +96,7 @@ func catalogSummaryExposesExplicitResultStateAndDiagnosticSummary() {
         )
     )
     #expect(mixedWarningSummary.resultState == .warning)
+    #expect(mixedWarningSummary.diagnosticSummary.hasDiagnostics)
     #expect(mixedWarningSummary.rows.map(\.id.rawValue) == ["healthy-session"])
     #expect(
         mixedWarningSummary.diagnosticSummary == AppShellCatalogDiagnosticSummary(
