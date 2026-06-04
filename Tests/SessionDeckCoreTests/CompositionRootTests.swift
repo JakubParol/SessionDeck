@@ -53,11 +53,19 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
     let transcriptURL = sessionsRoot
         .appending(path: "2026/06/03", directoryHint: .isDirectory)
         .appending(path: "rollout-2026-06-03T06-00-00-composition.jsonl")
+    let unreadableTranscriptURL = sessionsRoot
+        .appending(path: "2026/06/03", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-03T06-01-00-unreadable.jsonl")
     try FileManager.default.createDirectory(
         at: transcriptURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
     )
     try #"{"type":"session_meta"}"#.write(to: transcriptURL, atomically: true, encoding: .utf8)
+    try #"{"type":"session_meta"}"#.write(to: unreadableTranscriptURL, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadableTranscriptURL.path)
+    defer {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: unreadableTranscriptURL.path)
+    }
 
     let composition = SessionDeckCompositionRoot.makeApplicationComposition(
         homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: fixtureRoot.url),
@@ -80,6 +88,14 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
     #expect(sources.first?.locationDescription == sessionsRoot.standardizedFileURL.path)
 
     let candidates = try composition.enumerateCandidateSessionFiles.enumerateCandidateFiles()
-    #expect(candidates.map(\.sourceID.rawValue) == ["codex-configured"])
-    #expect(candidates.map(\.relativePath) == ["2026/06/03/rollout-2026-06-03T06-00-00-composition.jsonl"])
+    #expect(candidates.map(\.sourceID.rawValue) == ["codex-configured", "codex-configured"])
+    #expect(candidates.map(\.relativePath) == [
+        "2026/06/03/rollout-2026-06-03T06-00-00-composition.jsonl",
+        "2026/06/03/rollout-2026-06-03T06-01-00-unreadable.jsonl",
+    ])
+
+    let report = try composition.discoverSessionSources.discoveryReport()
+    #expect(report.candidateDiagnostics.map(\.candidate.relativePath) == [
+        "2026/06/03/rollout-2026-06-03T06-01-00-unreadable.jsonl",
+    ])
 }

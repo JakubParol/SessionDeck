@@ -11,7 +11,8 @@ public enum SessionDeckCompositionRoot {
             sourceDefinitions: sourceDefinitions
         )
         let discoverSessionSources = DiscoverSessionSourcesUseCase(
-            sourceDiscovery: sourceDiscoveryAdapter
+            sourceDiscovery: sourceDiscoveryAdapter,
+            candidateFileEnumeration: sourceDiscoveryAdapter
         )
         let enumerateCandidateSessionFiles = EnumerateCandidateSessionFilesUseCase(
             candidateFileEnumeration: sourceDiscoveryAdapter

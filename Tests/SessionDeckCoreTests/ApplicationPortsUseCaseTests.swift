@@ -32,6 +32,125 @@ func sourceDiscoveryUseCaseUsesFakePort() throws {
     ])
 }
 
+@Test("source discovery report preserves healthy sources and failed diagnostics")
+func sourceDiscoveryReportPreservesHealthySourcesAndFailedDiagnostics() throws {
+    let healthySource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-healthy"),
+        displayName: "Codex healthy",
+        kind: .codex,
+        locationDescription: "Synthetic healthy source",
+        isEnabled: true,
+        availability: .available,
+        counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 2)
+    )
+    let failedSource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-missing"),
+        displayName: "Codex missing",
+        kind: .codex,
+        locationDescription: "Synthetic missing source",
+        isEnabled: true,
+        availability: .missing,
+        diagnostic: SessionSourceDiagnostic(
+            code: .codexSessionsRootMissing,
+            message: "Configured Codex sessions root was not found."
+        )
+    )
+    let useCase = DiscoverSessionSourcesUseCase(
+        sourceDiscovery: FakeSourceDiscoveryPort(sources: [healthySource, failedSource])
+    )
+
+    let report = try useCase.discoveryReport()
+
+    #expect(report.sources == [healthySource, failedSource])
+    #expect(report.availableSources == [healthySource])
+    #expect(report.diagnostics.map(\.sourceID) == [failedSource.id])
+    #expect(report.diagnostics.map(\.diagnostic.code) == [.codexSessionsRootMissing])
+    #expect(report.canContinueDiscovery)
+}
+
+@Test("source discovery report includes candidate file diagnostics in health summaries")
+func sourceDiscoveryReportIncludesCandidateFileDiagnosticsInHealthSummaries() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-primary")
+    let source = SessionSourceSummary(
+        id: sourceID,
+        displayName: "Codex primary",
+        kind: .codex,
+        locationDescription: "Synthetic primary source",
+        isEnabled: true,
+        availability: .available,
+        counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 2)
+    )
+    let candidate = CandidateSessionFile(
+        sourceID: sourceID,
+        relativePath: "2026/06/04/rollout-2026-06-04T10-01-00-unreadable.jsonl",
+        absolutePath: "/tmp/source/.codex/sessions/2026/06/04/rollout-2026-06-04T10-01-00-unreadable.jsonl",
+        byteSize: 128,
+        modifiedAt: nil,
+        confidence: .high,
+        reason: "codex.sessions.date-bucket-jsonl",
+        diagnostic: CandidateSessionFileDiagnostic(
+            code: .codexCandidateFileUnreadable,
+            message: "Candidate transcript file could not be read by the current process."
+        )
+    )
+    let useCase = DiscoverSessionSourcesUseCase(
+        sourceDiscovery: FakeSourceDiscoveryPort(sources: [source]),
+        candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(files: [candidate])
+    )
+
+    let report = try useCase.discoveryReport()
+
+    #expect(report.candidateDiagnostics.map(\.sourceID) == [sourceID])
+    #expect(report.candidateDiagnostics.map(\.candidate.relativePath) == [candidate.relativePath])
+    #expect(report.healthSummaries.map(\.candidateDiagnosticCode) == [.codexCandidateFileUnreadable])
+    #expect(report.healthSummaries.map(\.severity) == [.warning])
+}
+
+@Test("source discovery report exposes presentation-facing health summaries")
+func sourceDiscoveryReportExposesPresentationFacingHealthSummaries() throws {
+    let healthySource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-healthy"),
+        displayName: "Codex healthy",
+        kind: .codex,
+        locationDescription: "Synthetic healthy source",
+        isEnabled: true,
+        availability: .available,
+        counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 2)
+    )
+    let missingSource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-missing"),
+        displayName: "Codex missing",
+        kind: .codex,
+        locationDescription: "Synthetic missing source",
+        isEnabled: true,
+        availability: .missing,
+        diagnostic: SessionSourceDiagnostic(
+            code: .codexSessionsRootMissing,
+            message: "Configured Codex sessions root was not found."
+        )
+    )
+    let report = SessionSourceDiscoveryReport(sources: [healthySource, missingSource])
+
+    #expect(report.healthSummaries == [
+        SourceHealthSummary(
+            sourceID: healthySource.id,
+            displayName: "Codex healthy",
+            severity: .info,
+            diagnosticCode: nil,
+            message: "Source is available with 2 candidate transcript files.",
+            allowsDiscoveryToContinue: true
+        ),
+        SourceHealthSummary(
+            sourceID: missingSource.id,
+            displayName: "Codex missing",
+            severity: .warning,
+            diagnosticCode: .codexSessionsRootMissing,
+            message: "Configured Codex sessions root was not found.",
+            allowsDiscoveryToContinue: true
+        ),
+    ])
+}
+
 @Test("candidate file enumeration use case returns bounded metadata through an injected fake port")
 func candidateFileEnumerationUseCaseUsesFakePort() throws {
     let sourceID = SessionSourceID(rawValue: "codex-default")
@@ -53,6 +172,42 @@ func candidateFileEnumerationUseCaseUsesFakePort() throws {
     let files = try useCase.enumerateCandidateFiles(sourceID: sourceID)
 
     #expect(files == [candidate])
+}
+
+@Test("source diagnostics expose typed codes for application and presentation DTOs")
+func sourceDiagnosticsExposeTypedCodes() throws {
+    let sourceDiagnostic = SessionSourceDiagnostic(
+        code: .codexSessionsRootMissing,
+        message: "Configured Codex sessions root was not found."
+    )
+    let candidateDiagnostic = CandidateSessionFileDiagnostic(
+        code: .codexCandidateFileUnreadable,
+        message: "Candidate transcript file could not be read by the current process."
+    )
+
+    #expect(sourceDiagnostic.code == .codexSessionsRootMissing)
+    #expect(candidateDiagnostic.code == .codexCandidateFileUnreadable)
+}
+
+@Test("source diagnostics expose severity and continuation policy")
+func sourceDiagnosticsExposeSeverityAndContinuationPolicy() throws {
+    let missingDiagnostic = SessionSourceDiagnostic(
+        code: .codexSessionsRootMissing,
+        severity: .warning,
+        allowsDiscoveryToContinue: true,
+        message: "Configured Codex sessions root was not found."
+    )
+    let unreadableCandidateDiagnostic = CandidateSessionFileDiagnostic(
+        code: .codexCandidateFileUnreadable,
+        severity: .warning,
+        allowsDiscoveryToContinue: true,
+        message: "Candidate transcript file could not be read by the current process."
+    )
+
+    #expect(missingDiagnostic.severity == .warning)
+    #expect(missingDiagnostic.allowsDiscoveryToContinue)
+    #expect(unreadableCandidateDiagnostic.severity == .warning)
+    #expect(unreadableCandidateDiagnostic.allowsDiscoveryToContinue)
 }
 
 @Test("session catalog use case filters session summaries through an injected fake port")

@@ -18,6 +18,7 @@ public struct EnvironmentHomeDirectoryProvider: HomeDirectoryProviding, Sendable
 
 public protocol CodexSourceFileSystemChecking: Sendable {
     func directoryExists(at url: URL) -> Bool
+    func isReadableDirectory(at url: URL) -> Bool
     func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts
     func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile]
 }
@@ -37,18 +38,26 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
         return exists && isDirectory.boolValue
     }
 
+    public func isReadableDirectory(at url: URL) -> Bool {
+        fileManager.isReadableFile(atPath: url.path)
+    }
+
     public func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts {
         guard let enumerator = fileManager.enumerator(
             at: sessionsRoot,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else {
-            return .empty
+            throw CodexSourceFileSystemError.unreadableDirectory
         }
 
         var transcriptFileCount = 0
         var sessionBucketDirectoryPaths: Set<String> = []
         for case let fileURL as URL in enumerator {
+            guard isConservativeCodexTranscriptCandidate(fileURL: fileURL, sessionsRoot: sessionsRoot) else {
+                continue
+            }
+
             let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
             if values.isRegularFile == true && fileURL.pathExtension == "jsonl" {
                 transcriptFileCount += 1
@@ -105,7 +114,7 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
                 diagnostic = nil
             } else {
                 diagnostic = CandidateSessionFileDiagnostic(
-                    code: "codex.candidate_file_unreadable",
+                    code: .codexCandidateFileUnreadable,
                     message: "Candidate transcript file could not be read by the current process."
                 )
             }
@@ -167,6 +176,10 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
         let resolvedFilePath = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
         return resolvedFilePath.hasPrefix("\(resolvedRootPath)/")
     }
+}
+
+public enum CodexSourceFileSystemError: Error, Equatable {
+    case unreadableDirectory
 }
 
 public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, CandidateSessionFileEnumerationPort, Sendable {
@@ -255,8 +268,22 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
                 rootURL: rootURL,
                 availability: .missing,
                 diagnostic: SessionSourceDiagnostic(
-                    code: "codex.sessions_root_missing",
+                    code: .codexSessionsRootMissing,
                     message: "Configured Codex sessions root was not found."
+                ),
+                counts: .empty
+            )
+        }
+
+        guard fileSystem.isReadableDirectory(at: rootURL) else {
+            return summary(
+                definition: definition,
+                rootURL: rootURL,
+                availability: .inaccessible,
+                diagnostic: SessionSourceDiagnostic(
+                    code: .codexSessionsRootPermissionDenied,
+                    severity: .error,
+                    message: "Configured Codex sessions root exists but the current process does not have read permission."
                 ),
                 counts: .empty
             )
@@ -264,10 +291,22 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
 
         do {
             let counts = try fileSystem.sourceCounts(at: rootURL)
+            let diagnostic: SessionSourceDiagnostic?
+            if counts == .empty {
+                diagnostic = SessionSourceDiagnostic(
+                    code: .codexSessionsRootEmpty,
+                    severity: .info,
+                    message: "Configured Codex sessions root is readable but contains no candidate session files yet."
+                )
+            } else {
+                diagnostic = nil
+            }
+
             return summary(
                 definition: definition,
                 rootURL: rootURL,
                 availability: .available,
+                diagnostic: diagnostic,
                 counts: counts
             )
         } catch {
@@ -276,7 +315,8 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
                 rootURL: rootURL,
                 availability: .inaccessible,
                 diagnostic: SessionSourceDiagnostic(
-                    code: "codex.sessions_root_inaccessible",
+                    code: .codexSessionsRootUnreadable,
+                    severity: .error,
                     message: "Configured Codex sessions root exists but could not be inspected."
                 ),
                 counts: .empty
@@ -315,7 +355,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             rootURL: rootURL,
             availability: .duplicate,
             diagnostic: SessionSourceDiagnostic(
-                code: "source_root_duplicate",
+                code: .sourceRootDuplicate,
                 message: "Configured source root duplicates an earlier source root."
             ),
             counts: .empty
@@ -331,7 +371,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             rootURL: rootURL,
             availability: .disabled,
             diagnostic: SessionSourceDiagnostic(
-                code: "source_root_disabled",
+                code: .sourceRootDisabled,
                 message: "Configured source root is disabled."
             ),
             counts: .empty
@@ -347,7 +387,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             rootURL: rootURL,
             availability: .unsupported,
             diagnostic: SessionSourceDiagnostic(
-                code: "source_kind_unsupported",
+                code: .sourceKindUnsupported,
                 message: "Configured source kind is not supported by this discovery adapter."
             ),
             counts: .empty
@@ -366,7 +406,7 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Candidate
             displayName: definition.displayName,
             kind: definition.kind,
             locationDescription: rootURL.standardizedFileURL.path,
-            isEnabled: availability == .available,
+            isEnabled: definition.isEnabled,
             availability: availability,
             diagnostic: diagnostic,
             counts: counts

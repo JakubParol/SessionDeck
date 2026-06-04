@@ -6,12 +6,25 @@ public enum CandidateSessionFileConfidence: Equatable, Sendable {
     case low
 }
 
+public enum CandidateSessionFileDiagnosticCode: String, Equatable, Sendable {
+    case codexCandidateFileUnreadable = "codex.candidate_file_unreadable"
+}
+
 public struct CandidateSessionFileDiagnostic: Equatable, Sendable {
-    public let code: String
+    public let code: CandidateSessionFileDiagnosticCode
+    public let severity: SourceDiagnosticSeverity
+    public let allowsDiscoveryToContinue: Bool
     public let message: String
 
-    public init(code: String, message: String) {
+    public init(
+        code: CandidateSessionFileDiagnosticCode,
+        severity: SourceDiagnosticSeverity = .warning,
+        allowsDiscoveryToContinue: Bool = true,
+        message: String
+    ) {
         self.code = code
+        self.severity = severity
+        self.allowsDiscoveryToContinue = allowsDiscoveryToContinue
         self.message = message
     }
 }
