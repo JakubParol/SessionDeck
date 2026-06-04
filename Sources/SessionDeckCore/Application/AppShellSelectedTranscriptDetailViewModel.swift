@@ -56,9 +56,29 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
     }
 }
 
+public struct AppShellSelectedTranscriptMetadataRow: Equatable, Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let value: String
+    public let isFallback: Bool
+
+    public init(
+        id: String,
+        title: String,
+        value: String,
+        isFallback: Bool
+    ) {
+        self.id = id
+        self.title = title
+        self.value = value
+        self.isFallback = isFallback
+    }
+}
+
 public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public let title: String
     public let statusMessage: String
+    public let metadataRows: [AppShellSelectedTranscriptMetadataRow]
     public let rows: [AppShellTranscriptSegmentRow]
     public let diagnosticMessages: [String]
     public let severity: AppShellCatalogRowSeverity
@@ -67,6 +87,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public init(
         title: String,
         statusMessage: String,
+        metadataRows: [AppShellSelectedTranscriptMetadataRow],
         rows: [AppShellTranscriptSegmentRow],
         diagnosticMessages: [String],
         severity: AppShellCatalogRowSeverity,
@@ -74,6 +95,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     ) {
         self.title = title
         self.statusMessage = statusMessage
+        self.metadataRows = metadataRows
         self.rows = rows
         self.diagnosticMessages = diagnosticMessages
         self.severity = severity
@@ -83,6 +105,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public static let noSelection = AppShellSelectedTranscriptDetailState(
         title: "No session selected",
         statusMessage: "Select a catalog row to load transcript detail.",
+        metadataRows: [],
         rows: [],
         diagnosticMessages: [],
         severity: .info,
@@ -93,6 +116,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         AppShellSelectedTranscriptDetailState(
             title: sessionTitle,
             statusMessage: "Loading selected transcript...",
+            metadataRows: [],
             rows: [],
             diagnosticMessages: [],
             severity: .info,
@@ -106,13 +130,14 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         let severity = loadedSeverity(errorCount: errorCount, warningCount: warningCount)
 
         return AppShellSelectedTranscriptDetailState(
-            title: readModel.title,
+            title: titleLabel(for: readModel.title),
             statusMessage: loadedStatusMessage(
                 segmentCount: readModel.segments.count,
                 warningCount: warningCount,
                 errorCount: errorCount,
                 isPartial: readModel.isPartial
             ),
+            metadataRows: metadataRows(for: readModel),
             rows: readModel.segments.map(AppShellTranscriptSegmentRow.make(segment:)),
             diagnosticMessages: readModel.diagnostics.map(\.message),
             severity: severity,
@@ -125,6 +150,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         return AppShellSelectedTranscriptDetailState(
             title: "Transcript unavailable",
             statusMessage: failure.message,
+            metadataRows: [],
             rows: [],
             diagnosticMessages: [],
             severity: failure.severity,
@@ -163,6 +189,93 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         }
 
         return "Loaded \(segmentCount) transcript segment(s)."
+    }
+
+    private static func metadataRows(
+        for readModel: SelectedTranscriptReadModel
+    ) -> [AppShellSelectedTranscriptMetadataRow] {
+        [
+            AppShellSelectedTranscriptMetadataRow(
+                id: "title",
+                title: "Title",
+                value: titleLabel(for: readModel.title),
+                isFallback: readModel.title.isEmpty
+            ),
+            AppShellSelectedTranscriptMetadataRow(
+                id: "source",
+                title: "Source",
+                value: sourceLabel(for: readModel),
+                isFallback: readModel.sourceLabel.displayName.isEmpty
+            ),
+            AppShellSelectedTranscriptMetadataRow(
+                id: "project",
+                title: "Project",
+                value: projectLabel(for: readModel.projectHint),
+                isFallback: readModel.projectHint.cwdPath == nil || readModel.projectHint.displayName.isEmpty
+            ),
+            AppShellSelectedTranscriptMetadataRow(
+                id: "path",
+                title: "Path",
+                value: pathLabel(for: readModel.sessionPath),
+                isFallback: readModel.sessionPath.isEmpty
+            ),
+            AppShellSelectedTranscriptMetadataRow(
+                id: "created",
+                title: "Created",
+                value: timestampLabel(
+                    for: readModel.activity.createdAtEpochSeconds,
+                    fallback: "Created time unavailable"
+                ),
+                isFallback: readModel.activity.createdAtEpochSeconds == nil
+            ),
+            AppShellSelectedTranscriptMetadataRow(
+                id: "last-activity",
+                title: "Last Activity",
+                value: timestampLabel(
+                    for: readModel.activity.lastActivityEpochSeconds,
+                    fallback: "Last activity unavailable"
+                ),
+                isFallback: readModel.activity.lastActivityEpochSeconds == nil
+            ),
+        ]
+    }
+
+    private static func titleLabel(for title: String) -> String {
+        title.isEmpty ? "Untitled session" : title
+    }
+
+    private static func sourceLabel(for readModel: SelectedTranscriptReadModel) -> String {
+        let sourceDisplayName = readModel.sourceLabel.displayName
+        guard sourceDisplayName.isEmpty == false else {
+            return "Unknown source"
+        }
+
+        let profileName = readModel.sourceLabel.profileName ?? readModel.metadata.agentProfileName
+        guard let profileName, profileName.isEmpty == false else {
+            return sourceDisplayName
+        }
+
+        return "\(sourceDisplayName) / \(profileName)"
+    }
+
+    private static func projectLabel(for projectHint: CatalogProjectHint) -> String {
+        guard projectHint.displayName.isEmpty == false else {
+            return "Project unavailable"
+        }
+
+        return projectHint.displayName
+    }
+
+    private static func pathLabel(for sessionPath: String) -> String {
+        sessionPath.isEmpty ? "Path unavailable" : sessionPath
+    }
+
+    private static func timestampLabel(for epochSeconds: Int64?, fallback: String) -> String {
+        guard let epochSeconds else {
+            return fallback
+        }
+
+        return "\(epochSeconds)"
     }
 
     private static func failureDescription(for error: Error) -> (
