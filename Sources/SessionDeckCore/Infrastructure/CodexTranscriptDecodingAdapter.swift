@@ -46,6 +46,9 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             let lineNumber = lineIndex + 1
             let source = file.source.withLineNumber(lineNumber)
             guard let event = CodexTranscriptJSONEvent(line: line) else {
+                segments.append(
+                    malformedSegment(file: file, source: source, orderIndex: segments.count)
+                )
                 diagnostics.append(
                     TranscriptDecodeDiagnostic(
                         code: "codex.malformed_jsonl",
@@ -66,6 +69,9 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             if let segment = supportedSegment(from: event, file: file, source: source, orderIndex: segments.count) {
                 segments.append(segment)
             } else if event.type != "turn_context" {
+                segments.append(
+                    unsupportedSegment(from: event, file: file, source: source, orderIndex: segments.count)
+                )
                 diagnostics.append(
                     TranscriptDecodeDiagnostic(
                         code: "codex.unsupported_event",
@@ -112,8 +118,49 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             source: source,
             timestampDescription: event.timestamp,
             metadata: [
+                "content_type": event.messageContentType,
                 "event_type": event.type,
+                "line_number": String(source.lineNumber ?? 0),
                 "role": role,
+            ]
+        )
+    }
+
+    private func malformedSegment(
+        file: CodexTranscriptFile,
+        source: TranscriptSegmentSourceReference,
+        orderIndex: Int
+    ) -> TranscriptSegment {
+        TranscriptSegment(
+            id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
+            kind: .error(code: "codex.malformed_jsonl"),
+            text: "Malformed Codex JSONL line.",
+            order: TranscriptSegmentOrder(index: orderIndex),
+            source: source,
+            timestampDescription: nil,
+            metadata: [
+                "event_type": "malformed_jsonl",
+                "line_number": String(source.lineNumber ?? 0),
+            ]
+        )
+    }
+
+    private func unsupportedSegment(
+        from event: CodexTranscriptJSONEvent,
+        file: CodexTranscriptFile,
+        source: TranscriptSegmentSourceReference,
+        orderIndex: Int
+    ) -> TranscriptSegment {
+        TranscriptSegment(
+            id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
+            kind: .unknown(eventType: event.type),
+            text: "Unsupported Codex event: \(event.type)",
+            order: TranscriptSegmentOrder(index: orderIndex),
+            source: source,
+            timestampDescription: event.timestamp,
+            metadata: [
+                "event_type": event.type,
+                "line_number": String(source.lineNumber ?? 0),
             ]
         )
     }
@@ -187,6 +234,14 @@ private struct CodexTranscriptJSONEvent {
         }
 
         return texts.joined(separator: "\n")
+    }
+
+    var messageContentType: String {
+        if payload["content"] is String {
+            return "string"
+        }
+
+        return "content_array"
     }
 
     func payloadString(_ key: String) -> String? {
