@@ -17,6 +17,7 @@ func codexTranscriptFixtureManifestCoversRequiredFixtureCategories() {
     #expect(hasFixtureCategory("tool-call"))
     #expect(hasFixtureCategory("tool-output"))
     #expect(hasFixtureCategory("tool-error"))
+    #expect(hasFixtureCategory("unknown-tool-payload"))
     #expect(hasFixtureCategory("mixed-order"))
     #expect(hasFixtureCategory("malformed-line"))
     #expect(hasFixtureCategory("unknown-event"))
@@ -82,6 +83,16 @@ func codexTranscriptFixturesIncludeMixedToolActivityExamples() throws {
     #expect(toolActivity.contains("\"status\":\"failed\""))
     #expect(toolActivity.contains("synthetic failure output"))
     #expect(toolActivity.contains("synthetic structured failure"))
+}
+
+@Test("Codex transcript fixtures include degraded tool payload examples")
+func codexTranscriptFixturesIncludeDegradedToolPayloadExamples() throws {
+    let degradedToolPayload = try CodexTranscriptFixtureManifest.readFixture(.toolPayloadDegraded)
+    #expect(degradedToolPayload.contains("\"type\":\"function_call_output\""))
+    #expect(degradedToolPayload.contains("\"call_id\":\"call_tool_payload_omitted\""))
+    #expect(degradedToolPayload.contains("\"type\":\"future_tool_payload\""))
+    #expect(degradedToolPayload.contains("synthetic nested result payload"))
+    #expect(degradedToolPayload.contains("synthetic unknown tool payload"))
 }
 
 @Test("Codex transcript fixtures contain only synthetic redacted content")

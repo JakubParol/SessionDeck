@@ -1,0 +1,7 @@
+{"timestamp":"2026-01-04T00:00:00Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000088","title":"Synthetic Degraded Tool Payload Session","cwd":"<synthetic-project-root>","project":"SyntheticProject","source":"codex-cli"}}
+{"timestamp":"2026-01-04T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Inspect degraded synthetic tool payloads."}]}}
+{"timestamp":"2026-01-04T00:00:02Z","type":"response_item","payload":{"type":"function_call","name":"synthetic_omitted_output_probe","call_id":"call_tool_payload_omitted","arguments":"{}"}}
+{"timestamp":"2026-01-04T00:00:03Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_tool_payload_omitted","status":"failed"}}
+{"timestamp":"2026-01-04T00:00:04Z","type":"response_item","payload":{"type":"function_call","name":"synthetic_nested_result_probe","call_id":"call_tool_payload_nested","arguments":"{}"}}
+{"timestamp":"2026-01-04T00:00:05Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_tool_payload_nested","result":{"message":"synthetic nested result payload","code":"synthetic_result"}}}
+{"timestamp":"2026-01-04T00:00:06Z","type":"future_tool_payload","payload":{"kind":"synthetic_unknown_tool_shape","message":"synthetic unknown tool payload"}}
