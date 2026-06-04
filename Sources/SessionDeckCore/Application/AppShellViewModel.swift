@@ -36,6 +36,59 @@ public struct AppShellSourceDiscoverySummary: Equatable, Sendable {
         self.errorCount = errorCount
         self.statusMessage = statusMessage
     }
+
+    public static func make(report: SessionSourceDiscoveryReport) -> AppShellSourceDiscoverySummary {
+        let healthSummaries = report.healthSummaries
+        let warningCount = healthSummaries.filter { $0.severity == .warning }.count
+            + report.candidateDiagnostics.filter { $0.diagnostic.severity == .warning }.count
+        let errorCount = healthSummaries.filter { $0.severity == .error }.count
+            + report.candidateDiagnostics.filter { $0.diagnostic.severity == .error }.count
+
+        return AppShellSourceDiscoverySummary(
+            configuredSourceCount: report.sources.count,
+            availableSourceCount: report.availableSources.count,
+            candidateFileCount: report.candidateFileCount,
+            warningCount: warningCount,
+            errorCount: errorCount,
+            statusMessage: statusMessage(
+                report: report,
+                warningCount: warningCount,
+                errorCount: errorCount
+            )
+        )
+    }
+
+    public static func failed(message: String) -> AppShellSourceDiscoverySummary {
+        AppShellSourceDiscoverySummary(
+            configuredSourceCount: 0,
+            availableSourceCount: 0,
+            candidateFileCount: nil,
+            warningCount: 0,
+            errorCount: 1,
+            statusMessage: message
+        )
+    }
+
+    private static func statusMessage(
+        report: SessionSourceDiscoveryReport,
+        warningCount: Int,
+        errorCount: Int
+    ) -> String {
+        if report.sources.isEmpty {
+            return "No session sources are configured."
+        }
+        if errorCount > 0 {
+            return "Source discovery found errors that need attention."
+        }
+        if warningCount > 0 {
+            return "Source discovery completed with warnings."
+        }
+        if report.availableSources.isEmpty {
+            return "No available session sources were found."
+        }
+
+        return "Source discovery found \(report.availableSources.count) available source(s)."
+    }
 }
 
 public struct AppShellViewModel: Equatable, Sendable {

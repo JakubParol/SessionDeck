@@ -63,6 +63,12 @@ public struct SessionSourceDiscoveryReport: Equatable, Sendable {
         sources.filter { $0.availability == .available }
     }
 
+    public var candidateFileCount: Int {
+        sources.reduce(0) { partialResult, source in
+            partialResult + source.counts.transcriptFileCount
+        }
+    }
+
     public var canContinueDiscovery: Bool {
         diagnostics.allSatisfy { $0.diagnostic.allowsDiscoveryToContinue }
             && candidateDiagnostics.allSatisfy { $0.diagnostic.allowsDiscoveryToContinue }
