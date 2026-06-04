@@ -64,12 +64,11 @@ public extension AppShellNavigationSummary {
     }
 
     private static func sourcesNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
-        let children = groupNodes(
-            sessions: sessions,
-            idPrefix: "sources",
-            key: { $0.sourceStableNavigationKey },
-            title: { $0.navigationSourceDisplayName }
-        )
+        let children = Dictionary(grouping: sessions, by: { SourceProfileNavigationPolicy.sourceMetadata(for: $0).stableID })
+            .map { sourceNode(sessions: $0.value) }
+            .sorted { lhs, rhs in
+                lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
+            }
 
         return AppShellNavigationNode(
             id: "sources",
@@ -77,6 +76,45 @@ public extension AppShellNavigationSummary {
             count: sessions.count,
             sessionIDs: sessions.map(\.id),
             children: children
+        )
+    }
+
+    private static func sourceNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
+        let orderedSessions = SessionCatalogOrdering.sort(sessions)
+        let sourceMetadata = SourceProfileNavigationPolicy.sourceMetadata(for: orderedSessions[0])
+        let sessionIDs = orderedSessions.map { $0.id }
+
+        return AppShellNavigationNode(
+            id: "sources." + sourceMetadata.stableID,
+            title: sourceMetadata.displayName,
+            count: orderedSessions.count,
+            sessionIDs: sessionIDs,
+            catalogScope: .source(sourceMetadata),
+            sourceProfileMetadata: .source(sourceMetadata),
+            children: profileNodes(sessions: orderedSessions)
+        )
+    }
+
+    private static func profileNodes(sessions: [SessionSummary]) -> [AppShellNavigationNode] {
+        Dictionary(grouping: sessions, by: { SourceProfileNavigationPolicy.profileMetadata(for: $0).stableID })
+            .map { profileNode(sessions: $0.value) }
+            .sorted { lhs, rhs in
+                lhs.title == rhs.title ? lhs.id < rhs.id : lhs.title < rhs.title
+            }
+    }
+
+    private static func profileNode(sessions: [SessionSummary]) -> AppShellNavigationNode {
+        let orderedSessions = SessionCatalogOrdering.sort(sessions)
+        let profileMetadata = SourceProfileNavigationPolicy.profileMetadata(for: orderedSessions[0])
+        let sessionIDs = orderedSessions.map { $0.id }
+
+        return AppShellNavigationNode(
+            id: "sources." + profileMetadata.stableID,
+            title: profileMetadata.displayName,
+            count: orderedSessions.count,
+            sessionIDs: sessionIDs,
+            catalogScope: .profile(profileMetadata),
+            sourceProfileMetadata: .profile(profileMetadata)
         )
     }
 
@@ -198,21 +236,6 @@ public extension AppShellNavigationSummary {
         }
 
         return categories.uniquePreservingOrder()
-    }
-}
-
-private extension SessionSummary {
-    var navigationSourceDisplayName: String {
-        let profileName = sourceLabel.profileName ?? metadata.agentProfileName
-        guard let profileName, profileName.isEmpty == false else {
-            return sourceLabel.displayName
-        }
-
-        return "\(sourceLabel.displayName) / \(profileName)"
-    }
-
-    var sourceStableNavigationKey: String {
-        "\(sourceID.rawValue)|\(navigationSourceDisplayName)"
     }
 }
 

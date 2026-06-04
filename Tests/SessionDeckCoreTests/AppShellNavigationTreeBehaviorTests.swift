@@ -176,6 +176,95 @@ func navigationTreeKeepsDuplicateProjectDisplayNamesDistinct() {
     #expect(summary.projectsNode.children.map(\.title) == ["Toolbox", "Toolbox"])
 }
 
+@Test("navigation tree normalizes source profile nodes with fallbacks and duplicate names")
+func navigationTreeNormalizesSourceProfileNodesWithFallbacksAndDuplicateNames() throws {
+    let cliSourceID = SessionSourceID(rawValue: "codex-cli")
+    let appSourceID = SessionSourceID(rawValue: "codex-app")
+    let missingSourceID = SessionSourceID(rawValue: "missing-source")
+    let snapshot = navigationSnapshot(
+        sessions: [
+            navigationSession(
+                id: "cli-default",
+                sourceID: cliSourceID,
+                sourceLabel: CatalogSourceLabel(
+                    sourceID: cliSourceID.rawValue,
+                    displayName: "Codex",
+                    profileName: "default"
+                ),
+                projectHint: CatalogProjectHint(cwdPath: "/tmp/work/Alpha", displayName: "Alpha"),
+                profileName: "default",
+                lastActivity: 30
+            ),
+            navigationSession(
+                id: "app-viewer",
+                sourceID: appSourceID,
+                sourceLabel: CatalogSourceLabel(
+                    sourceID: appSourceID.rawValue,
+                    displayName: "Codex",
+                    profileName: "viewer"
+                ),
+                projectHint: CatalogProjectHint(cwdPath: "/tmp/work/Beta", displayName: "Beta"),
+                profileName: "viewer",
+                lastActivity: 20
+            ),
+            navigationSession(
+                id: "missing-source",
+                sourceID: missingSourceID,
+                sourceLabel: CatalogSourceLabel(
+                    sourceID: "",
+                    displayName: "",
+                    profileName: nil
+                ),
+                projectHint: .unavailable,
+                profileName: nil,
+                lastActivity: 10,
+                fallbackReasons: [.unknownSource]
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+    let cliSourceNode = try #require(summary.sourcesNode.children.first { $0.id == "sources.source.codex-cli" })
+    let appSourceNode = try #require(summary.sourcesNode.children.first { $0.id == "sources.source.codex-app" })
+    let unknownSourceNode = try #require(summary.sourcesNode.children.first { $0.id == "sources.unknown-source" })
+
+    #expect(summary.sourcesNode.count == 3)
+    #expect(summary.sourcesNode.children.map(\.id) == [
+        "sources.source.codex-app",
+        "sources.source.codex-cli",
+        "sources.unknown-source",
+    ])
+    #expect(summary.sourcesNode.children.map(\.title) == ["Codex", "Codex", "Unknown Source"])
+    #expect(cliSourceNode.children.map(\.id) == ["sources.source.codex-cli.profile.default"])
+    #expect(appSourceNode.children.map(\.id) == ["sources.source.codex-app.profile.viewer"])
+    #expect(unknownSourceNode.children.map(\.id) == ["sources.unknown-source.profile.unknown-profile"])
+    #expect(cliSourceNode.catalogScope == .source(
+        SourceProfileSourceNavigationMetadata(
+            stableID: "source.codex-cli",
+            sourceID: cliSourceID,
+            displayName: "Codex",
+            isFallback: false
+        )
+    ))
+    #expect(unknownSourceNode.catalogScope == .source(
+        SourceProfileSourceNavigationMetadata(
+            stableID: "unknown-source",
+            sourceID: nil,
+            displayName: "Unknown Source",
+            isFallback: true
+        )
+    ))
+    #expect(unknownSourceNode.children[0].catalogScope == .profile(
+        SourceProfileProfileNavigationMetadata(
+            stableID: "unknown-source.profile.unknown-profile",
+            sourceID: nil,
+            sourceStableID: "unknown-source",
+            displayName: "Unknown Profile",
+            isFallback: true
+        )
+    ))
+}
+
 private func navigationSnapshot(sessions: [SessionSummary]) -> CatalogSnapshot {
     CatalogSnapshot(
         refreshedAt: Date(timeIntervalSince1970: 1_770_300_300),
@@ -189,7 +278,7 @@ private func navigationSession(
     sourceID: SessionSourceID,
     sourceLabel: CatalogSourceLabel,
     projectHint: CatalogProjectHint,
-    profileName: String,
+    profileName: String?,
     lastActivity: Int64,
     fallbackReasons: [CatalogSessionFallbackReason] = [],
     health: CatalogEntryHealth = CatalogEntryHealth(parseStatus: .complete)

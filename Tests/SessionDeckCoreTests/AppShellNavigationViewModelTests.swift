@@ -87,8 +87,10 @@ func navigationTreeGroupsPopulatedCatalogSessionsByProjectSourceAndRecency() {
     #expect(summary.nonProjectChatsNode.count == 1)
     #expect(summary.nonProjectChatsNode.sessionIDs.map(\.rawValue) == ["loose-chat"])
     #expect(summary.sourcesNode.count == 4)
-    #expect(summary.sourcesNode.children.map(\.title) == ["Codex / Naomi", "Hermes / Jim"])
+    #expect(summary.sourcesNode.children.map(\.title) == ["Codex", "Hermes"])
     #expect(summary.sourcesNode.children.map(\.count) == [3, 1])
+    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.title) == ["Naomi", "Jim"])
+    #expect(summary.sourcesNode.children.flatMap(\.children).map(\.count) == [3, 1])
     #expect(summary.recentlyActiveNode.sessionIDs.map(\.rawValue) == [
         "beta-chat",
         "alpha-new",
@@ -193,6 +195,55 @@ func navigationNodesExposeConciseCountLabels() {
     #expect(summary.allChatsNode.countLabel == "2 sessions")
     #expect(summary.problemSessionsNode.countLabel == "1 session")
     #expect(summary.problemSessionsNode.children.first?.countLabel == "1 session")
+}
+
+@Test("navigation nodes expose catalog selection scopes and source profile metadata")
+func navigationNodesExposeCatalogSelectionScopesAndSourceProfileMetadata() {
+    let sourceID = SessionSourceID(rawValue: "codex-source")
+    let sourceMetadata = SourceProfileSourceNavigationMetadata(
+        stableID: "source.codex-source",
+        sourceID: sourceID,
+        displayName: "Codex Source",
+        isFallback: false
+    )
+    let profileMetadata = SourceProfileProfileNavigationMetadata(
+        stableID: "source.codex-source.profile.default",
+        sourceID: sourceID,
+        sourceStableID: sourceMetadata.stableID,
+        displayName: "default",
+        isFallback: false
+    )
+    let sessionID = SessionID(rawValue: "source-profile-session")
+
+    let sourceNode = AppShellNavigationNode(
+        id: "sources.source.codex-source",
+        title: "Codex Source",
+        count: 1,
+        sessionIDs: [sessionID],
+        catalogScope: .source(sourceMetadata),
+        sourceProfileMetadata: .source(sourceMetadata)
+    )
+    let profileNode = AppShellNavigationNode(
+        id: "sources.source.codex-source.profile.default",
+        title: "default",
+        count: 1,
+        sessionIDs: [sessionID],
+        catalogScope: .profile(profileMetadata),
+        sourceProfileMetadata: .profile(profileMetadata)
+    )
+    let diagnosticNode = AppShellNavigationNode(
+        id: "diagnostics.problem-sessions.parseWarning",
+        title: "Parse warning",
+        count: 1,
+        sessionIDs: [sessionID]
+    )
+
+    #expect(sourceNode.catalogScope == .source(sourceMetadata))
+    #expect(sourceNode.sourceProfileMetadata == .source(sourceMetadata))
+    #expect(profileNode.catalogScope == .profile(profileMetadata))
+    #expect(profileNode.sourceProfileMetadata == .profile(profileMetadata))
+    #expect(diagnosticNode.catalogScope == .sessionIDs([sessionID]))
+    #expect(diagnosticNode.sourceProfileMetadata == nil)
 }
 
 @Test("navigation maps unreadable permission diagnostics to permission denied")

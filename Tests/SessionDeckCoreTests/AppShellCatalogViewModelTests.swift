@@ -71,6 +71,92 @@ func catalogSummaryMapsSnapshotDiagnosticsOntoRows() {
     #expect(summary.rows.first?.severity == .warning)
 }
 
+@Test("catalog summary scopes rows from source profile navigation selections")
+func catalogSummaryScopesRowsFromSourceProfileNavigationSelections() throws {
+    let snapshot = SourceProfileNavigationFixtureCatalog.snapshot()
+    let navigationSummary = AppShellNavigationSummary.make(snapshot: snapshot)
+    let cliSourceNode = try #require(
+        navigationSummary.sourcesNode.children.first { $0.id == "sources.source.codex-cli" }
+    )
+    let viewerProfileNode = try #require(
+        navigationSummary.sourcesNode.children
+            .flatMap(\.children)
+            .first { $0.id == "sources.source.codex-app.profile.viewer" }
+    )
+    let unknownSourceNode = try #require(
+        navigationSummary.sourcesNode.children.first { $0.id == "sources.unknown-source" }
+    )
+
+    let allSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: .all)
+    let cliSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: cliSourceNode.catalogScope)
+    let viewerSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: viewerProfileNode.catalogScope)
+    let unknownSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: unknownSourceNode.catalogScope)
+
+    #expect(allSummary.rows.map(\.id.rawValue) == [
+        "cli-sessiondeck-default",
+        "cli-cracker-default",
+        "app-sessiondeck-viewer",
+        "automation-sessiondeck",
+        "unknown-non-project",
+    ])
+    #expect(cliSummary.rows.map(\.id.rawValue) == [
+        "cli-sessiondeck-default",
+        "cli-cracker-default",
+    ])
+    #expect(viewerSummary.rows.map(\.id.rawValue) == ["app-sessiondeck-viewer"])
+    #expect(unknownSummary.rows.map(\.id.rawValue) == ["unknown-non-project"])
+}
+
+@Test("scoped catalog summary excludes source diagnostics outside the selected scope")
+func scopedCatalogSummaryExcludesSourceDiagnosticsOutsideSelectedScope() {
+    let selectedSourceID = SessionSourceID(rawValue: "selected-source")
+    let unrelatedSourceID = SessionSourceID(rawValue: "unrelated-source")
+    let selectedSession = catalogViewModelSession(
+        id: SessionID(rawValue: "selected-session"),
+        identity: CatalogSessionIdentity(rawValue: "selected-session"),
+        sourceID: selectedSourceID,
+        title: "Selected Session"
+    )
+    let selectedScope = SourceProfileSourceNavigationMetadata(
+        stableID: "source.selected-source",
+        sourceID: selectedSourceID,
+        displayName: "Selected Source",
+        isFallback: false
+    )
+    let snapshot = CatalogSnapshot(
+        refreshedAt: Date(timeIntervalSince1970: 1_770_200_004),
+        sources: [
+            catalogViewModelSource(id: selectedSourceID),
+            catalogViewModelSource(id: unrelatedSourceID),
+        ],
+        sessions: [selectedSession],
+        sourceWarnings: [
+            CatalogSnapshotSourceWarning(
+                sourceID: unrelatedSourceID,
+                displayName: "Unrelated Source",
+                message: "Unrelated source warning."
+            )
+        ],
+        refreshErrors: [
+            CatalogSnapshotRefreshError(
+                sourceID: unrelatedSourceID,
+                displayName: "Unrelated Source",
+                message: "Unrelated source failed."
+            )
+        ]
+    )
+
+    let selectedSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: .source(selectedScope))
+    let allSummary = AppShellCatalogSummary.make(snapshot: snapshot, scope: .all)
+
+    #expect(selectedSummary.rows.map(\.id.rawValue) == ["selected-session"])
+    #expect(selectedSummary.sourceWarningCount == 0)
+    #expect(selectedSummary.sourceFailureCount == 0)
+    #expect(selectedSummary.statusMessage == "Catalog shows 1 entry healthy.")
+    #expect(allSummary.sourceWarningCount == 1)
+    #expect(allSummary.sourceFailureCount == 1)
+}
+
 private func catalogViewModelSource(id: SessionSourceID) -> SessionSourceSummary {
     SessionSourceSummary(
         id: id,
