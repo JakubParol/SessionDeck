@@ -38,10 +38,9 @@ public struct AppShellSourceDiscoverySummary: Equatable, Sendable {
     }
 
     public static func make(report: SessionSourceDiscoveryReport) -> AppShellSourceDiscoverySummary {
-        let healthSummaries = report.healthSummaries
-        let warningCount = healthSummaries.filter { $0.severity == .warning }.count
+        let warningCount = report.diagnostics.filter { $0.diagnostic.severity == .warning }.count
             + report.candidateDiagnostics.filter { $0.diagnostic.severity == .warning }.count
-        let errorCount = healthSummaries.filter { $0.severity == .error }.count
+        let errorCount = report.diagnostics.filter { $0.diagnostic.severity == .error }.count
             + report.candidateDiagnostics.filter { $0.diagnostic.severity == .error }.count
 
         return AppShellSourceDiscoverySummary(
