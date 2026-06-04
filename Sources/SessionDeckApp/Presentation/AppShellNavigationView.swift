@@ -5,40 +5,35 @@ struct AppShellNavigationView: View {
     let summary: AppShellNavigationSummary
     @Binding var selectedSessionID: SessionID?
 
+    private let columns = [
+        GridItem(.adaptive(minimum: 190), alignment: .topLeading),
+    ]
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Navigation", systemImage: "sidebar.left")
                 .font(.title3.bold())
 
-            HStack(alignment: .top, spacing: 20) {
-                nodeButton(summary.allChatsNode, systemImage: "bubble.left.and.bubble.right")
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                ForEach(summary.sectionNodes) { sectionNode in
+                    VStack(alignment: .leading, spacing: 6) {
+                        nodeButton(sectionNode, systemImage: sectionIcon(sectionNode))
 
-                VStack(alignment: .leading, spacing: 7) {
-                    nodeHeader(summary.diagnosticsNode, systemImage: "exclamationmark.triangle")
+                        ForEach(sectionNode.children) { childNode in
+                            VStack(alignment: .leading, spacing: 5) {
+                                nodeButton(childNode, systemImage: childIcon(childNode))
+                                    .padding(.leading, 18)
 
-                    ForEach(summary.diagnosticsNode.children) { child in
-                        VStack(alignment: .leading, spacing: 5) {
-                            nodeButton(child, systemImage: "folder.badge.questionmark")
-                                .padding(.leading, 18)
-
-                            ForEach(child.children) { categoryNode in
-                                nodeButton(categoryNode, systemImage: categoryIcon(categoryNode))
-                                    .padding(.leading, 36)
+                                ForEach(childNode.children) { nestedNode in
+                                    nodeButton(nestedNode, systemImage: childIcon(nestedNode))
+                                        .padding(.leading, 36)
+                                }
                             }
                         }
                     }
                 }
             }
             .font(.callout)
-        }
-    }
-
-    private func nodeHeader(_ node: AppShellNavigationNode, systemImage: String) -> some View {
-        Label {
-            nodeText(node)
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(node.count > 0 ? .orange : .secondary)
         }
     }
 
@@ -65,7 +60,26 @@ struct AppShellNavigationView: View {
         }
     }
 
-    private func categoryIcon(_ node: AppShellNavigationNode) -> String {
+    private func sectionIcon(_ node: AppShellNavigationNode) -> String {
+        switch node.id {
+        case "all-chats":
+            return "bubble.left.and.bubble.right"
+        case "projects":
+            return "folder"
+        case "non-project-chats":
+            return "bubble.left"
+        case "sources":
+            return "externaldrive"
+        case "recently-active":
+            return "clock.arrow.circlepath"
+        case "diagnostics":
+            return "exclamationmark.triangle"
+        default:
+            return childIcon(node)
+        }
+    }
+
+    private func childIcon(_ node: AppShellNavigationNode) -> String {
         switch node.problemCategory {
         case .missingPath, .unknownSource, .ambiguousProject:
             return "questionmark.folder"
@@ -74,7 +88,7 @@ struct AppShellNavigationView: View {
         case .missingMetadata, .malformedMetadata, .parseWarning:
             return "doc.badge.exclamationmark"
         case nil:
-            return "exclamationmark.triangle"
+            return node.children.isEmpty ? "folder" : "folder.badge.questionmark"
         }
     }
 }

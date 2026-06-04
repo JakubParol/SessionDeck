@@ -57,6 +57,18 @@ func presentationDoesNotConstructInfrastructure() throws {
     }
 }
 
+@Test("Presentation renders navigation sections from the application DTO")
+func presentationRendersNavigationSectionsFromApplicationDTO() throws {
+    let navigationView = repositoryRoot()
+        .appending(path: "Sources/SessionDeckApp/Presentation/AppShellNavigationView.swift")
+    let contents = try String(contentsOf: navigationView, encoding: .utf8)
+
+    #expect(
+        contents.contains("summary.sectionNodes"),
+        "AppShellNavigationView should render the Application-owned navigation section DTO"
+    )
+}
+
 @Test("concrete adapters are only constructed in the composition root")
 func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
     let sourcesDirectory = repositoryRoot().appending(path: "Sources")
