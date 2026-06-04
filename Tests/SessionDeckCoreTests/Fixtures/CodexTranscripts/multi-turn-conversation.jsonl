@@ -1,0 +1,6 @@
+{"timestamp":"2026-01-02T00:01:00Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000011","title":"Multi Turn Conversation","cwd":"<synthetic-project-root>","project":"SyntheticProject","source":"codex-cli"}}
+{"timestamp":"2026-01-02T00:01:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"List the synthetic steps."}]}}
+{"timestamp":"2026-01-02T00:01:02Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"First, inspect the fixture. Second, decode the turns."}]}}
+{"timestamp":"2026-01-02T00:01:03Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Keep the order stable."}]}}
+{"timestamp":"2026-01-02T00:01:04Z","type":"future_codex_event","payload":{"schema_version":"synthetic-vNext","opaque":{"kind":"unrecognized-conversation-event","value":"diagnostic only"}}}
+{"timestamp":"2026-01-02T00:01:05Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Order and roles remain stable."}]}}
