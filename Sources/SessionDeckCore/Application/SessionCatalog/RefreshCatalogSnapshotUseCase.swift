@@ -161,7 +161,7 @@ public struct RefreshCatalogSnapshotUseCase: Sendable {
                     CatalogSnapshotRefreshError(
                         sourceID: source.id,
                         displayName: source.displayName,
-                        message: String(describing: error)
+                        message: error.catalogSnapshotMessage
                     )
                 )
             }
@@ -194,6 +194,18 @@ public struct RefreshCatalogSnapshotUseCase: Sendable {
                     message: "Duplicate session identity \(identity.rawValue) appears in \(sessionIDs.count) catalog entries."
                 )
             }
+    }
+}
+
+private extension Error {
+    var catalogSnapshotMessage: String {
+        if let localizedError = self as? LocalizedError,
+           let errorDescription = localizedError.errorDescription,
+           errorDescription.isEmpty == false {
+            return errorDescription
+        }
+
+        return String(describing: self)
     }
 }
 
