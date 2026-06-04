@@ -255,6 +255,69 @@ func sessionCatalogUseCaseUsesFakePort() throws {
     #expect(sessions == [codexSession])
 }
 
+@Test("session catalog use case filters catalog selection scopes")
+func sessionCatalogUseCaseFiltersCatalogSelectionScopes() throws {
+    let codexSourceID = SessionSourceID(rawValue: "codex-default")
+    let otherSourceID = SessionSourceID(rawValue: "other-default")
+    let codexSourceMetadata = SourceProfileSourceNavigationMetadata(
+        stableID: "source.codex-default",
+        sourceID: codexSourceID,
+        displayName: "Codex Default",
+        isFallback: false
+    )
+    let codexViewerProfileMetadata = SourceProfileProfileNavigationMetadata(
+        stableID: "source.codex-default.profile.viewer",
+        sourceID: codexSourceID,
+        sourceStableID: codexSourceMetadata.stableID,
+        displayName: "viewer",
+        isFallback: false
+    )
+    let codexDefault = scopedCatalogSession(
+        id: "codex-default-profile",
+        sourceID: codexSourceID,
+        sourceDisplayName: "Codex Default",
+        profileName: "default",
+        lastActivity: 10
+    )
+    let codexViewer = scopedCatalogSession(
+        id: "codex-viewer-profile",
+        sourceID: codexSourceID,
+        sourceDisplayName: "Codex Default",
+        profileName: "viewer",
+        lastActivity: 30
+    )
+    let otherViewer = scopedCatalogSession(
+        id: "other-viewer-profile",
+        sourceID: otherSourceID,
+        sourceDisplayName: "Other Default",
+        profileName: "viewer",
+        lastActivity: 20
+    )
+    let useCase = ListSessionsUseCase(
+        sessionCatalog: FakeSessionCatalogPort(sessions: [codexDefault, codexViewer, otherViewer])
+    )
+
+    let allSessions = try useCase.listSessions(scope: .all)
+    let sourceSessions = try useCase.listSessions(scope: .source(codexSourceMetadata))
+    let profileSessions = try useCase.listSessions(scope: .profile(codexViewerProfileMetadata))
+    let selectedSessions = try useCase.listSessions(scope: .sessionIDs([codexDefault.id, otherViewer.id]))
+
+    #expect(allSessions.map(\.id.rawValue) == [
+        "codex-viewer-profile",
+        "other-viewer-profile",
+        "codex-default-profile",
+    ])
+    #expect(sourceSessions.map(\.id.rawValue) == [
+        "codex-viewer-profile",
+        "codex-default-profile",
+    ])
+    #expect(profileSessions.map(\.id.rawValue) == ["codex-viewer-profile"])
+    #expect(selectedSessions.map(\.id.rawValue) == [
+        "other-viewer-profile",
+        "codex-default-profile",
+    ])
+}
+
 @Test("transcript loading use case returns transcript previews through an injected fake port")
 func transcriptLoadingUseCaseUsesFakePort() throws {
     let sessionID = SessionID(rawValue: "codex-1")
@@ -284,4 +347,29 @@ func transcriptLoadingUseCaseUsesFakePort() throws {
     let loadedPreview = try useCase.loadPreview(sessionID: sessionID)
 
     #expect(loadedPreview == preview)
+}
+
+private func scopedCatalogSession(
+    id: String,
+    sourceID: SessionSourceID,
+    sourceDisplayName: String,
+    profileName: String?,
+    lastActivity: Int64
+) -> SessionSummary {
+    SessionSummary(
+        id: SessionID(rawValue: id),
+        sourceID: sourceID,
+        sourceLabel: CatalogSourceLabel(
+            sourceID: sourceID.rawValue,
+            displayName: sourceDisplayName,
+            profileName: profileName
+        ),
+        title: "Session \(id)",
+        projectHint: CatalogProjectHint(cwdPath: "/tmp/SessionDeck", displayName: "SessionDeck"),
+        sessionPath: "/tmp/\(id).jsonl",
+        activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: lastActivity),
+        fileSize: CatalogFileSize(byteCount: 128),
+        metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: profileName),
+        health: CatalogEntryHealth(parseStatus: .complete)
+    )
 }
