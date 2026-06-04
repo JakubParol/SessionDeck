@@ -81,7 +81,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             ),
             metadataRows: metadataRows(for: readModel),
             rows: readModel.segments.map(AppShellTranscriptSegmentRow.make(segment:)),
-            diagnosticMessages: readModel.diagnostics.map(\.message),
+            diagnosticMessages: readModel.diagnostics.map(diagnosticMessage(for:)),
             severity: severity,
             isLoading: false
         )
@@ -93,6 +93,22 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             title: "Transcript unavailable",
             statusMessage: failure.message,
             metadataRows: [],
+            rows: [],
+            diagnosticMessages: [],
+            severity: failure.severity,
+            isLoading: false
+        )
+    }
+
+    public static func failed(
+        _ error: Error,
+        session: SessionSummary
+    ) -> AppShellSelectedTranscriptDetailState {
+        let failure = failureDescription(for: error)
+        return AppShellSelectedTranscriptDetailState(
+            title: titleLabel(for: session.title ?? ""),
+            statusMessage: failure.message,
+            metadataRows: metadataRows(for: session),
             rows: [],
             diagnosticMessages: [],
             severity: failure.severity,
@@ -182,42 +198,30 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         ]
     }
 
-    private static func titleLabel(for title: String) -> String {
-        title.isEmpty ? "Untitled session" : title
-    }
-
     private static func sourceLabel(for readModel: SelectedTranscriptReadModel) -> String {
-        let sourceDisplayName = readModel.sourceLabel.displayName
-        guard sourceDisplayName.isEmpty == false else {
-            return "Unknown source"
-        }
-
-        let profileName = readModel.sourceLabel.profileName ?? readModel.metadata.agentProfileName
-        guard let profileName, profileName.isEmpty == false else {
-            return sourceDisplayName
-        }
-
-        return "\(sourceDisplayName) / \(profileName)"
+        sourceLabel(sourceLabel: readModel.sourceLabel, metadata: readModel.metadata)
     }
 
-    private static func projectLabel(for projectHint: CatalogProjectHint) -> String {
-        guard projectHint.displayName.isEmpty == false else {
-            return "Project unavailable"
+    private static func diagnosticMessage(for diagnostic: TranscriptDecodeDiagnostic) -> String {
+        let prefix = diagnosticSeverityLabel(for: diagnostic.severity)
+        guard let lineNumber = diagnostic.source?.lineNumber else {
+            return "\(prefix): \(diagnostic.message)"
         }
 
-        return projectHint.displayName
+        return "\(prefix) line \(lineNumber): \(diagnostic.message)"
     }
 
-    private static func pathLabel(for sessionPath: String) -> String {
-        sessionPath.isEmpty ? "Path unavailable" : sessionPath
-    }
-
-    private static func timestampLabel(for epochSeconds: Int64?, fallback: String) -> String {
-        guard let epochSeconds else {
-            return fallback
+    private static func diagnosticSeverityLabel(
+        for severity: TranscriptDecodeDiagnosticSeverity
+    ) -> String {
+        switch severity {
+        case .info:
+            return "Info"
+        case .warning:
+            return "Warning"
+        case .error:
+            return "Error"
         }
-
-        return "\(epochSeconds)"
     }
 
     private static func failureDescription(for error: Error) -> (

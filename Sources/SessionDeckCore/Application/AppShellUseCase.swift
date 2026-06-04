@@ -173,7 +173,7 @@ public struct AppShellUseCase: Sendable {
         do {
             return .loaded(try loadSelectedTranscript.loadTranscript(for: selectedSession))
         } catch {
-            return .failed(error)
+            return .failed(error, session: selectedSession)
         }
     }
 
