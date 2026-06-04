@@ -107,6 +107,36 @@ func codexCatalogAdapterReportsMalformedLinesInsideScanBounds() throws {
     #expect(summary.health.allowsListing)
 }
 
+@Test("Codex catalog adapter reports exact-limit malformed final lines")
+func codexCatalogAdapterReportsExactLimitMalformedFinalLines() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "exact-limit-malformed")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let content = """
+    {"timestamp":"2026-01-01T00:00:00Z","type":"session_meta","payload":{"id":"exact-limit","title":"Exact Limit","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+    {this final line is malformed
+    """
+    let transcript = try store.writeTranscript(
+        content,
+        source: source,
+        sessionID: "exact-limit",
+        placement: .project("SessionDeck"),
+        timestamp: "2026-01-01T00:00:00Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        scanLimits: CodexCatalogScanLimits(maximumBytes: content.utf8.count, maximumLines: 8)
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.health.parseStatus == .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata."))
+}
+
 @Test("Codex catalog adapter keeps missing-metadata sessions visible without mutating fixtures")
 func codexCatalogAdapterKeepsMissingMetadataSessionsVisibleWithoutMutation() throws {
     let fixtureRoot = try makeCatalogFixtureRoot(name: "missing-metadata")

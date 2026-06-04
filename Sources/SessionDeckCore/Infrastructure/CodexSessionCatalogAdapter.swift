@@ -81,7 +81,7 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
             )
         }
 
-        guard let boundedRead = boundedData(at: candidate.absolutePath) else {
+        guard let boundedRead = boundedData(at: candidate.absolutePath, fileByteSize: candidate.byteSize) else {
             return CodexCatalogScanResult(
                 metadata: CodexCatalogMetadata(),
                 createdAtEpochSeconds: candidate.modifiedAt.map(epochSeconds),
@@ -123,7 +123,7 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
         )
     }
 
-    private func boundedData(at path: String) -> CodexCatalogBoundedRead? {
+    private func boundedData(at path: String, fileByteSize: Int64) -> CodexCatalogBoundedRead? {
         guard scanLimits.maximumBytes > 0,
               let fileHandle = FileHandle(forReadingAtPath: path)
         else {
@@ -135,7 +135,7 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
         guard let data = try? fileHandle.read(upToCount: scanLimits.maximumBytes) else {
             return nil
         }
-        return CodexCatalogBoundedRead(data: data, reachedByteLimit: data.count == scanLimits.maximumBytes)
+        return CodexCatalogBoundedRead(data: data, reachedByteLimit: fileByteSize > Int64(scanLimits.maximumBytes))
     }
 
     private func isFinalByteLimitFragment(
