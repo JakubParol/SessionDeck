@@ -175,6 +175,9 @@ public struct AppShellNavigationSummary: Equatable, Sendable {
             categories.append(.ambiguousProject)
         }
 
+        let hasPermissionDiagnostic = session.health.diagnostics.contains {
+            $0.problemCategories.contains(.permissionDenied)
+        }
         switch session.health.parseStatus {
         case .complete:
             break
@@ -184,6 +187,8 @@ public struct AppShellNavigationSummary: Equatable, Sendable {
             categories.append(.malformedMetadata)
         case let .unreadable(reason) where reason.localizedCaseInsensitiveContains("permission"):
             categories.append(.permissionDenied)
+        case .unreadable where hasPermissionDiagnostic:
+            break
         case .unreadable:
             categories.append(.parseWarning)
         }
@@ -220,6 +225,8 @@ private extension CatalogEntryDiagnostic {
             return [.missingMetadata]
         case .malformedJSONL:
             return [.malformedMetadata]
+        case .unreadableFile where message.localizedCaseInsensitiveContains("permission"):
+            return [.permissionDenied]
         case .unknownEventShape, .boundedReadTruncated, .unreadableFile:
             return [.parseWarning]
         }

@@ -100,6 +100,36 @@ func navigationNodesExposeConciseCountLabels() {
     #expect(summary.problemSessionsNode.children.first?.countLabel == "1 session")
 }
 
+@Test("navigation maps unreadable permission diagnostics to permission denied")
+func navigationMapsUnreadablePermissionDiagnosticsToPermissionDenied() {
+    let snapshot = CatalogSnapshot(
+        refreshedAt: Date(timeIntervalSince1970: 1_770_300_200),
+        sources: [navigationSource()],
+        sessions: [
+            navigationSession(
+                id: "candidate-permission",
+                health: CatalogEntryHealth(
+                    parseStatus: .unreadable(reason: "Candidate transcript file could not be read."),
+                    diagnostics: [
+                        CatalogEntryDiagnostic(
+                            code: .unreadableFile,
+                            severity: .error,
+                            message: "Permission denied while reading candidate transcript."
+                        ),
+                    ]
+                )
+            ),
+        ]
+    )
+
+    let categories = AppShellNavigationSummary.make(snapshot: snapshot)
+        .problemSessionsNode
+        .children
+        .compactMap(\.problemCategory)
+
+    #expect(categories == [.permissionDenied])
+}
+
 private func navigationSource() -> SessionSourceSummary {
     SessionSourceSummary(
         id: SessionSourceID(rawValue: "codex-navigation"),
