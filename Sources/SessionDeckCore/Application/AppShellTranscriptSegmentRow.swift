@@ -4,6 +4,25 @@ public enum AppShellTranscriptRoleStyle: Equatable, Sendable {
     case supporting
 }
 
+public struct AppShellTranscriptToolPresentation: Equatable, Sendable {
+    public let displayLabel: String
+    public let metadataSummary: String
+    public let expandedText: String
+    public let isCollapsedByDefault: Bool
+
+    public init(
+        displayLabel: String,
+        metadataSummary: String,
+        expandedText: String,
+        isCollapsedByDefault: Bool
+    ) {
+        self.displayLabel = displayLabel
+        self.metadataSummary = metadataSummary
+        self.expandedText = expandedText
+        self.isCollapsedByDefault = isCollapsedByDefault
+    }
+}
+
 public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
     public let id: String
     public let roleLabel: String
@@ -11,6 +30,7 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
     public let text: String
     public let severity: AppShellCatalogRowSeverity
     public let roleStyle: AppShellTranscriptRoleStyle
+    public let toolPresentation: AppShellTranscriptToolPresentation?
 
     public init(
         id: String,
@@ -18,7 +38,8 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
         timestampLabel: String?,
         text: String,
         severity: AppShellCatalogRowSeverity,
-        roleStyle: AppShellTranscriptRoleStyle
+        roleStyle: AppShellTranscriptRoleStyle,
+        toolPresentation: AppShellTranscriptToolPresentation? = nil
     ) {
         self.id = id
         self.roleLabel = roleLabel
@@ -26,6 +47,7 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
         self.text = text
         self.severity = severity
         self.roleStyle = roleStyle
+        self.toolPresentation = toolPresentation
     }
 
     public static func make(segment: TranscriptSegment) -> AppShellTranscriptSegmentRow {
@@ -33,14 +55,104 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             id: segment.id,
             roleLabel: roleLabel(for: segment.role),
             timestampLabel: segment.timestampDescription,
-            text: textLabel(for: segment.text),
+            text: textLabel(for: segment),
             severity: severity(for: segment.role),
-            roleStyle: roleStyle(for: segment.role)
+            roleStyle: roleStyle(for: segment.role),
+            toolPresentation: toolPresentation(for: segment)
         )
+    }
+
+    private static func textLabel(for segment: TranscriptSegment) -> String {
+        if let toolPresentation = toolPresentation(for: segment) {
+            switch segment.kind {
+            case .toolCall:
+                return "Tool call: \(toolPresentation.displayLabel)"
+            case .toolOutput:
+                if toolPresentation.displayLabel == "tool output" {
+                    return "Tool output"
+                }
+                return "Tool output from \(toolPresentation.displayLabel)"
+            case .assistantMessage, .error, .metadata, .unknown, .userMessage:
+                break
+            }
+        }
+
+        return textLabel(for: segment.text)
     }
 
     private static func textLabel(for text: String) -> String {
         text.allSatisfy(\.isWhitespace) ? "Empty transcript segment." : text
+    }
+
+    private static func toolPresentation(
+        for segment: TranscriptSegment
+    ) -> AppShellTranscriptToolPresentation? {
+        guard segment.role == .tool else {
+            return nil
+        }
+
+        let metadata = segment.toolMetadata
+        let displayLabel = textLabel(for: metadata?.displayLabel ?? fallbackToolDisplayLabel(for: segment.kind))
+
+        return AppShellTranscriptToolPresentation(
+            displayLabel: displayLabel,
+            metadataSummary: toolMetadataSummary(for: metadata),
+            expandedText: textLabel(for: segment.text),
+            isCollapsedByDefault: true
+        )
+    }
+
+    private static func fallbackToolDisplayLabel(for kind: TranscriptSegmentKind) -> String {
+        switch kind {
+        case let .toolCall(name, _):
+            return name.isEmpty ? "Unknown tool" : name
+        case .toolOutput:
+            return "tool output"
+        case .assistantMessage, .error, .metadata, .unknown, .userMessage:
+            return "Unknown tool"
+        }
+    }
+
+    private static func toolMetadataSummary(for metadata: TranscriptToolMetadata?) -> String {
+        guard let metadata else {
+            return "metadata unavailable"
+        }
+
+        var parts: [String] = []
+        if let status = metadata.status, status.isEmpty == false {
+            parts.append(status)
+        } else {
+            parts.append("status unknown")
+        }
+
+        if let characterCount = metadata.characterCount {
+            parts.append("\(characterCount) \(characterCount == 1 ? "character" : "characters")")
+        }
+
+        if let lineCount = metadata.lineCount {
+            parts.append("\(lineCount) \(lineCount == 1 ? "line" : "lines")")
+        }
+
+        if metadata.bodyAvailability != .available {
+            parts.append(bodyAvailabilityLabel(for: metadata.bodyAvailability))
+        }
+
+        return parts.joined(separator: " - ")
+    }
+
+    private static func bodyAvailabilityLabel(
+        for availability: TranscriptToolBodyAvailability
+    ) -> String {
+        switch availability {
+        case .available:
+            return "body available"
+        case .omitted:
+            return "body omitted"
+        case .malformed:
+            return "body malformed"
+        case .truncated:
+            return "body truncated"
+        }
     }
 
     private static func roleLabel(for role: TranscriptSegmentRole) -> String {

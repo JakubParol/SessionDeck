@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AppShellTranscriptDetailView: View {
     let state: AppShellSelectedTranscriptDetailState
+    @State private var expandedToolRowIDs: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -118,7 +119,20 @@ struct AppShellTranscriptDetailView: View {
         )
     }
 
+    @ViewBuilder
     private func transcriptRow(_ row: AppShellTranscriptSegmentRow) -> some View {
+        if let toolPresentation = row.toolPresentation {
+            AppShellToolTranscriptRowView(
+                row: row,
+                presentation: toolPresentation,
+                expandedToolRowIDs: $expandedToolRowIDs
+            )
+        } else {
+            conversationTranscriptRow(row)
+        }
+    }
+
+    private func conversationTranscriptRow(_ row: AppShellTranscriptSegmentRow) -> some View {
         HStack {
             if row.roleStyle == .userTurn {
                 Spacer(minLength: 40)
