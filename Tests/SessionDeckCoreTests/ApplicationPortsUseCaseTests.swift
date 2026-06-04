@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import SessionDeckCore
 
 @Test("source discovery use case returns source summaries through an injected fake port")
@@ -29,6 +30,29 @@ func sourceDiscoveryUseCaseUsesFakePort() throws {
             isEnabled: true
         )
     ])
+}
+
+@Test("candidate file enumeration use case returns bounded metadata through an injected fake port")
+func candidateFileEnumerationUseCaseUsesFakePort() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let modifiedAt = Date(timeIntervalSince1970: 1_770_000_000)
+    let candidate = CandidateSessionFile(
+        sourceID: sourceID,
+        relativePath: "2026/06/04/rollout-2026-06-04T10-00-00-test.jsonl",
+        absolutePath: "/tmp/source/.codex/sessions/2026/06/04/rollout-2026-06-04T10-00-00-test.jsonl",
+        byteSize: 4096,
+        modifiedAt: modifiedAt,
+        confidence: .high,
+        reason: "codex.sessions.jsonl",
+        diagnostic: nil
+    )
+    let useCase = EnumerateCandidateSessionFilesUseCase(
+        candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(files: [candidate])
+    )
+
+    let files = try useCase.enumerateCandidateFiles(sourceID: sourceID)
+
+    #expect(files == [candidate])
 }
 
 @Test("session catalog use case filters session summaries through an injected fake port")

@@ -12,6 +12,22 @@ struct FakeSourceDiscoveryPort: SourceDiscoveryPort {
     }
 }
 
+struct FakeCandidateSessionFileEnumerationPort: CandidateSessionFileEnumerationPort {
+    let files: [CandidateSessionFile]
+
+    init(files: [CandidateSessionFile]) {
+        self.files = files
+    }
+
+    func enumerateCandidateFiles(sourceID: SessionSourceID?) throws -> [CandidateSessionFile] {
+        guard let sourceID else {
+            return files
+        }
+
+        return files.filter { $0.sourceID == sourceID }
+    }
+}
+
 struct FakeSessionCatalogPort: SessionCatalogPort {
     let sessions: [SessionSummary]
 
