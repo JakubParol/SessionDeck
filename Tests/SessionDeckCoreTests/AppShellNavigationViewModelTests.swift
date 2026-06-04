@@ -2,6 +2,31 @@ import Foundation
 import Testing
 @testable import SessionDeckCore
 
+@Test("navigation tree exposes required stable top-level sections when empty")
+func navigationTreeExposesRequiredStableTopLevelSectionsWhenEmpty() {
+    let snapshot = CatalogSnapshot(
+        refreshedAt: Date(timeIntervalSince1970: 1_770_299_900),
+        sources: [],
+        sessions: []
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+
+    #expect(summary.sectionNodes.map(\.id) == [
+        "all-chats",
+        "projects",
+        "non-project-chats",
+        "sources",
+        "recently-active",
+        "diagnostics",
+    ])
+    #expect(summary.projectsNode.title == "Projects")
+    #expect(summary.nonProjectChatsNode.title == "Non-project Chats")
+    #expect(summary.sourcesNode.title == "Sources / Profiles")
+    #expect(summary.recentlyActiveNode.title == "Recently Active")
+    #expect(summary.sectionNodes.allSatisfy { $0.count == 0 })
+}
+
 @Test("navigation summary keeps problem sessions in all chats and diagnostic categories")
 func navigationSummaryKeepsProblemSessionsVisibleInDiagnostics() {
     let snapshot = CatalogSnapshot(

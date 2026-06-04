@@ -1,66 +1,32 @@
-public enum AppShellNavigationProblemCategory: String, Equatable, Hashable, Sendable {
-    case missingPath
-    case permissionDenied
-    case missingMetadata
-    case malformedMetadata
-    case parseWarning
-    case unknownSource
-    case ambiguousProject
-
-    public var label: String {
-        switch self {
-        case .missingPath:
-            return "Missing path"
-        case .permissionDenied:
-            return "Permission denied"
-        case .missingMetadata:
-            return "Missing metadata"
-        case .malformedMetadata:
-            return "Malformed metadata"
-        case .parseWarning:
-            return "Parse warning"
-        case .unknownSource:
-            return "Unknown source"
-        case .ambiguousProject:
-            return "Ambiguous project"
-        }
-    }
-}
-
-public struct AppShellNavigationNode: Equatable, Identifiable, Sendable {
-    public let id: String
-    public let title: String
-    public let count: Int
-    public let sessionIDs: [SessionID]
-    public let problemCategory: AppShellNavigationProblemCategory?
-    public let children: [AppShellNavigationNode]
-
-    public init(
-        id: String,
-        title: String,
-        count: Int,
-        sessionIDs: [SessionID],
-        problemCategory: AppShellNavigationProblemCategory? = nil,
-        children: [AppShellNavigationNode] = []
-    ) {
-        self.id = id
-        self.title = title
-        self.count = count
-        self.sessionIDs = sessionIDs
-        self.problemCategory = problemCategory
-        self.children = children
-    }
-
-    public var countLabel: String {
-        count == 1 ? "1 session" : "\(count) sessions"
-    }
-}
-
 public struct AppShellNavigationSummary: Equatable, Sendable {
     public static let placeholder = AppShellNavigationSummary(
         allChatsNode: AppShellNavigationNode(
             id: "all-chats",
             title: "All Chats",
+            count: 0,
+            sessionIDs: []
+        ),
+        projectsNode: AppShellNavigationNode(
+            id: "projects",
+            title: "Projects",
+            count: 0,
+            sessionIDs: []
+        ),
+        nonProjectChatsNode: AppShellNavigationNode(
+            id: "non-project-chats",
+            title: "Non-project Chats",
+            count: 0,
+            sessionIDs: []
+        ),
+        sourcesNode: AppShellNavigationNode(
+            id: "sources",
+            title: "Sources / Profiles",
+            count: 0,
+            sessionIDs: []
+        ),
+        recentlyActiveNode: AppShellNavigationNode(
+            id: "recently-active",
+            title: "Recently Active",
             count: 0,
             sessionIDs: []
         ),
@@ -73,7 +39,22 @@ public struct AppShellNavigationSummary: Equatable, Sendable {
     )
 
     public let allChatsNode: AppShellNavigationNode
+    public let projectsNode: AppShellNavigationNode
+    public let nonProjectChatsNode: AppShellNavigationNode
+    public let sourcesNode: AppShellNavigationNode
+    public let recentlyActiveNode: AppShellNavigationNode
     public let diagnosticsNode: AppShellNavigationNode
+
+    public var sectionNodes: [AppShellNavigationNode] {
+        [
+            allChatsNode,
+            projectsNode,
+            nonProjectChatsNode,
+            sourcesNode,
+            recentlyActiveNode,
+            diagnosticsNode,
+        ]
+    }
 
     public var problemSessionsNode: AppShellNavigationNode {
         diagnosticsNode.children.first(where: { $0.id == "diagnostics.problem-sessions" })
@@ -85,8 +66,19 @@ public struct AppShellNavigationSummary: Equatable, Sendable {
             )
     }
 
-    public init(allChatsNode: AppShellNavigationNode, diagnosticsNode: AppShellNavigationNode) {
+    public init(
+        allChatsNode: AppShellNavigationNode,
+        projectsNode: AppShellNavigationNode,
+        nonProjectChatsNode: AppShellNavigationNode,
+        sourcesNode: AppShellNavigationNode,
+        recentlyActiveNode: AppShellNavigationNode,
+        diagnosticsNode: AppShellNavigationNode
+    ) {
         self.allChatsNode = allChatsNode
+        self.projectsNode = projectsNode
+        self.nonProjectChatsNode = nonProjectChatsNode
+        self.sourcesNode = sourcesNode
+        self.recentlyActiveNode = recentlyActiveNode
         self.diagnosticsNode = diagnosticsNode
     }
 
@@ -123,6 +115,30 @@ public struct AppShellNavigationSummary: Equatable, Sendable {
                 title: "All Chats",
                 count: sessionIDs.count,
                 sessionIDs: sessionIDs
+            ),
+            projectsNode: AppShellNavigationNode(
+                id: "projects",
+                title: "Projects",
+                count: 0,
+                sessionIDs: []
+            ),
+            nonProjectChatsNode: AppShellNavigationNode(
+                id: "non-project-chats",
+                title: "Non-project Chats",
+                count: 0,
+                sessionIDs: []
+            ),
+            sourcesNode: AppShellNavigationNode(
+                id: "sources",
+                title: "Sources / Profiles",
+                count: 0,
+                sessionIDs: []
+            ),
+            recentlyActiveNode: AppShellNavigationNode(
+                id: "recently-active",
+                title: "Recently Active",
+                count: 0,
+                sessionIDs: []
             ),
             diagnosticsNode: AppShellNavigationNode(
                 id: "diagnostics",
