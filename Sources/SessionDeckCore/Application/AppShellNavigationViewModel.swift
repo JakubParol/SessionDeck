@@ -50,6 +50,10 @@ public struct AppShellNavigationNode: Equatable, Identifiable, Sendable {
         self.problemCategory = problemCategory
         self.children = children
     }
+
+    public var countLabel: String {
+        count == 1 ? "1 session" : "\(count) sessions"
+    }
 }
 
 public struct AppShellNavigationSummary: Equatable, Sendable {

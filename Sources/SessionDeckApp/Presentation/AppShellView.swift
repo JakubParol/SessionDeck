@@ -43,6 +43,13 @@ struct AppShellView: View {
 
             Divider()
 
+            AppShellNavigationView(
+                summary: viewModel.navigationSummary,
+                selectedSessionID: $selectedSessionID
+            )
+
+            Divider()
+
             AppShellCatalogView(
                 summary: viewModel.catalogSummary,
                 refreshState: viewModel.refreshState,

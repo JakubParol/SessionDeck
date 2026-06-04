@@ -82,6 +82,24 @@ func navigationSummaryKeepsProblemSessionsVisibleInDiagnostics() {
     #expect(countsByCategory[.ambiguousProject] == 1)
 }
 
+@Test("navigation nodes expose concise count labels for app shell rendering")
+func navigationNodesExposeConciseCountLabels() {
+    let snapshot = CatalogSnapshot(
+        refreshedAt: Date(timeIntervalSince1970: 1_770_300_100),
+        sources: [navigationSource()],
+        sessions: [
+            navigationSession(id: "healthy"),
+            navigationSession(id: "missing-path", sessionPath: "", fallbackReasons: [.missingPath]),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+
+    #expect(summary.allChatsNode.countLabel == "2 sessions")
+    #expect(summary.problemSessionsNode.countLabel == "1 session")
+    #expect(summary.problemSessionsNode.children.first?.countLabel == "1 session")
+}
+
 private func navigationSource() -> SessionSourceSummary {
     SessionSourceSummary(
         id: SessionSourceID(rawValue: "codex-navigation"),
