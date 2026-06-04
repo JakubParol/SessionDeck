@@ -60,6 +60,23 @@ func codexTranscriptDecoderConvertsMalformedLinesIntoDiagnostics() throws {
     #expect(orderedSegments[1].text == "Malformed Codex JSONL line.")
 }
 
+@Test("Codex transcript decoder maps tool call events into distinct segments")
+func codexTranscriptDecoderMapsToolCallEventsIntoDistinctSegments() throws {
+    let result = try decodeFixture(.projectSession, sessionID: "project-tool-call-session")
+    let orderedSegments = result.orderedSegments
+
+    #expect(orderedSegments.count == 4)
+    #expect(orderedSegments[2].kind == .toolCall(name: "synthetic_fixture_probe", callID: "call_synthetic_001"))
+    #expect(orderedSegments[2].role == .tool)
+    #expect(orderedSegments[2].text == "{\"target\":\"fixture\"}")
+    #expect(orderedSegments[2].timestampDescription == "2026-01-01T00:00:03Z")
+    #expect(orderedSegments[2].source.lineNumber == 4)
+    #expect(orderedSegments[2].metadata["event_type"] == "response_item")
+    #expect(orderedSegments[2].metadata["payload_type"] == "function_call")
+    #expect(orderedSegments[2].metadata["tool_name"] == "synthetic_fixture_probe")
+    #expect(orderedSegments[2].metadata["call_id"] == "call_synthetic_001")
+}
+
 private func decodeFixture(
     _ fixtureID: CodexTranscriptFixtureID,
     sessionID rawSessionID: String

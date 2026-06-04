@@ -103,6 +103,10 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         source: TranscriptSegmentSourceReference,
         orderIndex: Int
     ) -> TranscriptSegment? {
+        if event.isToolCall {
+            return toolCallSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+        }
+
         guard let role = event.supportedMessageRole,
               let text = event.messageText
         else {
@@ -123,6 +127,34 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
                 "line_number": String(source.lineNumber ?? 0),
                 "role": role,
             ]
+        )
+    }
+
+    private func toolCallSegment(
+        from event: CodexTranscriptJSONEvent,
+        file: CodexTranscriptFile,
+        source: TranscriptSegmentSourceReference,
+        orderIndex: Int
+    ) -> TranscriptSegment {
+        let toolName = event.toolName ?? "unknown_tool"
+        var metadata = baseMetadata(from: event, source: source)
+        metadata["payload_type"] = event.payloadType ?? "function_call"
+        metadata["tool_name"] = toolName
+        if let callID = event.callID {
+            metadata["call_id"] = callID
+        }
+        if let status = event.status {
+            metadata["status"] = status
+        }
+
+        return TranscriptSegment(
+            id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
+            kind: .toolCall(name: toolName, callID: event.callID),
+            text: event.toolCallText ?? "Tool call: \(toolName)",
+            order: TranscriptSegmentOrder(index: orderIndex),
+            source: source,
+            timestampDescription: event.timestamp,
+            metadata: metadata
         )
     }
 
@@ -163,6 +195,16 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
                 "line_number": String(source.lineNumber ?? 0),
             ]
         )
+    }
+
+    private func baseMetadata(
+        from event: CodexTranscriptJSONEvent,
+        source: TranscriptSegmentSourceReference
+    ) -> [String: String] {
+        [
+            "event_type": event.type,
+            "line_number": String(source.lineNumber ?? 0),
+        ]
     }
 }
 
@@ -205,6 +247,30 @@ private struct CodexTranscriptJSONEvent {
         default:
             return nil
         }
+    }
+
+    var payloadType: String? {
+        payload["type"] as? String
+    }
+
+    var isToolCall: Bool {
+        payloadType == "function_call" || payloadType == "tool_call" || type == "tool_call"
+    }
+
+    var toolName: String? {
+        payloadString("name") ?? payloadString("tool_name")
+    }
+
+    var callID: String? {
+        payloadString("call_id") ?? payloadString("id")
+    }
+
+    var status: String? {
+        payloadString("status")
+    }
+
+    var toolCallText: String? {
+        payloadString("arguments") ?? payloadString("input") ?? payloadString("command")
     }
 
     var messageText: String? {
