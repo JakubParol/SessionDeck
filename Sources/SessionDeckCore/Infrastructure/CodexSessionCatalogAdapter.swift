@@ -10,7 +10,7 @@ public struct CodexCatalogScanLimits: Equatable, Sendable {
     }
 }
 
-public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
+public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, SessionCatalogPort, Sendable {
     private let sourceDiscovery: any SourceDiscoveryPort
     private let candidateFileEnumeration: any CandidateSessionFileEnumerationPort
     private let scanLimits: CodexCatalogScanLimits
@@ -41,6 +41,13 @@ public struct CodexSessionCatalogAdapter: SessionCatalogPort, Sendable {
         return try candidateFileEnumeration.enumerateCandidateFiles(sourceID: sourceID).map { candidate in
             try summary(for: candidate, sourceLabelsByID: sourceLabelsByID)
         }
+    }
+
+    public func extractSessions(source: SessionSourceSummary) throws -> CatalogSourceExtractionResult {
+        CatalogSourceExtractionResult(
+            sourceID: source.id,
+            sessions: try listSessions(sourceID: source.id)
+        )
     }
 
     private func summary(

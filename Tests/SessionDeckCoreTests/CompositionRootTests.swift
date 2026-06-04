@@ -31,6 +31,10 @@ func compositionRootWiresDefaultSourceDiscoveryWithoutPresentationIO() throws {
     let sessions = try composition.listSessions.listSessions()
     #expect(sessions.isEmpty)
 
+    let snapshot = try composition.refreshCatalogSnapshot.refreshSnapshot()
+    #expect(snapshot.sessions.isEmpty)
+    #expect(snapshot.refreshErrors.isEmpty)
+
     let missingSessionID = SessionID(rawValue: "placeholder-missing")
     do {
         _ = try composition.loadTranscriptPreview.loadPreview(sessionID: missingSessionID)
@@ -103,6 +107,11 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
     #expect(sessions.count == 2)
     #expect(compositionSession.displayTitle == "Composition Catalog")
     #expect(compositionSession.sourceLabel.displayName == "Codex configured")
+
+    let snapshot = try composition.refreshCatalogSnapshot.refreshSnapshot()
+    #expect(snapshot.sources.map(\.id.rawValue) == ["codex-configured"])
+    #expect(snapshot.sessions.map(\.id.rawValue).contains("composition-session"))
+    #expect(snapshot.counts.totalEntries == 2)
 
     let report = try composition.discoverSessionSources.discoveryReport()
     #expect(report.candidateDiagnostics.map(\.candidate.relativePath) == [
