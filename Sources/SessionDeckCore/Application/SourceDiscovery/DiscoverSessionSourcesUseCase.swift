@@ -8,4 +8,8 @@ public struct DiscoverSessionSourcesUseCase: Sendable {
     public func discoverSources() throws -> [SessionSourceSummary] {
         try sourceDiscovery.discoverSources()
     }
+
+    public func discoveryReport() throws -> SessionSourceDiscoveryReport {
+        SessionSourceDiscoveryReport(sources: try discoverSources())
+    }
 }

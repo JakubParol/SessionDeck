@@ -32,6 +32,42 @@ func sourceDiscoveryUseCaseUsesFakePort() throws {
     ])
 }
 
+@Test("source discovery report preserves healthy sources and failed diagnostics")
+func sourceDiscoveryReportPreservesHealthySourcesAndFailedDiagnostics() throws {
+    let healthySource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-healthy"),
+        displayName: "Codex healthy",
+        kind: .codex,
+        locationDescription: "Synthetic healthy source",
+        isEnabled: true,
+        availability: .available,
+        counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 2)
+    )
+    let failedSource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-missing"),
+        displayName: "Codex missing",
+        kind: .codex,
+        locationDescription: "Synthetic missing source",
+        isEnabled: true,
+        availability: .missing,
+        diagnostic: SessionSourceDiagnostic(
+            code: .codexSessionsRootMissing,
+            message: "Configured Codex sessions root was not found."
+        )
+    )
+    let useCase = DiscoverSessionSourcesUseCase(
+        sourceDiscovery: FakeSourceDiscoveryPort(sources: [healthySource, failedSource])
+    )
+
+    let report = try useCase.discoveryReport()
+
+    #expect(report.sources == [healthySource, failedSource])
+    #expect(report.availableSources == [healthySource])
+    #expect(report.diagnostics.map(\.sourceID) == [failedSource.id])
+    #expect(report.diagnostics.map(\.diagnostic.code) == [.codexSessionsRootMissing])
+    #expect(report.canContinueDiscovery)
+}
+
 @Test("candidate file enumeration use case returns bounded metadata through an injected fake port")
 func candidateFileEnumerationUseCaseUsesFakePort() throws {
     let sourceID = SessionSourceID(rawValue: "codex-default")
