@@ -119,6 +119,9 @@ final class FixtureHarnessApplicationSmoke {
             discoverSessionSources: DiscoverSessionSourcesUseCase(
                 sourceDiscovery: FakeSourceDiscoveryPort(sources: sourceSummaries)
             ),
+            enumerateCandidateSessionFiles: EnumerateCandidateSessionFilesUseCase(
+                candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(files: [])
+            ),
             listSessions: ListSessionsUseCase(
                 sessionCatalog: FakeSessionCatalogPort(sessions: sessionSummaries)
             ),

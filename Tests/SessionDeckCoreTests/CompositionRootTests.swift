@@ -78,4 +78,8 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
     #expect(sources.first?.displayName == "Codex configured")
     #expect(sources.first?.availability == .available)
     #expect(sources.first?.locationDescription == sessionsRoot.standardizedFileURL.path)
+
+    let candidates = try composition.enumerateCandidateSessionFiles.enumerateCandidateFiles()
+    #expect(candidates.map(\.sourceID.rawValue) == ["codex-configured"])
+    #expect(candidates.map(\.relativePath) == ["2026/06/03/rollout-2026-06-03T06-00-00-composition.jsonl"])
 }

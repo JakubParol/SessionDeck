@@ -103,6 +103,163 @@ func defaultCodexSourceDiscoveryDoesNotMutateSourceRoot() throws {
     #expect(after == before)
 }
 
+@Test("default Codex source discovery enumerates conservative candidate files with bounded metadata")
+func defaultCodexSourceDiscoveryEnumeratesCandidateFiles() throws {
+    let fixtureRoot = try makeDiscoveryFixtureRoot(name: "candidate-files")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let homeDirectory = fixtureRoot.url.appending(path: "home", directoryHint: .isDirectory)
+    let sessionsRoot = homeDirectory
+        .appending(path: ".codex", directoryHint: .isDirectory)
+        .appending(path: "sessions", directoryHint: .isDirectory)
+    let candidateURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T10-00-00-test.jsonl")
+    let unrelatedJSONL = sessionsRoot.appending(path: "scratch.jsonl")
+    let unrelatedDateBucketJSONL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "not-a-codex-rollout.jsonl")
+    let unrelatedText = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "notes.txt")
+    try FileManager.default.createDirectory(
+        at: candidateURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try #"{"type":"session_meta"}"#.write(to: candidateURL, atomically: true, encoding: .utf8)
+    try #"{"not":"a-codex-session"}"#.write(to: unrelatedJSONL, atomically: true, encoding: .utf8)
+    try #"{"not":"a-codex-rollout"}"#.write(to: unrelatedDateBucketJSONL, atomically: true, encoding: .utf8)
+    try "notes".write(to: unrelatedText, atomically: true, encoding: .utf8)
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: nil)
+
+    let candidate = try #require(files.first)
+    #expect(files.count == 1)
+    #expect(candidate.sourceID == DefaultCodexSourceDiscoveryAdapter.sourceID)
+    #expect(candidate.relativePath == "2026/06/04/rollout-2026-06-04T10-00-00-test.jsonl")
+    #expect(candidate.absolutePath == candidateURL.standardizedFileURL.path)
+    #expect(candidate.byteSize == Int64(#"{"type":"session_meta"}"#.utf8.count))
+    #expect(candidate.modifiedAt != nil)
+    #expect(candidate.confidence == .high)
+    #expect(candidate.reason == "codex.sessions.date-bucket-jsonl")
+    #expect(candidate.diagnostic == nil)
+}
+
+@Test("default Codex source discovery records unreadable candidate diagnostics and continues")
+func defaultCodexSourceDiscoveryRecordsUnreadableCandidateDiagnosticsAndContinues() throws {
+    let fixtureRoot = try makeDiscoveryFixtureRoot(name: "unreadable-candidates")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let homeDirectory = fixtureRoot.url.appending(path: "home", directoryHint: .isDirectory)
+    let sessionsRoot = homeDirectory
+        .appending(path: ".codex", directoryHint: .isDirectory)
+        .appending(path: "sessions", directoryHint: .isDirectory)
+    let readableURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T10-00-00-readable.jsonl")
+    let unreadableURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T10-01-00-unreadable.jsonl")
+    try FileManager.default.createDirectory(
+        at: readableURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try #"{"type":"session_meta"}"#.write(to: readableURL, atomically: true, encoding: .utf8)
+    try #"{"type":"session_meta"}"#.write(to: unreadableURL, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadableURL.path)
+    defer {
+        try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: unreadableURL.path)
+    }
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: nil)
+
+    #expect(files.map(\.relativePath) == [
+        "2026/06/04/rollout-2026-06-04T10-00-00-readable.jsonl",
+        "2026/06/04/rollout-2026-06-04T10-01-00-unreadable.jsonl",
+    ])
+    #expect(files.first?.diagnostic == nil)
+    #expect(files.last?.diagnostic?.code == "codex.candidate_file_unreadable")
+}
+
+@Test("default Codex source discovery skips candidate symlinks that escape the source root")
+func defaultCodexSourceDiscoverySkipsCandidateSymlinksThatEscapeSourceRoot() throws {
+    let fixtureRoot = try makeDiscoveryFixtureRoot(name: "escaping-symlink")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let homeDirectory = fixtureRoot.url.appending(path: "home", directoryHint: .isDirectory)
+    let sessionsRoot = homeDirectory
+        .appending(path: ".codex", directoryHint: .isDirectory)
+        .appending(path: "sessions", directoryHint: .isDirectory)
+    let outsideRoot = fixtureRoot.url.appending(path: "outside", directoryHint: .isDirectory)
+    let outsideFile = outsideRoot.appending(path: "outside.jsonl")
+    let symlinkURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T10-02-00-escape.jsonl")
+    try FileManager.default.createDirectory(at: outsideRoot, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+        at: symlinkURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    try #"{"type":"session_meta"}"#.write(to: outsideFile, atomically: true, encoding: .utf8)
+    try FileManager.default.createSymbolicLink(atPath: symlinkURL.path, withDestinationPath: outsideFile.path)
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: nil)
+
+    #expect(files.isEmpty)
+}
+
+@Test("default Codex source discovery records large candidate file metadata without parsing")
+func defaultCodexSourceDiscoveryRecordsLargeCandidateFileMetadataWithoutParsing() throws {
+    let fixtureRoot = try makeDiscoveryFixtureRoot(name: "large-candidate")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let homeDirectory = fixtureRoot.url.appending(path: "home", directoryHint: .isDirectory)
+    let sessionsRoot = homeDirectory
+        .appending(path: ".codex", directoryHint: .isDirectory)
+        .appending(path: "sessions", directoryHint: .isDirectory)
+    let candidateURL = sessionsRoot
+        .appending(path: "2026/06/04", directoryHint: .isDirectory)
+        .appending(path: "rollout-2026-06-04T10-03-00-large.jsonl")
+    try FileManager.default.createDirectory(
+        at: candidateURL.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    let largePayload = Data(repeating: 0x7B, count: 1_048_576)
+    try largePayload.write(to: candidateURL)
+
+    let adapter = DefaultCodexSourceDiscoveryAdapter(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: homeDirectory)
+    )
+
+    let files = try adapter.enumerateCandidateFiles(sourceID: nil)
+
+    let candidate = try #require(files.first)
+    #expect(files.count == 1)
+    #expect(candidate.relativePath == "2026/06/04/rollout-2026-06-04T10-03-00-large.jsonl")
+    #expect(candidate.byteSize == 1_048_576)
+    #expect(candidate.diagnostic == nil)
+}
+
 private func makeDiscoveryFixtureRoot(name: String) throws -> FixtureTempRoot {
     try FixtureTempRoot(
         parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),

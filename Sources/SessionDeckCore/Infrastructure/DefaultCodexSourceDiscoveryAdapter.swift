@@ -19,6 +19,7 @@ public struct EnvironmentHomeDirectoryProvider: HomeDirectoryProviding, Sendable
 public protocol CodexSourceFileSystemChecking: Sendable {
     func directoryExists(at url: URL) -> Bool
     func sourceCounts(at sessionsRoot: URL) throws -> SessionSourceCounts
+    func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile]
 }
 
 public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @unchecked Sendable {
@@ -63,9 +64,112 @@ public struct FoundationCodexSourceFileSystem: CodexSourceFileSystemChecking, @u
             transcriptFileCount: transcriptFileCount
         )
     }
+
+    public func candidateFiles(at sessionsRoot: URL, sourceID: SessionSourceID) throws -> [CandidateSessionFile] {
+        guard let enumerator = fileManager.enumerator(
+            at: sessionsRoot,
+            includingPropertiesForKeys: [
+                .isRegularFileKey,
+                .isSymbolicLinkKey,
+                .fileSizeKey,
+                .contentModificationDateKey,
+            ],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+
+        let rootPath = sessionsRoot.standardizedFileURL.path
+        var files: [CandidateSessionFile] = []
+        for case let fileURL as URL in enumerator {
+            guard isConservativeCodexTranscriptCandidate(fileURL: fileURL, sessionsRoot: sessionsRoot) else {
+                continue
+            }
+
+            let values = try fileURL.resourceValues(forKeys: [
+                .isRegularFileKey,
+                .isSymbolicLinkKey,
+                .fileSizeKey,
+                .contentModificationDateKey,
+            ])
+            guard values.isRegularFile == true,
+                  values.isSymbolicLink != true,
+                  isContainedAfterResolvingSymlinks(fileURL: fileURL, sessionsRoot: sessionsRoot)
+            else {
+                continue
+            }
+
+            let absolutePath = fileURL.standardizedFileURL.path
+            let diagnostic: CandidateSessionFileDiagnostic?
+            if fileManager.isReadableFile(atPath: absolutePath) {
+                diagnostic = nil
+            } else {
+                diagnostic = CandidateSessionFileDiagnostic(
+                    code: "codex.candidate_file_unreadable",
+                    message: "Candidate transcript file could not be read by the current process."
+                )
+            }
+
+            files.append(
+                CandidateSessionFile(
+                    sourceID: sourceID,
+                    relativePath: relativePath(absolutePath: absolutePath, rootPath: rootPath),
+                    absolutePath: absolutePath,
+                    byteSize: Int64(values.fileSize ?? 0),
+                    modifiedAt: values.contentModificationDate,
+                    confidence: .high,
+                    reason: "codex.sessions.date-bucket-jsonl",
+                    diagnostic: diagnostic
+                )
+            )
+
+            if files.count >= maximumTranscriptCount {
+                break
+            }
+        }
+
+        return files.sorted { $0.relativePath < $1.relativePath }
+    }
+
+    private func isConservativeCodexTranscriptCandidate(fileURL: URL, sessionsRoot: URL) -> Bool {
+        guard fileURL.pathExtension == "jsonl" else {
+            return false
+        }
+
+        let relativeComponents = Array(fileURL.standardizedFileURL.pathComponents.dropFirst(
+            sessionsRoot.standardizedFileURL.pathComponents.count
+        ))
+        guard relativeComponents.count == 4 else {
+            return false
+        }
+
+        let year = relativeComponents[0]
+        let month = relativeComponents[1]
+        let day = relativeComponents[2]
+        let fileName = relativeComponents[3]
+        return year.count == 4 && year.allSatisfy(\.isNumber)
+            && month.count == 2 && month.allSatisfy(\.isNumber)
+            && day.count == 2 && day.allSatisfy(\.isNumber)
+            && fileName.hasPrefix("rollout-\(year)-\(month)-\(day)T")
+    }
+
+    private func relativePath(absolutePath: String, rootPath: String) -> String {
+        let rootPrefix = "\(rootPath)/"
+        guard absolutePath.hasPrefix(rootPrefix) else {
+            return absolutePath
+        }
+
+        return String(absolutePath.dropFirst(rootPrefix.count))
+    }
+
+    private func isContainedAfterResolvingSymlinks(fileURL: URL, sessionsRoot: URL) -> Bool {
+        let resolvedRootPath = sessionsRoot.resolvingSymlinksInPath().standardizedFileURL.path
+        let resolvedFilePath = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+        return resolvedFilePath.hasPrefix("\(resolvedRootPath)/")
+    }
 }
 
-public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable {
+public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, CandidateSessionFileEnumerationPort, Sendable {
     public static let sourceID = SessionSourceID(rawValue: "codex-default")
 
     private let homeDirectoryProvider: any HomeDirectoryProviding
@@ -104,6 +208,37 @@ public struct DefaultCodexSourceDiscoveryAdapter: SourceDiscoveryPort, Sendable 
         }
 
         return summaries
+    }
+
+    public func enumerateCandidateFiles(sourceID: SessionSourceID? = nil) throws -> [CandidateSessionFile] {
+        let definitions = sourceDefinitions ?? [defaultSourceDefinition()]
+
+        var seenRootPaths: Set<String> = []
+        var files: [CandidateSessionFile] = []
+        for definition in definitions {
+            let rootURL = rootURL(for: definition)
+            let isCandidateSource = definition.isEnabled && definition.kind == .codex
+            let duplicateKey = duplicateDetectionKey(for: rootURL)
+            let isDuplicate = isCandidateSource && seenRootPaths.contains(duplicateKey)
+            if isCandidateSource && !isDuplicate {
+                seenRootPaths.insert(duplicateKey)
+            }
+
+            guard sourceID == nil || definition.id == sourceID else {
+                continue
+            }
+            guard isCandidateSource && !isDuplicate else {
+                continue
+            }
+
+            guard fileSystem.directoryExists(at: rootURL) else {
+                continue
+            }
+
+            files.append(contentsOf: try fileSystem.candidateFiles(at: rootURL, sourceID: definition.id))
+        }
+
+        return files.sorted { $0.absolutePath < $1.absolutePath }
     }
 
     private func discoverSource(
