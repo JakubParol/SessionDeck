@@ -1,4 +1,5 @@
 import SessionDeckCore
+import Foundation
 
 struct FakeSourceDiscoveryPort: SourceDiscoveryPort {
     let sources: [SessionSourceSummary]
@@ -62,4 +63,37 @@ struct FakeTranscriptLoadingPort: TranscriptLoadingPort {
 
 enum FakeTranscriptLoadingError: Error, Equatable {
     case previewNotFound(SessionID)
+}
+
+struct FakeCatalogMetadataExtractionPort: CatalogMetadataExtractionPort {
+    let resultsBySourceID: [SessionSourceID: CatalogSourceExtractionResult]
+    let errorsBySourceID: [SessionSourceID: Error]
+
+    init(
+        resultsBySourceID: [SessionSourceID: CatalogSourceExtractionResult],
+        errorsBySourceID: [SessionSourceID: Error] = [:]
+    ) {
+        self.resultsBySourceID = resultsBySourceID
+        self.errorsBySourceID = errorsBySourceID
+    }
+
+    func extractSessions(source: SessionSourceSummary) throws -> CatalogSourceExtractionResult {
+        if let error = errorsBySourceID[source.id] {
+            throw error
+        }
+
+        return resultsBySourceID[source.id] ?? CatalogSourceExtractionResult(sourceID: source.id, sessions: [])
+    }
+}
+
+struct FixedCatalogRefreshClock: CatalogRefreshClock {
+    let nowDate: Date
+
+    init(now: Date) {
+        self.nowDate = now
+    }
+
+    func now() -> Date {
+        nowDate
+    }
 }
