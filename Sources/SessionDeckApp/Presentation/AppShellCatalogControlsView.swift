@@ -14,8 +14,16 @@ struct AppShellCatalogControlsView: View {
 
                 TextField("Catalog metadata", text: searchText)
                     .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 180)
+                    .frame(minWidth: 160, maxWidth: 360)
 
+                if controls.hasActiveFilters {
+                    Button(action: clearFilters) {
+                        Label("Clear", systemImage: "xmark.circle")
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
                 filterPicker(
                     title: "Project",
                     systemImage: "folder",
@@ -38,12 +46,6 @@ struct AppShellCatalogControlsView: View {
                 )
 
                 parseStatusMenu
-
-                if controls.hasActiveFilters {
-                    Button(action: clearFilters) {
-                        Label("Clear", systemImage: "xmark.circle")
-                    }
-                }
             }
 
             if controls.activeFilters.isEmpty == false {
@@ -53,18 +55,21 @@ struct AppShellCatalogControlsView: View {
     }
 
     private var activeFilterLabels: some View {
-        HStack(spacing: 6) {
-            ForEach(controls.activeFilters) { filter in
-                Button(action: { clear(filter) }) {
-                    Label(filter.title, systemImage: "xmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(Color(nsColor: .controlBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(controls.activeFilters) { filter in
+                    Button(action: { clear(filter) }) {
+                        Label(filter.title, systemImage: "xmark.circle")
+                            .font(.caption)
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -103,7 +108,7 @@ struct AppShellCatalogControlsView: View {
         } label: {
             Label(title, systemImage: systemImage)
         }
-        .frame(width: 150)
+        .frame(width: 128)
         .disabled(options.isEmpty)
     }
 

@@ -97,19 +97,53 @@ public extension AppShellCatalogQueryState {
         }
     }
 
-    func replacing(
-        searchText: String? = nil,
-        projectOptionID: String?? = nil,
-        sourceOptionID: String?? = nil,
-        profileOptionID: String?? = nil,
-        parseStatusOptionIDs: Set<String>? = nil
-    ) -> AppShellCatalogQueryState {
+    func replacing(searchText: String) -> AppShellCatalogQueryState {
         AppShellCatalogQueryState(
-            searchText: searchText ?? self.searchText,
-            selectedProjectOptionID: projectOptionID ?? selectedProjectOptionID,
-            selectedSourceOptionID: sourceOptionID ?? selectedSourceOptionID,
-            selectedProfileOptionID: profileOptionID ?? selectedProfileOptionID,
-            selectedParseStatusOptionIDs: parseStatusOptionIDs ?? selectedParseStatusOptionIDs
+            searchText: searchText,
+            selectedProjectOptionID: selectedProjectOptionID,
+            selectedSourceOptionID: selectedSourceOptionID,
+            selectedProfileOptionID: selectedProfileOptionID,
+            selectedParseStatusOptionIDs: selectedParseStatusOptionIDs
+        )
+    }
+
+    func replacing(projectOptionID: String?) -> AppShellCatalogQueryState {
+        AppShellCatalogQueryState(
+            searchText: searchText,
+            selectedProjectOptionID: projectOptionID,
+            selectedSourceOptionID: selectedSourceOptionID,
+            selectedProfileOptionID: selectedProfileOptionID,
+            selectedParseStatusOptionIDs: selectedParseStatusOptionIDs
+        )
+    }
+
+    func replacing(sourceOptionID: String?) -> AppShellCatalogQueryState {
+        AppShellCatalogQueryState(
+            searchText: searchText,
+            selectedProjectOptionID: selectedProjectOptionID,
+            selectedSourceOptionID: sourceOptionID,
+            selectedProfileOptionID: selectedProfileOptionID,
+            selectedParseStatusOptionIDs: selectedParseStatusOptionIDs
+        )
+    }
+
+    func replacing(profileOptionID: String?) -> AppShellCatalogQueryState {
+        AppShellCatalogQueryState(
+            searchText: searchText,
+            selectedProjectOptionID: selectedProjectOptionID,
+            selectedSourceOptionID: selectedSourceOptionID,
+            selectedProfileOptionID: profileOptionID,
+            selectedParseStatusOptionIDs: selectedParseStatusOptionIDs
+        )
+    }
+
+    func replacing(parseStatusOptionIDs: Set<String>) -> AppShellCatalogQueryState {
+        AppShellCatalogQueryState(
+            searchText: searchText,
+            selectedProjectOptionID: selectedProjectOptionID,
+            selectedSourceOptionID: selectedSourceOptionID,
+            selectedProfileOptionID: selectedProfileOptionID,
+            selectedParseStatusOptionIDs: parseStatusOptionIDs
         )
     }
 }
