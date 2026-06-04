@@ -60,6 +60,56 @@ func codexTranscriptDecoderConvertsMalformedLinesIntoDiagnostics() throws {
     #expect(orderedSegments[1].text == "Malformed Codex JSONL line.")
 }
 
+@Test("Codex transcript decoder records safe line diagnostics for malformed input")
+func codexTranscriptDecoderRecordsSafeLineDiagnosticsForMalformedInput() throws {
+    let result = try decodeFixture(.malformedLine, sessionID: "safe-malformed-session")
+    let diagnostic = try #require(result.diagnostics.first)
+
+    #expect(diagnostic.severity == .warning)
+    #expect(diagnostic.source?.lineNumber == 3)
+    #expect(diagnostic.allowsDecodingToContinue)
+    #expect(diagnostic.message == "A Codex transcript line could not be decoded as JSON.")
+    #expect(!diagnostic.message.contains("intentionally malformed"))
+    #expect(!diagnostic.message.contains("{this line"))
+}
+
+@Test("Codex transcript decoder preserves unknown fixture events as ordered diagnostic segments")
+func codexTranscriptDecoderPreservesUnknownFixtureEventsAsOrderedDiagnosticSegments() throws {
+    let result = try decodeFixture(.unknownEvent, sessionID: "unknown-session")
+    let orderedSegments = result.orderedSegments
+    let diagnostic = try #require(result.diagnostics.first)
+
+    #expect(result.title == "Synthetic Unknown Event Session")
+    #expect(result.isPartial)
+    #expect(result.canContinueDecoding)
+    #expect(result.diagnostics.map(\.code) == ["codex.unsupported_event"])
+    #expect(diagnostic.severity == .info)
+    #expect(diagnostic.source?.lineNumber == 3)
+    #expect(diagnostic.message == "A Codex transcript event is not mapped to a readable segment yet.")
+    #expect(orderedSegments.map(\.kind) == [
+        .userMessage,
+        .unknown(eventType: "future_codex_event"),
+        .assistantMessage,
+    ])
+    #expect(orderedSegments.map(\.source.lineNumber) == [2, 3, 4])
+    #expect(orderedSegments.map(\.order.index) == [0, 1, 2])
+    #expect(orderedSegments[1].metadata["event_type"] == "future_codex_event")
+    #expect(!orderedSegments[1].text.contains("preserve-or-diagnose"))
+}
+
+@Test("Codex transcript decoder tolerates missing optional metadata and timestamps")
+func codexTranscriptDecoderToleratesMissingOptionalMetadataAndTimestamps() throws {
+    let result = try decodeFixture(.missingMetadata, sessionID: "missing-metadata-session")
+
+    #expect(result.title == "Synthetic Missing Metadata Session")
+    #expect(result.isPartial == false)
+    #expect(result.diagnostics.isEmpty)
+    #expect(result.orderedSegments.map(\.timestampDescription) == [
+        "2026-01-01T00:03:01Z",
+        "2026-01-01T00:03:02Z",
+    ])
+}
+
 @Test("Codex transcript decoder maps tool call events into distinct segments")
 func codexTranscriptDecoderMapsToolCallEventsIntoDistinctSegments() throws {
     let result = try decodeFixture(.projectSession, sessionID: "project-tool-call-session")
@@ -123,6 +173,18 @@ func codexTranscriptDecoderPreservesMixedToolOrderingAndSourceMetadata() throws 
         "call_tool_activity_003",
         "call_tool_activity_003",
     ])
+}
+
+@Test("Codex transcript decoder uses path-guarded synthetic fixtures for degraded cases")
+func codexTranscriptDecoderUsesPathGuardedSyntheticFixturesForDegradedCases() throws {
+    for fixtureID in [CodexTranscriptFixtureID.malformedLine, .unknownEvent, .missingMetadata] {
+        let url = try CodexTranscriptFixtureManifest.fixtureURL(for: fixtureID)
+
+        #expect(url.path.contains("CodexTranscripts"))
+        #expect(!url.path.contains("/.codex"))
+        #expect(!url.path.contains("/.hermes"))
+        _ = try decodeFixture(fixtureID, sessionID: "guarded-\(fixtureID.rawValue)")
+    }
 }
 
 private func decodeFixture(
