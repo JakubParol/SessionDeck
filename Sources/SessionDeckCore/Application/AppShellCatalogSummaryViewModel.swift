@@ -1,40 +1,5 @@
 import Foundation
 
-public enum AppShellCatalogResultState: Equatable, Sendable {
-    case notRun
-    case empty
-    case matches
-    case noMatches
-    case warning
-    case failure
-}
-
-public struct AppShellCatalogDiagnosticSummary: Equatable, Sendable {
-    public static let none = AppShellCatalogDiagnosticSummary(
-        entryDiagnosticCount: 0,
-        sourceWarningCount: 0,
-        sourceFailureCount: 0,
-        primaryMessage: nil
-    )
-
-    public let entryDiagnosticCount: Int
-    public let sourceWarningCount: Int
-    public let sourceFailureCount: Int
-    public let primaryMessage: String?
-
-    public init(
-        entryDiagnosticCount: Int,
-        sourceWarningCount: Int,
-        sourceFailureCount: Int,
-        primaryMessage: String?
-    ) {
-        self.entryDiagnosticCount = entryDiagnosticCount
-        self.sourceWarningCount = sourceWarningCount
-        self.sourceFailureCount = sourceFailureCount
-        self.primaryMessage = primaryMessage
-    }
-}
-
 public struct AppShellCatalogSummary: Equatable, Sendable {
     public static let placeholder = AppShellCatalogSummary(
         rows: [],
@@ -58,6 +23,7 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
     public let isFiltered: Bool
     public let resultState: AppShellCatalogResultState
     public let diagnosticSummary: AppShellCatalogDiagnosticSummary
+    public let emptyState: AppShellCatalogEmptyState?
     public let statusMessage: String
 
     public init(
@@ -74,6 +40,20 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
         statusMessage: String
     ) {
         let resolvedUnfilteredTotalCount = unfilteredTotalCount ?? totalCount
+        let resolvedResultState = resultState ?? Self.resultState(
+            totalCount: totalCount,
+            diagnosticCount: diagnosticCount,
+            sourceWarningCount: sourceWarningCount,
+            sourceFailureCount: sourceFailureCount,
+            unfilteredTotalCount: resolvedUnfilteredTotalCount,
+            isFiltered: isFiltered
+        )
+        let resolvedDiagnosticSummary = diagnosticSummary ?? Self.diagnosticSummary(
+            entryDiagnosticCount: diagnosticCount,
+            sourceWarningCount: sourceWarningCount,
+            sourceFailureCount: sourceFailureCount,
+            primaryMessage: statusMessage
+        )
 
         self.rows = rows
         self.totalCount = totalCount
@@ -83,19 +63,11 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
         self.sourceFailureCount = sourceFailureCount
         self.unfilteredTotalCount = resolvedUnfilteredTotalCount
         self.isFiltered = isFiltered
-        self.resultState = resultState ?? Self.resultState(
-            totalCount: totalCount,
-            diagnosticCount: diagnosticCount,
-            sourceWarningCount: sourceWarningCount,
-            sourceFailureCount: sourceFailureCount,
-            unfilteredTotalCount: resolvedUnfilteredTotalCount,
-            isFiltered: isFiltered
-        )
-        self.diagnosticSummary = diagnosticSummary ?? Self.diagnosticSummary(
-            entryDiagnosticCount: diagnosticCount,
-            sourceWarningCount: sourceWarningCount,
-            sourceFailureCount: sourceFailureCount,
-            primaryMessage: statusMessage
+        self.resultState = resolvedResultState
+        self.diagnosticSummary = resolvedDiagnosticSummary
+        self.emptyState = Self.emptyState(
+            resultState: resolvedResultState,
+            unfilteredTotalCount: resolvedUnfilteredTotalCount
         )
         self.statusMessage = statusMessage
     }
@@ -207,6 +179,10 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
         count == 1 ? "1 source" : "\(count) sources"
     }
 
+    private static func rowCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 row" : "\(count) rows"
+    }
+
     private static func resultState(
         totalCount: Int,
         diagnosticCount: Int,
@@ -247,6 +223,36 @@ public struct AppShellCatalogSummary: Equatable, Sendable {
             sourceFailureCount: sourceFailureCount,
             primaryMessage: primaryMessage
         )
+    }
+
+    private static func emptyState(
+        resultState: AppShellCatalogResultState,
+        unfilteredTotalCount: Int
+    ) -> AppShellCatalogEmptyState? {
+        switch resultState {
+        case .notRun:
+            return AppShellCatalogEmptyState(
+                title: "Catalog has not run yet",
+                detail: "Refresh the configured local sources to build catalog rows."
+            )
+        case .empty:
+            return AppShellCatalogEmptyState(
+                title: "No catalog rows",
+                detail: "No lightweight session metadata is available from configured sources yet."
+            )
+        case .noMatches:
+            return AppShellCatalogEmptyState(
+                title: "No matching catalog rows",
+                detail: "Active criteria hide \(rowCountLabel(unfilteredTotalCount))."
+            )
+        case .failure:
+            return AppShellCatalogEmptyState(
+                title: "Catalog source or index failed",
+                detail: "Diagnostics stayed local; no catalog rows were hidden by filters."
+            )
+        case .matches, .warning:
+            return nil
+        }
     }
 
     private static func sourceIDs(

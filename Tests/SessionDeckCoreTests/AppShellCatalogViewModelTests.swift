@@ -34,6 +34,12 @@ func catalogSummaryDistinguishesEmptyCatalogFromSourceFailure() {
     #expect(failedSummary.rows.isEmpty)
     #expect(failedSummary.sourceFailureCount == 1)
     #expect(failedSummary.statusMessage == "Catalog refresh failed for 1 source.")
+    #expect(
+        failedSummary.emptyState == AppShellCatalogEmptyState(
+            title: "Catalog source or index failed",
+            detail: "Diagnostics stayed local; no catalog rows were hidden by filters."
+        )
+    )
 }
 
 @Test("catalog summary exposes explicit result state and diagnostic summary")
@@ -82,6 +88,12 @@ func catalogSummaryExposesExplicitResultStateAndDiagnosticSummary() {
     #expect(AppShellCatalogSummary.make(snapshot: healthySnapshot).resultState == .matches)
     #expect(noMatchSummary.resultState == .noMatches)
     #expect(noMatchSummary.diagnosticSummary == .none)
+    #expect(
+        noMatchSummary.emptyState == AppShellCatalogEmptyState(
+            title: "No matching catalog rows",
+            detail: "Active criteria hide 1 row."
+        )
+    )
     #expect(mixedWarningSummary.resultState == .warning)
     #expect(mixedWarningSummary.rows.map(\.id.rawValue) == ["healthy-session"])
     #expect(

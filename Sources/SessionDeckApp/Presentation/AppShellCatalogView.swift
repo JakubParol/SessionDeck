@@ -160,50 +160,48 @@ struct AppShellCatalogView: View {
     }
 
     private var statusIcon: String {
-        if summary.sourceFailureCount > 0 {
+        switch summary.resultState {
+        case .failure:
             return "xmark.octagon"
-        }
-        if summary.diagnosticCount > 0 || summary.sourceWarningCount > 0 {
+        case .warning:
             return "exclamationmark.triangle"
-        }
-        if summary.totalCount == 0 {
+        case .noMatches:
+            return "magnifyingglass"
+        case .notRun, .empty:
             return "tray"
+        case .matches:
+            return "checkmark.circle"
         }
-
-        return "checkmark.circle"
     }
 
     private var statusColor: Color {
-        if summary.sourceFailureCount > 0 {
+        switch summary.resultState {
+        case .failure:
             return .red
-        }
-        if summary.diagnosticCount > 0 || summary.sourceWarningCount > 0 {
+        case .warning:
             return .orange
+        case .matches, .empty, .noMatches, .notRun:
+            return .secondary
         }
-
-        return .secondary
     }
 
     private var emptyMessage: String {
-        if summary.isFiltered && summary.unfilteredTotalCount > 0 {
-            return "No matching catalog rows"
-        }
-
-        return summary.sourceFailureCount > 0 ? "Catalog source failed" : "No catalog rows"
+        summary.emptyState?.title ?? "No catalog rows"
     }
 
     private var emptyDetail: String {
-        if summary.isFiltered && summary.unfilteredTotalCount > 0 {
-            return "Active filters hide \(rowCountLabel(summary.unfilteredTotalCount))."
-        }
-
-        return summary.sourceFailureCount > 0
-            ? "Source diagnostics are available above; no rows were hidden."
-            : "No lightweight session metadata is available from configured sources yet."
+        summary.emptyState?.detail ?? "No lightweight session metadata is available from configured sources yet."
     }
 
     private var emptyIcon: String {
-        summary.sourceFailureCount > 0 ? "xmark.octagon" : "tray"
+        switch summary.resultState {
+        case .failure:
+            return "xmark.octagon"
+        case .noMatches:
+            return "magnifyingglass"
+        case .notRun, .empty, .matches, .warning:
+            return "tray"
+        }
     }
 
     private func rowBackground(_ row: AppShellCatalogRow) -> Color {
