@@ -68,6 +68,51 @@ func sourceDiscoveryReportPreservesHealthySourcesAndFailedDiagnostics() throws {
     #expect(report.canContinueDiscovery)
 }
 
+@Test("source discovery report exposes presentation-facing health summaries")
+func sourceDiscoveryReportExposesPresentationFacingHealthSummaries() throws {
+    let healthySource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-healthy"),
+        displayName: "Codex healthy",
+        kind: .codex,
+        locationDescription: "Synthetic healthy source",
+        isEnabled: true,
+        availability: .available,
+        counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 2)
+    )
+    let missingSource = SessionSourceSummary(
+        id: SessionSourceID(rawValue: "codex-missing"),
+        displayName: "Codex missing",
+        kind: .codex,
+        locationDescription: "Synthetic missing source",
+        isEnabled: true,
+        availability: .missing,
+        diagnostic: SessionSourceDiagnostic(
+            code: .codexSessionsRootMissing,
+            message: "Configured Codex sessions root was not found."
+        )
+    )
+    let report = SessionSourceDiscoveryReport(sources: [healthySource, missingSource])
+
+    #expect(report.healthSummaries == [
+        SourceHealthSummary(
+            sourceID: healthySource.id,
+            displayName: "Codex healthy",
+            severity: .info,
+            diagnosticCode: nil,
+            message: "Source is available with 2 candidate transcript files.",
+            allowsDiscoveryToContinue: true
+        ),
+        SourceHealthSummary(
+            sourceID: missingSource.id,
+            displayName: "Codex missing",
+            severity: .warning,
+            diagnosticCode: .codexSessionsRootMissing,
+            message: "Configured Codex sessions root was not found.",
+            allowsDiscoveryToContinue: true
+        ),
+    ])
+}
+
 @Test("candidate file enumeration use case returns bounded metadata through an injected fake port")
 func candidateFileEnumerationUseCaseUsesFakePort() throws {
     let sourceID = SessionSourceID(rawValue: "codex-default")
