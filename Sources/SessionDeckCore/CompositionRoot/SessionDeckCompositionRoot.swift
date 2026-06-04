@@ -19,7 +19,10 @@ public enum SessionDeckCompositionRoot {
             candidateFileEnumeration: sourceDiscoveryAdapter
         )
         let listSessions = ListSessionsUseCase(
-            sessionCatalog: PlaceholderSessionCatalogAdapter()
+            sessionCatalog: CodexSessionCatalogAdapter(
+                sourceDiscovery: sourceDiscoveryAdapter,
+                candidateFileEnumeration: sourceDiscoveryAdapter
+            )
         )
         let loadTranscriptPreview = LoadTranscriptPreviewUseCase(
             transcriptLoading: PlaceholderTranscriptLoadingAdapter()

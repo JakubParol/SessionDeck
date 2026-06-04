@@ -63,7 +63,8 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
         at: transcriptURL.deletingLastPathComponent(),
         withIntermediateDirectories: true
     )
-    try #"{"type":"session_meta"}"#.write(to: transcriptURL, atomically: true, encoding: .utf8)
+    try #"{"timestamp":"2026-06-03T06:00:00Z","type":"session_meta","payload":{"id":"composition-session","title":"Composition Catalog","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}"#
+        .write(to: transcriptURL, atomically: true, encoding: .utf8)
     try #"{"type":"session_meta"}"#.write(to: unreadableTranscriptURL, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: unreadableTranscriptURL.path)
     defer {
@@ -96,6 +97,12 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
         "2026/06/03/rollout-2026-06-03T06-00-00-composition.jsonl",
         "2026/06/03/rollout-2026-06-03T06-01-00-unreadable.jsonl",
     ])
+
+    let sessions = try composition.listSessions.listSessions()
+    let compositionSession = try #require(sessions.first { $0.id.rawValue == "composition-session" })
+    #expect(sessions.count == 2)
+    #expect(compositionSession.displayTitle == "Composition Catalog")
+    #expect(compositionSession.sourceLabel.displayName == "Codex configured")
 
     let report = try composition.discoverSessionSources.discoveryReport()
     #expect(report.candidateDiagnostics.map(\.candidate.relativePath) == [
