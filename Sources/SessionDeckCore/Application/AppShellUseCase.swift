@@ -28,7 +28,7 @@ public struct AppShellUseCase: Sendable {
     private func makeViewModel(refreshState: AppShellRefreshState) -> AppShellViewModel {
         let configuration = launchConfigurationProvider.loadConfiguration()
         let discoveryResult = sourceDiscoverySummary()
-        let catalogResult = catalogSummary()
+        let catalogResult = catalogAndNavigationSummary()
 
         return AppShellViewModel(
             title: configuration.title,
@@ -39,6 +39,7 @@ public struct AppShellUseCase: Sendable {
                 : discoveryResult.summary.configuredSourceCount,
             sourceDiscoverySummary: discoveryResult.summary,
             catalogSummary: catalogResult.summary,
+            navigationSummary: catalogResult.navigation,
             refreshState: discoveryResult.refreshState ?? catalogResult.refreshState ?? refreshState,
             safetyPolicy: configuration.safetyPolicy
         )
@@ -60,19 +61,21 @@ public struct AppShellUseCase: Sendable {
         }
     }
 
-    private func catalogSummary() -> (
+    private func catalogAndNavigationSummary() -> (
         summary: AppShellCatalogSummary,
+        navigation: AppShellNavigationSummary,
         refreshState: AppShellRefreshState?
     ) {
         guard let refreshCatalogSnapshot else {
-            return (.placeholder, nil)
+            return (.placeholder, .placeholder, nil)
         }
 
         do {
-            return (.make(snapshot: try refreshCatalogSnapshot.refreshSnapshot()), nil)
+            let snapshot = try refreshCatalogSnapshot.refreshSnapshot()
+            return (.make(snapshot: snapshot), .make(snapshot: snapshot), nil)
         } catch {
             let message = "Catalog refresh failed before rows could be built."
-            return (.failed(message: message), .failed(message))
+            return (.failed(message: message), .placeholder, .failed(message))
         }
     }
 }

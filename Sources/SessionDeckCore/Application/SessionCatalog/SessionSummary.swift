@@ -18,6 +18,7 @@ public struct SessionSummary: Equatable, Sendable {
     public let activity: CatalogActivityTimestamps
     public let fileSize: CatalogFileSize
     public let metadata: CatalogSessionMetadata
+    public let fallbackReasons: [CatalogSessionFallbackReason]
     public let health: CatalogEntryHealth
 
     public init(
@@ -32,6 +33,7 @@ public struct SessionSummary: Equatable, Sendable {
         activity: CatalogActivityTimestamps,
         fileSize: CatalogFileSize,
         metadata: CatalogSessionMetadata = CatalogSessionMetadata(modelName: nil, agentProfileName: nil),
+        fallbackReasons: [CatalogSessionFallbackReason] = [],
         health: CatalogEntryHealth
     ) {
         self.id = id
@@ -45,6 +47,7 @@ public struct SessionSummary: Equatable, Sendable {
         self.activity = activity
         self.fileSize = fileSize
         self.metadata = metadata
+        self.fallbackReasons = fallbackReasons
         self.health = health
     }
 
