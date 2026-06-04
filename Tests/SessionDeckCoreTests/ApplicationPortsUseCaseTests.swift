@@ -70,6 +70,27 @@ func sourceDiagnosticsExposeTypedCodes() throws {
     #expect(candidateDiagnostic.code == .codexCandidateFileUnreadable)
 }
 
+@Test("source diagnostics expose severity and continuation policy")
+func sourceDiagnosticsExposeSeverityAndContinuationPolicy() throws {
+    let missingDiagnostic = SessionSourceDiagnostic(
+        code: .codexSessionsRootMissing,
+        severity: .warning,
+        allowsDiscoveryToContinue: true,
+        message: "Configured Codex sessions root was not found."
+    )
+    let unreadableCandidateDiagnostic = CandidateSessionFileDiagnostic(
+        code: .codexCandidateFileUnreadable,
+        severity: .warning,
+        allowsDiscoveryToContinue: true,
+        message: "Candidate transcript file could not be read by the current process."
+    )
+
+    #expect(missingDiagnostic.severity == .warning)
+    #expect(missingDiagnostic.allowsDiscoveryToContinue)
+    #expect(unreadableCandidateDiagnostic.severity == .warning)
+    #expect(unreadableCandidateDiagnostic.allowsDiscoveryToContinue)
+}
+
 @Test("session catalog use case filters session summaries through an injected fake port")
 func sessionCatalogUseCaseUsesFakePort() throws {
     let codexSourceID = SessionSourceID(rawValue: "codex-default")

@@ -43,12 +43,27 @@ public enum SessionSourceDiagnosticCode: String, Equatable, Sendable {
     case sourceRootDisabled = "source_root_disabled"
 }
 
+public enum SourceDiagnosticSeverity: Equatable, Sendable {
+    case info
+    case warning
+    case error
+}
+
 public struct SessionSourceDiagnostic: Equatable, Sendable {
     public let code: SessionSourceDiagnosticCode
+    public let severity: SourceDiagnosticSeverity
+    public let allowsDiscoveryToContinue: Bool
     public let message: String
 
-    public init(code: SessionSourceDiagnosticCode, message: String) {
+    public init(
+        code: SessionSourceDiagnosticCode,
+        severity: SourceDiagnosticSeverity = .warning,
+        allowsDiscoveryToContinue: Bool = true,
+        message: String
+    ) {
         self.code = code
+        self.severity = severity
+        self.allowsDiscoveryToContinue = allowsDiscoveryToContinue
         self.message = message
     }
 }

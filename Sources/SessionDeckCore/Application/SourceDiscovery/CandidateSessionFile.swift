@@ -12,10 +12,19 @@ public enum CandidateSessionFileDiagnosticCode: String, Equatable, Sendable {
 
 public struct CandidateSessionFileDiagnostic: Equatable, Sendable {
     public let code: CandidateSessionFileDiagnosticCode
+    public let severity: SourceDiagnosticSeverity
+    public let allowsDiscoveryToContinue: Bool
     public let message: String
 
-    public init(code: CandidateSessionFileDiagnosticCode, message: String) {
+    public init(
+        code: CandidateSessionFileDiagnosticCode,
+        severity: SourceDiagnosticSeverity = .warning,
+        allowsDiscoveryToContinue: Bool = true,
+        message: String
+    ) {
         self.code = code
+        self.severity = severity
+        self.allowsDiscoveryToContinue = allowsDiscoveryToContinue
         self.message = message
     }
 }
