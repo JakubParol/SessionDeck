@@ -145,6 +145,10 @@ func presentationRendersSelectedTranscriptDetailFromApplicationState() throws {
         detailContents.contains("AppShellSelectedTranscriptDetailState"),
         "AppShellTranscriptDetailView should consume the Application detail state DTO"
     )
+    #expect(
+        detailContents.contains("row.roleStyle"),
+        "AppShellTranscriptDetailView should render transcript turns from Application-owned role style semantics"
+    )
 }
 
 @Test("concrete adapters are only constructed in the composition root")
