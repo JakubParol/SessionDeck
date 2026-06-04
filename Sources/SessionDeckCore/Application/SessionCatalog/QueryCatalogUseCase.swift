@@ -8,12 +8,13 @@ public struct QueryCatalogUseCase: Sendable {
     }
 
     public func query(_ request: CatalogQueryRequest = CatalogQueryRequest()) throws -> [SessionSummary] {
-        let candidates = try sessionCatalog.listSessions(sourceID: request.sourceID)
+        let candidates = try sessionCatalog.listSessions(sourceID: request.source?.sourceID ?? request.sourceID)
 
         return SessionCatalogOrdering.sort(
             candidates.filter { session in
                 matchesSearch(session, searchText: request.searchText)
                     && matchesProject(session, filter: request.project)
+                    && matchesSource(session, filter: request.source)
                     && matchesProfile(session, filter: request.profile)
                     && matchesParseStatus(session, filters: request.parseStatuses)
             }
@@ -160,6 +161,16 @@ public struct QueryCatalogUseCase: Sendable {
         let profileMetadata = SourceProfileNavigationPolicy.profileMetadata(for: session)
         return profileMetadata.stableID == filter.stableID
             && profileMetadata.sourceID == filter.sourceID
+    }
+
+    private func matchesSource(_ session: SessionSummary, filter: CatalogSourceFilter?) -> Bool {
+        guard let filter else {
+            return true
+        }
+
+        let sourceMetadata = SourceProfileNavigationPolicy.sourceMetadata(for: session)
+        return sourceMetadata.stableID == filter.stableID
+            && sourceMetadata.sourceID == filter.sourceID
     }
 
     private func matchesParseStatus(

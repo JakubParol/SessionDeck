@@ -100,6 +100,29 @@ func catalogQueryFiltersIndividualSourceProfileAndParseStatusCriteria() throws {
     #expect(unsupportedResults.isEmpty)
 }
 
+@Test("catalog query can select fallback source options by stable identifier")
+func catalogQueryCanSelectFallbackSourceOptionsByStableIdentifier() throws {
+    let unknownSource = regressionCatalogSummary(
+        id: "unknown-source",
+        sourceID: "",
+        sourceDisplayName: "",
+        fallbackReasons: [.unknownSource]
+    )
+    let knownSource = regressionCatalogSummary(id: "known-source", sourceID: "codex-cli")
+    let useCase = QueryCatalogUseCase(
+        sessionCatalog: FakeSessionCatalogPort(sessions: [knownSource, unknownSource])
+    )
+
+    let options = try useCase.filterOptions()
+    let fallbackSource = try #require(
+        options.sourceOptions.first { $0.stableID == SourceProfileNavigationPolicy.unknownSourceStableID }
+    )
+    let results = try useCase.query(CatalogQueryRequest(source: fallbackSource.filter))
+
+    #expect(fallbackSource.sourceID == nil)
+    #expect(results.map(\.id.rawValue) == ["unknown-source"])
+}
+
 private func regressionCatalogSummary(
     id: String,
     sourceID: String = "codex-default",
@@ -114,7 +137,8 @@ private func regressionCatalogSummary(
     createdAt: Int64? = nil,
     lastActivity: Int64? = 1,
     modelName: String? = nil,
-    parseStatus: CatalogParseStatus = .complete
+    parseStatus: CatalogParseStatus = .complete,
+    fallbackReasons: [CatalogSessionFallbackReason] = []
 ) -> SessionSummary {
     SessionSummary(
         id: SessionID(rawValue: id),
@@ -137,6 +161,7 @@ private func regressionCatalogSummary(
         ),
         fileSize: CatalogFileSize(byteCount: 128),
         metadata: CatalogSessionMetadata(modelName: modelName, agentProfileName: profileName),
+        fallbackReasons: fallbackReasons,
         health: CatalogEntryHealth(parseStatus: parseStatus)
     )
 }

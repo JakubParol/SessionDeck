@@ -1,6 +1,7 @@
 public struct CatalogQueryRequest: Equatable, Sendable {
     public let searchText: String
     public let project: CatalogProjectFilter?
+    public let source: CatalogSourceFilter?
     public let sourceID: SessionSourceID?
     public let profile: CatalogProfileFilter?
     public let parseStatuses: Set<CatalogParseStatusFilter>
@@ -9,6 +10,7 @@ public struct CatalogQueryRequest: Equatable, Sendable {
     public init(
         searchText: String = "",
         project: CatalogProjectFilter? = nil,
+        source: CatalogSourceFilter? = nil,
         sourceID: SessionSourceID? = nil,
         profile: CatalogProfileFilter? = nil,
         parseStatuses: Set<CatalogParseStatusFilter> = [],
@@ -16,6 +18,7 @@ public struct CatalogQueryRequest: Equatable, Sendable {
     ) {
         self.searchText = searchText
         self.project = project
+        self.source = source
         self.sourceID = sourceID
         self.profile = profile
         self.parseStatuses = parseStatuses
@@ -27,6 +30,16 @@ public enum CatalogProjectFilter: Equatable, Hashable, Sendable {
     case project(id: String)
     case nonProject
     case unknownProject
+}
+
+public struct CatalogSourceFilter: Equatable, Hashable, Sendable {
+    public let stableID: String
+    public let sourceID: SessionSourceID?
+
+    public init(stableID: String, sourceID: SessionSourceID?) {
+        self.stableID = stableID
+        self.sourceID = sourceID
+    }
 }
 
 public struct CatalogProfileFilter: Equatable, Hashable, Sendable {
@@ -82,6 +95,7 @@ public struct CatalogProjectFilterOption: Equatable, Sendable {
 }
 
 public struct CatalogSourceFilterOption: Equatable, Sendable {
+    public let filter: CatalogSourceFilter
     public let stableID: String
     public let sourceID: SessionSourceID?
     public let displayName: String
@@ -95,6 +109,7 @@ public struct CatalogSourceFilterOption: Equatable, Sendable {
         isFallback: Bool,
         sessionCount: Int
     ) {
+        self.filter = CatalogSourceFilter(stableID: stableID, sourceID: sourceID)
         self.stableID = stableID
         self.sourceID = sourceID
         self.displayName = displayName
