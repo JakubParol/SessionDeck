@@ -6,6 +6,6 @@ public struct ListSessionsUseCase: Sendable {
     }
 
     public func listSessions(sourceID: SessionSourceID? = nil) throws -> [SessionSummary] {
-        try sessionCatalog.listSessions(sourceID: sourceID)
+        SessionCatalogOrdering.sort(try sessionCatalog.listSessions(sourceID: sourceID))
     }
 }
