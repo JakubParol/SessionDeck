@@ -41,6 +41,7 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         var title = file.fallbackTitle
         var segments: [TranscriptSegment] = []
         var diagnostics: [TranscriptDecodeDiagnostic] = []
+        var toolNamesByCallID: [String: String] = [:]
 
         for (lineIndex, line) in transcriptLines(from: text).enumerated() {
             let lineNumber = lineIndex + 1
@@ -66,7 +67,13 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
                 continue
             }
 
-            if let segment = supportedSegment(from: event, file: file, source: source, orderIndex: segments.count) {
+            if let segment = supportedSegment(
+                from: event,
+                file: file,
+                source: source,
+                orderIndex: segments.count,
+                toolNamesByCallID: &toolNamesByCallID
+            ) {
                 segments.append(segment)
             } else if event.type != "turn_context" {
                 segments.append(
@@ -101,14 +108,26 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         from event: CodexTranscriptJSONEvent,
         file: CodexTranscriptFile,
         source: TranscriptSegmentSourceReference,
-        orderIndex: Int
+        orderIndex: Int,
+        toolNamesByCallID: inout [String: String]
     ) -> TranscriptSegment? {
         if event.isToolCall {
-            return toolCallSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+            let segment = toolCallSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+            if let callID = event.callID {
+                toolNamesByCallID[callID] = event.toolName ?? "unknown_tool"
+            }
+            return segment
         }
 
         if event.isToolOutput {
-            return toolOutputSegment(from: event, file: file, source: source, orderIndex: orderIndex)
+            let displayLabel = event.callID.flatMap { toolNamesByCallID[$0] } ?? "tool output"
+            return toolOutputSegment(
+                from: event,
+                file: file,
+                source: source,
+                orderIndex: orderIndex,
+                displayLabel: displayLabel
+            )
         }
 
         guard let role = event.supportedMessageRole,
@@ -175,7 +194,8 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         from event: CodexTranscriptJSONEvent,
         file: CodexTranscriptFile,
         source: TranscriptSegmentSourceReference,
-        orderIndex: Int
+        orderIndex: Int,
+        displayLabel: String
     ) -> TranscriptSegment {
         var metadata = baseMetadata(from: event, source: source)
         metadata["payload_type"] = event.payloadType ?? "function_call_output"
@@ -198,7 +218,7 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             timestampDescription: event.timestamp,
             metadata: metadata,
             toolMetadata: toolMetadata(
-                displayLabel: "tool output",
+                displayLabel: displayLabel,
                 status: event.status,
                 bodyAvailability: availability,
                 body: body
@@ -253,43 +273,6 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             "event_type": event.type,
             "line_number": String(source.lineNumber ?? 0),
         ]
-    }
-
-    private func toolMetadata(
-        displayLabel: String,
-        status: String?,
-        bodyAvailability: TranscriptToolBodyAvailability,
-        body: String?
-    ) -> TranscriptToolMetadata {
-        TranscriptToolMetadata(
-            displayLabel: displayLabel,
-            status: status,
-            bodyAvailability: bodyAvailability,
-            characterCount: body?.count,
-            byteCount: body?.utf8.count,
-            lineCount: body.map(lineCount(in:))
-        )
-    }
-
-    private func lineCount(in body: String) -> Int {
-        if body.isEmpty {
-            return 0
-        }
-
-        return body.split(separator: "\n", omittingEmptySubsequences: false).count
-    }
-
-    private func metadataValue(for availability: TranscriptToolBodyAvailability) -> String {
-        switch availability {
-        case .available:
-            "available"
-        case .omitted:
-            "omitted"
-        case .malformed:
-            "malformed"
-        case .truncated:
-            "truncated"
-        }
     }
 }
 

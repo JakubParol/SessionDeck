@@ -171,7 +171,7 @@ func codexTranscriptDecoderAttachesStructuredMetadataToToolSegments() throws {
     #expect(toolCallMetadata.byteCount == 26)
     #expect(toolCallMetadata.lineCount == 1)
 
-    #expect(toolOutputMetadata.displayLabel == "tool output")
+    #expect(toolOutputMetadata.displayLabel == "synthetic_fixture_probe")
     #expect(toolOutputMetadata.status == nil)
     #expect(toolOutputMetadata.bodyAvailability == .available)
     #expect(toolOutputMetadata.characterCount == 21)
@@ -179,6 +179,7 @@ func codexTranscriptDecoderAttachesStructuredMetadataToToolSegments() throws {
     #expect(toolOutputMetadata.lineCount == 1)
 
     #expect(failedOutputMetadata.status == "failed")
+    #expect(failedOutputMetadata.displayLabel == "synthetic_fixture_failure_probe")
     #expect(failedOutputMetadata.bodyAvailability == .available)
     #expect(failedOutputMetadata.characterCount == 24)
     #expect(failedOutputMetadata.byteCount == 24)
@@ -213,6 +214,7 @@ func codexTranscriptDecoderDegradesOmittedAndUnknownToolPayloadsExplicitly() thr
     let nestedResultMetadata = try #require(orderedSegments[4].toolMetadata)
     #expect(orderedSegments[4].text == "synthetic_result: synthetic nested result payload")
     #expect(nestedResultMetadata.bodyAvailability == .available)
+    #expect(nestedResultMetadata.displayLabel == "synthetic_nested_result_probe")
     #expect(nestedResultMetadata.characterCount == 49)
     #expect(nestedResultMetadata.byteCount == 49)
     #expect(nestedResultMetadata.lineCount == 1)
