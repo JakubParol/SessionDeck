@@ -13,25 +13,50 @@ public struct AppShellUseCase: Sendable {
         self.refreshCatalogSnapshot = refreshCatalogSnapshot
     }
 
-    public func makeViewModel(selectedNavigationNodeID: String? = nil) -> AppShellViewModel {
-        makeViewModel(refreshState: .idle, selectedNavigationNodeID: selectedNavigationNodeID)
+    public func makeViewModel(
+        selectedNavigationNodeID: String? = nil,
+        catalogQuery: AppShellCatalogQueryState = .empty
+    ) -> AppShellViewModel {
+        makeViewModel(
+            refreshState: .idle,
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: catalogQuery
+        )
     }
 
-    public func refreshingViewModel(selectedNavigationNodeID: String? = nil) -> AppShellViewModel {
-        makeViewModel(refreshState: .refreshing, selectedNavigationNodeID: selectedNavigationNodeID)
+    public func refreshingViewModel(
+        selectedNavigationNodeID: String? = nil,
+        catalogQuery: AppShellCatalogQueryState = .empty
+    ) -> AppShellViewModel {
+        makeViewModel(
+            refreshState: .refreshing,
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: catalogQuery
+        )
     }
 
-    public func refreshViewModel(selectedNavigationNodeID: String? = nil) -> AppShellViewModel {
-        makeViewModel(refreshState: .idle, selectedNavigationNodeID: selectedNavigationNodeID)
+    public func refreshViewModel(
+        selectedNavigationNodeID: String? = nil,
+        catalogQuery: AppShellCatalogQueryState = .empty
+    ) -> AppShellViewModel {
+        makeViewModel(
+            refreshState: .idle,
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: catalogQuery
+        )
     }
 
     private func makeViewModel(
         refreshState: AppShellRefreshState,
-        selectedNavigationNodeID: String?
+        selectedNavigationNodeID: String?,
+        catalogQuery: AppShellCatalogQueryState
     ) -> AppShellViewModel {
         let configuration = launchConfigurationProvider.loadConfiguration()
         let discoveryResult = sourceDiscoverySummary()
-        let catalogResult = catalogAndNavigationSummary(selectedNavigationNodeID: selectedNavigationNodeID)
+        let catalogResult = catalogAndNavigationSummary(
+            selectedNavigationNodeID: selectedNavigationNodeID,
+            catalogQuery: catalogQuery
+        )
 
         return AppShellViewModel(
             title: configuration.title,
@@ -42,6 +67,7 @@ public struct AppShellUseCase: Sendable {
                 : discoveryResult.summary.configuredSourceCount,
             sourceDiscoverySummary: discoveryResult.summary,
             catalogSummary: catalogResult.summary,
+            catalogQueryControls: catalogResult.queryControls,
             navigationSummary: catalogResult.navigation,
             selectedNavigationNodeID: catalogResult.selectedNode.id,
             selectedNavigationTitle: catalogResult.selectedNode.title,
@@ -66,15 +92,19 @@ public struct AppShellUseCase: Sendable {
         }
     }
 
-    private func catalogAndNavigationSummary(selectedNavigationNodeID: String?) -> (
+    private func catalogAndNavigationSummary(
+        selectedNavigationNodeID: String?,
+        catalogQuery: AppShellCatalogQueryState
+    ) -> (
         summary: AppShellCatalogSummary,
+        queryControls: AppShellCatalogQueryControls,
         navigation: AppShellNavigationSummary,
         selectedNode: AppShellNavigationNode,
         refreshState: AppShellRefreshState?
     ) {
         guard let refreshCatalogSnapshot else {
             let navigation = AppShellNavigationSummary.placeholder
-            return (.placeholder, navigation, navigation.allChatsNode, nil)
+            return (.placeholder, .placeholder, navigation, navigation.allChatsNode, nil)
         }
 
         do {
@@ -84,11 +114,30 @@ public struct AppShellUseCase: Sendable {
                 in: navigation,
                 matching: selectedNavigationNodeID
             )
-            return (.make(snapshot: snapshot, scope: selectedNode.catalogScope), navigation, selectedNode, nil)
+            let scopedSessions = SourceProfileNavigationPolicy.filter(
+                sessions: snapshot.sessions,
+                scope: selectedNode.catalogScope
+            )
+            let queryControls = AppShellCatalogQueryControls.make(
+                sessions: scopedSessions,
+                queryState: catalogQuery
+            )
+            return (
+                .make(
+                    snapshot: snapshot,
+                    scope: selectedNode.catalogScope,
+                    queryRequest: queryControls.request,
+                    isFiltered: queryControls.hasActiveFilters
+                ),
+                queryControls,
+                navigation,
+                selectedNode,
+                nil
+            )
         } catch {
             let message = "Catalog refresh failed before rows could be built."
             let navigation = AppShellNavigationSummary.placeholder
-            return (.failed(message: message), navigation, navigation.allChatsNode, .failed(message))
+            return (.failed(message: message), .placeholder, navigation, navigation.allChatsNode, .failed(message))
         }
     }
 
