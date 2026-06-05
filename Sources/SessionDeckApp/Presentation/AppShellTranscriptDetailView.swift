@@ -15,7 +15,7 @@ struct AppShellTranscriptDetailView: View {
 
                 Spacer()
 
-                if state.isLoading {
+                if showsRefreshActivity {
                     ProgressView()
                         .controlSize(.small)
                 }
@@ -191,7 +191,11 @@ struct AppShellTranscriptDetailView: View {
     }
 
     private var statusIcon: String {
-        state.isLoading ? "arrow.clockwise" : titleIcon
+        showsRefreshActivity ? "arrow.clockwise" : titleIcon
+    }
+
+    private var showsRefreshActivity: Bool {
+        state.isLoading || state.refreshStatus == .refreshing
     }
 
     private var statusColor: Color {

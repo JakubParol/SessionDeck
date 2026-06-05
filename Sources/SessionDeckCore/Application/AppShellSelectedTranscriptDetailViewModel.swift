@@ -198,6 +198,10 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         return expandedRowIDs.intersection(currentToolRowIDs)
     }
 
+    public func shouldFollowTailAfterRefresh(isUserAtTail: Bool) -> Bool {
+        refreshStatus == .refreshed && isUserAtTail
+    }
+
     private func withRefreshStatus(
         _ refreshStatus: AppShellSelectedTranscriptRefreshStatus,
         statusMessage: String? = nil,
