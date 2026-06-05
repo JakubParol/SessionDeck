@@ -38,6 +38,7 @@ public enum SessionSourceDiagnosticCode: String, Equatable, Sendable {
     case codexSessionsRootPermissionDenied = "codex.sessions_root_permission_denied"
     case codexSessionsRootUnreadable = "codex.sessions_root_unreadable"
     case codexSessionsRootEmpty = "codex.sessions_root_empty"
+    case codexSessionsRootStale = "codex.sessions_root_stale"
     case sourceRootDuplicate = "source_root_duplicate"
     case sourceKindUnsupported = "source_kind_unsupported"
     case sourceRootDisabled = "source_root_disabled"
