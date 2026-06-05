@@ -75,6 +75,34 @@ public struct LiveSourceWatcherDegradedState: Equatable, Sendable {
     }
 }
 
+public struct LiveSourceWatchTarget: Equatable, Sendable {
+    public let sourceID: SessionSourceID
+    public let path: String
+    public let sessionID: SessionID?
+
+    public init(sourceID: SessionSourceID, path: String, sessionID: SessionID? = nil) {
+        self.sourceID = sourceID
+        self.path = path
+        self.sessionID = sessionID
+    }
+}
+
+public enum LiveSourceObservationEvent: Equatable, Sendable {
+    case change(LiveSourceChangeEvent)
+    case degraded(LiveSourceWatcherDegradedState)
+}
+
+public protocol LiveSourceObservation: AnyObject {
+    func cancel()
+}
+
+public protocol LiveSourceChangeObservationPort: AnyObject {
+    func observe(
+        targets: [LiveSourceWatchTarget],
+        eventHandler: @escaping (LiveSourceObservationEvent) -> Void
+    ) -> any LiveSourceObservation
+}
+
 public enum LiveRefreshScope: Equatable, Sendable {
     case allSources
     case source(SessionSourceID)
