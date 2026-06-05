@@ -10,12 +10,7 @@ struct AppShellToolTranscriptRowView: View {
         DisclosureGroup(
             isExpanded: expansionBinding,
             content: {
-                Text(presentation.expandedText)
-                    .font(.body.monospaced())
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .padding(.top, 6)
+                expandedContent
             },
             label: {
                 label
@@ -31,7 +26,32 @@ struct AppShellToolTranscriptRowView: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(rowBorderColor)
         )
-        .accessibilityLabel("\(row.text), \(presentation.metadataSummary)")
+        .accessibilityLabel("\(row.text), \(presentation.metadataSummary), \(presentation.detailSummary)")
+    }
+
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if presentation.detailSummary.isEmpty == false {
+                Text(presentation.detailSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if presentation.diagnosticMessages.isEmpty == false {
+                ForEach(presentation.diagnosticMessages, id: \.self) { message in
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Text(presentation.expandedText)
+                .font(.body.monospaced())
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
+        .padding(.top, 6)
     }
 
     private var label: some View {
