@@ -1,3 +1,5 @@
+import Foundation
+
 public enum SessionDeckCompositionRoot {
     public static func makeApplicationComposition(
         homeDirectoryProvider: any HomeDirectoryProviding = EnvironmentHomeDirectoryProvider(),
@@ -41,6 +43,21 @@ public enum SessionDeckCompositionRoot {
             transcriptDecoding: PlaceholderTranscriptDecodingAdapter()
         )
         let sourceChangeObservation = LocalFileSourceObservationAdapter()
+        let reconcileSessionSources = ReconcileSessionSourcesUseCase(
+            candidateEnumeration: sourceDiscoveryAdapter
+        )
+        let refreshQueue = DispatchQueue(label: "SessionDeck.live-refresh-work")
+        let liveRefreshPipeline = LiveRefreshPipelineCoordinator(
+            sourceChangeObservation: sourceChangeObservation,
+            reconciliation: reconcileSessionSources,
+            timerScheduler: DispatchLiveRefreshTimerScheduler(),
+            debounceInterval: 0.25,
+            reconciliationInterval: 30
+        ) { _ in
+            refreshQueue.async {
+                _ = try? refreshCatalogSnapshot.refreshSnapshot()
+            }
+        }
 
         return SessionDeckApplicationComposition(
             appShellUseCase: appShellUseCase,
@@ -52,7 +69,8 @@ public enum SessionDeckCompositionRoot {
             loadTranscriptPreview: loadTranscriptPreview,
             loadTranscriptSegments: loadTranscriptSegments,
             loadSelectedTranscript: loadSelectedTranscript,
-            sourceChangeObservation: sourceChangeObservation
+            sourceChangeObservation: sourceChangeObservation,
+            liveRefreshPipeline: liveRefreshPipeline
         )
     }
 

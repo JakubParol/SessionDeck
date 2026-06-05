@@ -181,6 +181,60 @@ func compositionRootExposesLocalFileObservationThroughApplicationBoundary() thro
     #expect(event.kind == .modified)
 }
 
+@Test("composition root exposes live refresh pipeline through application composition")
+func compositionRootExposesLiveRefreshPipelineThroughApplicationComposition() throws {
+    let fixtureRoot = try FixtureTempRoot(
+        parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
+        name: "sessiondeck-composition-live-refresh-pipeline-\(UUID().uuidString)",
+        pathGuard: FixturePathGuard(forbiddenHomeDirectories: [FileManager.default.homeDirectoryForCurrentUser])
+    )
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let sessionsRoot = fixtureRoot.url.appending(path: "configured/.codex/sessions", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: sessionsRoot, withIntermediateDirectories: true)
+    let composition = SessionDeckCompositionRoot.makeApplicationComposition(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: fixtureRoot.url),
+        sourceDefinitions: [
+            LocalSessionSourceDefinition(
+                id: SessionSourceID(rawValue: "codex-configured"),
+                displayName: "Codex configured",
+                kind: .codex,
+                rootPath: sessionsRoot.path,
+                isEnabled: true
+            ),
+        ]
+    )
+
+    composition.liveRefreshPipeline.start(
+        LiveRefreshPipelineConfiguration(
+            watchTargets: [
+                LiveSourceWatchTarget(sourceID: SessionSourceID(rawValue: "codex-configured"), path: sessionsRoot.path),
+            ],
+            knownCandidates: [],
+            reconciliationSourceID: SessionSourceID(rawValue: "codex-configured")
+        )
+    )
+    defer {
+        composition.liveRefreshPipeline.stop()
+    }
+
+    #expect(composition.liveRefreshPipeline.monitoringStates.contains(
+        .watching(sourceID: SessionSourceID(rawValue: "codex-configured"))
+    ))
+}
+
+@Test("composition root dispatches live refresh work off the caller path")
+func compositionRootDispatchesLiveRefreshWorkOffCallerPath() throws {
+    let compositionRoot = repositoryRoot()
+        .appending(path: "Sources/SessionDeckCore/CompositionRoot/SessionDeckCompositionRoot.swift")
+    let contents = try String(contentsOf: compositionRoot, encoding: .utf8)
+
+    #expect(contents.contains(#"DispatchQueue(label: "SessionDeck.live-refresh-work")"#))
+    #expect(contents.contains("refreshQueue.async"))
+}
+
 private final class LiveObservationRecorder {
     private let lock = NSLock()
     private var events: [LiveSourceObservationEvent] = []
@@ -211,4 +265,11 @@ private final class LiveObservationRecorder {
 
         return nil
     }
+}
+
+private func repositoryRoot() -> URL {
+    URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
 }

@@ -155,3 +155,13 @@ final class FakeLiveSourceChangeObservationPort: LiveSourceChangeObservationPort
 private final class FakeLiveSourceObservation: LiveSourceObservation, @unchecked Sendable {
     func cancel() {}
 }
+
+final class FakeLiveRefreshTimerScheduler: LiveRefreshTimerScheduling {
+    func schedule(after interval: TimeInterval, _ operation: @escaping () -> Void) -> any LiveRefreshScheduledTask {
+        FakeLiveRefreshScheduledTask()
+    }
+}
+
+private final class FakeLiveRefreshScheduledTask: LiveRefreshScheduledTask {
+    func cancel() {}
+}

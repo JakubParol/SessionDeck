@@ -41,6 +41,9 @@ func presentationDoesNotConstructInfrastructure() throws {
         "CodexSessionCatalogAdapter(",
         "CodexSelectedTranscriptLoadingAdapter(",
         "LocalFileSourceObservationAdapter(",
+        "DispatchLiveRefreshTimerScheduler(",
+        "LiveRefreshPipelineCoordinator(",
+        "LiveSourceWatchTarget(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
         "PlaceholderTranscriptDecodingAdapter(",
@@ -168,6 +171,8 @@ func concreteAdaptersAreOnlyConstructedInCompositionRoot() throws {
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
         "PlaceholderTranscriptDecodingAdapter(",
+        "DispatchLiveRefreshTimerScheduler(",
+        "LocalFileSourceObservationAdapter(",
     ]
 
     for file in sourceFiles {
