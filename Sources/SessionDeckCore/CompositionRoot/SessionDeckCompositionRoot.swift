@@ -41,6 +41,18 @@ public enum SessionDeckCompositionRoot {
             transcriptDecoding: PlaceholderTranscriptDecodingAdapter()
         )
         let sourceChangeObservation = LocalFileSourceObservationAdapter()
+        let reconcileSessionSources = ReconcileSessionSourcesUseCase(
+            candidateEnumeration: sourceDiscoveryAdapter
+        )
+        let liveRefreshPipeline = LiveRefreshPipelineCoordinator(
+            sourceChangeObservation: sourceChangeObservation,
+            reconciliation: reconcileSessionSources,
+            timerScheduler: DispatchLiveRefreshTimerScheduler(),
+            debounceInterval: 0.25,
+            reconciliationInterval: 30
+        ) { _ in
+            _ = try? refreshCatalogSnapshot.refreshSnapshot()
+        }
 
         return SessionDeckApplicationComposition(
             appShellUseCase: appShellUseCase,
@@ -52,7 +64,8 @@ public enum SessionDeckCompositionRoot {
             loadTranscriptPreview: loadTranscriptPreview,
             loadTranscriptSegments: loadTranscriptSegments,
             loadSelectedTranscript: loadSelectedTranscript,
-            sourceChangeObservation: sourceChangeObservation
+            sourceChangeObservation: sourceChangeObservation,
+            liveRefreshPipeline: liveRefreshPipeline
         )
     }
 

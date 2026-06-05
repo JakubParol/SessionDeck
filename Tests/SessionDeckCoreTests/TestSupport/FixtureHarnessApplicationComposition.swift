@@ -32,6 +32,15 @@ extension FixtureHarnessApplicationSmoke {
                 results: transcriptResultsBySessionID(transcriptResults)
             )
         )
+        let candidateEnumeration = FakeCandidateSessionFileEnumerationPort(files: [])
+        let sourceChangeObservation = FakeLiveSourceChangeObservationPort()
+        let liveRefreshPipeline = LiveRefreshPipelineCoordinator(
+            sourceChangeObservation: sourceChangeObservation,
+            reconciliation: ReconcileSessionSourcesUseCase(candidateEnumeration: candidateEnumeration),
+            timerScheduler: FakeLiveRefreshTimerScheduler(),
+            debounceInterval: 0.25,
+            reconciliationInterval: 30
+        ) { _ in }
         let appShellUseCase = AppShellUseCase(
             launchConfigurationProvider: FixtureHarnessLaunchConfigurationProvider(
                 configuredSourceCount: sourceSummaries.count
@@ -46,7 +55,7 @@ extension FixtureHarnessApplicationSmoke {
             appShellViewModel: appShellUseCase.makeViewModel(),
             discoverSessionSources: discoverSessionSources,
             enumerateCandidateSessionFiles: EnumerateCandidateSessionFilesUseCase(
-                candidateFileEnumeration: FakeCandidateSessionFileEnumerationPort(files: [])
+                candidateFileEnumeration: candidateEnumeration
             ),
             listSessions: ListSessionsUseCase(
                 sessionCatalog: FakeSessionCatalogPort(sessions: sessionSummaries)
@@ -59,7 +68,8 @@ extension FixtureHarnessApplicationSmoke {
                 transcriptDecoding: FakeTranscriptDecodingPort(results: transcriptResults)
             ),
             loadSelectedTranscript: loadSelectedTranscript,
-            sourceChangeObservation: FakeLiveSourceChangeObservationPort()
+            sourceChangeObservation: sourceChangeObservation,
+            liveRefreshPipeline: liveRefreshPipeline
         )
     }
 

@@ -9,6 +9,7 @@ public struct SessionDeckApplicationComposition: Sendable {
     public let loadTranscriptSegments: LoadTranscriptSegmentsUseCase
     public let loadSelectedTranscript: LoadSelectedTranscriptUseCase
     public let sourceChangeObservation: any LiveSourceChangeObservationPort
+    public let liveRefreshPipeline: LiveRefreshPipelineCoordinator
 
     public init(
         appShellUseCase: AppShellUseCase,
@@ -20,7 +21,8 @@ public struct SessionDeckApplicationComposition: Sendable {
         loadTranscriptPreview: LoadTranscriptPreviewUseCase,
         loadTranscriptSegments: LoadTranscriptSegmentsUseCase,
         loadSelectedTranscript: LoadSelectedTranscriptUseCase,
-        sourceChangeObservation: any LiveSourceChangeObservationPort
+        sourceChangeObservation: any LiveSourceChangeObservationPort,
+        liveRefreshPipeline: LiveRefreshPipelineCoordinator
     ) {
         self.appShellUseCase = appShellUseCase
         self.appShellViewModel = appShellViewModel
@@ -32,5 +34,6 @@ public struct SessionDeckApplicationComposition: Sendable {
         self.loadTranscriptSegments = loadTranscriptSegments
         self.loadSelectedTranscript = loadSelectedTranscript
         self.sourceChangeObservation = sourceChangeObservation
+        self.liveRefreshPipeline = liveRefreshPipeline
     }
 }
