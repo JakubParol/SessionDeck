@@ -95,6 +95,19 @@ public struct ReconcileSessionSourcesResult: Equatable, Sendable {
             unchanged: changes.filter { $0.kind == .unchanged }.count
         )
     }
+
+    public var refreshRequest: LiveRefreshRequest? {
+        let recoveredChangeCount = counts.new + counts.changed + counts.missing
+        guard recoveredChangeCount > 0 else {
+            return nil
+        }
+
+        return LiveRefreshRequest(
+            scope: sourceID.map(LiveRefreshScope.source) ?? .allSources,
+            trigger: trigger,
+            eventCount: recoveredChangeCount
+        )
+    }
 }
 
 public struct ReconcileSessionSourcesError: Error, Equatable, Sendable {

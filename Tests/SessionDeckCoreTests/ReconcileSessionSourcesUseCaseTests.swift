@@ -60,6 +60,20 @@ func reconciliationDetectsCandidateFileChanges() throws {
     #expect(result.changes.map(\.kind) == [.changed, .missing, .new, .unchanged])
     #expect(result.counts == ReconciliationChangeCounts(new: 1, changed: 1, missing: 1, unchanged: 1))
     #expect(result.monitoringStates.contains(.stale(sourceID: sourceID, reason: .missedChangeRecovered)))
+    #expect(result.refreshRequest == LiveRefreshRequest(scope: .source(sourceID), trigger: .reconciliation, eventCount: 3))
+}
+
+@Test("reconciliation does not request refresh when empty source remains current")
+func reconciliationDoesNotRequestRefreshForCurrentEmptySource() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let enumeration = ReconciliationCandidateEnumerationFake()
+    let useCase = ReconcileSessionSourcesUseCase(candidateEnumeration: enumeration)
+
+    let result = try useCase.reconcile(sourceID: sourceID, knownCandidates: [], trigger: .reconciliation)
+
+    #expect(result.changes.isEmpty)
+    #expect(result.monitoringStates == [.current(sourceID: sourceID)])
+    #expect(result.refreshRequest == nil)
 }
 
 @Test("reconciliation maps candidate enumeration failure to degraded monitoring state")
