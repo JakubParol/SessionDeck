@@ -123,6 +123,112 @@ func selectedSessionCoordinatorIgnoresNonSelectedRefreshWithoutLoading() {
     #expect(loadingPort.loadCount == 0)
 }
 
+@Test("selected session coordinator replaces unchanged content without duplicate rows")
+func selectedSessionCoordinatorReplacesUnchangedContentWithoutDuplicates() throws {
+    let selectedSession = selectedLiveRefreshSession()
+    let unchangedSegment = selectedSegment(id: "line-1", text: "Already readable", order: 0)
+    let previousModel = selectedReadModel(
+        selectedSession,
+        title: "Selected transcript",
+        segments: [unchangedSegment]
+    )
+    let refreshedResult = selectedDecodeResult(
+        sessionID: selectedSession.id,
+        title: "Selected transcript",
+        segments: [unchangedSegment]
+    )
+    let coordinator = SelectedSessionLiveRefreshCoordinator(
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase(
+            selectedTranscriptLoading: RecordingSelectedTranscriptLoadingPort(results: [
+                selectedSession.id: refreshedResult,
+            ])
+        )
+    )
+
+    let finalState = coordinator.handle(
+        LiveRefreshRequest(
+            scope: .path(selectedSession.sessionPath, sourceID: selectedSession.sourceID),
+            trigger: .debouncedSourceChange,
+            eventCount: 2
+        ),
+        selectedSession: selectedSession,
+        currentReadModel: previousModel
+    )
+    let readModel = try #require(finalState.loadedReadModel)
+
+    #expect(readModel.segments.map(\.id) == ["line-1"])
+}
+
+@Test("selected session coordinator preserves refreshed diagnostics in loaded read model")
+func selectedSessionCoordinatorPreservesRefreshedDiagnostics() throws {
+    let selectedSession = selectedLiveRefreshSession()
+    let diagnostic = TranscriptDecodeDiagnostic(
+        code: "codex_jsonl.unknown_event",
+        severity: .warning,
+        message: "Unsupported Codex event.",
+        source: TranscriptSegmentSourceReference(
+            sourceID: selectedSession.sourceID,
+            relativePath: "selected.jsonl",
+            lineNumber: 2
+        ),
+        allowsDecodingToContinue: true
+    )
+    let refreshedResult = TranscriptDecodeResult(
+        sessionID: selectedSession.id,
+        title: "Selected transcript",
+        segments: [selectedSegment(id: "line-1", text: "Already readable", order: 0)],
+        diagnostics: [diagnostic],
+        isPartial: false
+    )
+    let coordinator = SelectedSessionLiveRefreshCoordinator(
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase(
+            selectedTranscriptLoading: RecordingSelectedTranscriptLoadingPort(results: [
+                selectedSession.id: refreshedResult,
+            ])
+        )
+    )
+
+    let finalState = coordinator.handle(
+        LiveRefreshRequest(
+            scope: .session(selectedSession.id, sourceID: selectedSession.sourceID),
+            trigger: .debouncedSourceChange,
+            eventCount: 1
+        ),
+        selectedSession: selectedSession,
+        currentReadModel: nil
+    )
+    let readModel = try #require(finalState.loadedReadModel)
+
+    #expect(readModel.diagnostics == [diagnostic])
+}
+
+@Test("selected session coordinator keeps previous content when refresh loading fails")
+func selectedSessionCoordinatorKeepsPreviousContentWhenRefreshFails() throws {
+    let selectedSession = selectedLiveRefreshSession()
+    let previousModel = selectedReadModel(
+        selectedSession,
+        title: "Selected transcript",
+        segments: [selectedSegment(id: "line-1", text: "Already readable", order: 0)]
+    )
+    let coordinator = SelectedSessionLiveRefreshCoordinator(
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase(
+            selectedTranscriptLoading: FailingSelectedTranscriptLoadingPort()
+        )
+    )
+
+    let finalState = coordinator.handle(
+        LiveRefreshRequest(
+            scope: .session(selectedSession.id, sourceID: selectedSession.sourceID),
+            trigger: .debouncedSourceChange,
+            eventCount: 1
+        ),
+        selectedSession: selectedSession,
+        currentReadModel: previousModel
+    )
+
+    #expect(finalState.previousReadModel == previousModel)
+}
+
 private func selectedLiveRefreshSession() -> SessionSummary {
     let sourceID = SessionSourceID(rawValue: "codex-fixture")
     return SessionSummary(
@@ -197,5 +303,32 @@ private final class RecordingSelectedTranscriptLoadingPort: SelectedTranscriptLo
         }
 
         return result
+    }
+}
+
+private struct FailingSelectedTranscriptLoadingPort: SelectedTranscriptLoadingPort {
+    func loadSelectedTranscript(for session: SessionSummary) throws -> TranscriptDecodeResult {
+        throw SelectedTranscriptLoadingError.transcriptUnreadable(session.id)
+    }
+}
+
+private extension SelectedSessionLiveRefreshState {
+    var loadedReadModel: SelectedTranscriptReadModel? {
+        guard case let .loaded(readModel) = self else {
+            return nil
+        }
+
+        return readModel
+    }
+
+    var previousReadModel: SelectedTranscriptReadModel? {
+        switch self {
+        case let .ignored(previous),
+             let .refreshing(previous),
+             let .failed(previous, _):
+            return previous
+        case .idle, .loaded:
+            return nil
+        }
     }
 }
