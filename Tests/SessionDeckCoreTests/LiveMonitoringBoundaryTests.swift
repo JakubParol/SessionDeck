@@ -61,3 +61,52 @@ func liveRefreshRequestPreservesScopeTriggerAndCount() {
     #expect(request.trigger == .sourceChange)
     #expect(request.eventCount == 3)
 }
+
+@Test("live refresh request can represent reconciliation startup and debounced triggers")
+func liveRefreshRequestRepresentsReconciliationStartupAndDebouncedTriggers() {
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+
+    #expect(
+        LiveRefreshRequest(scope: .allSources, trigger: .appStartup, eventCount: 1).trigger == .appStartup
+    )
+    #expect(
+        LiveRefreshRequest(scope: .source(sourceID), trigger: .debouncedSourceChange, eventCount: 4).trigger
+            == .debouncedSourceChange
+    )
+    #expect(
+        LiveRefreshRequest(scope: .allSources, trigger: .reconciliation, eventCount: 1).trigger == .reconciliation
+    )
+}
+
+@Test("monitoring state exposes current running stale degraded and stopped states")
+func monitoringStateExposesRefreshLifecycle() {
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let request = LiveRefreshRequest(scope: .source(sourceID), trigger: .manualRefresh, eventCount: 1)
+    let failure = LiveMonitoringFailure(
+        sourceID: sourceID,
+        reason: .reconciliationFailed,
+        message: "candidate enumeration failed"
+    )
+
+    #expect(LiveMonitoringState.current(sourceID: sourceID) == .current(sourceID: sourceID))
+    #expect(LiveMonitoringState.refreshPending(request) == .refreshPending(request))
+    #expect(LiveMonitoringState.refreshRunning(request) == .refreshRunning(request))
+    #expect(LiveMonitoringState.reconciling(sourceID: sourceID, trigger: .reconciliation) == .reconciling(
+        sourceID: sourceID,
+        trigger: .reconciliation
+    ))
+    #expect(LiveMonitoringState.stale(sourceID: sourceID, reason: .missedChangeRecovered) == .stale(
+        sourceID: sourceID,
+        reason: .missedChangeRecovered
+    ))
+    #expect(LiveMonitoringState.degraded(failure) == .degraded(failure))
+    #expect(LiveMonitoringState.stopped == .stopped)
+}
+
+@Test("monitoring failures expose typed diagnostic codes")
+func monitoringFailuresExposeTypedCodes() {
+    #expect(LiveMonitoringFailureReason.watcherSetupFailed.code == "live_monitoring.watcher_setup_failed")
+    #expect(LiveMonitoringFailureReason.sourceMissing.code == "live_monitoring.source_missing")
+    #expect(LiveMonitoringFailureReason.permissionDenied.code == "live_monitoring.permission_denied")
+    #expect(LiveMonitoringFailureReason.reconciliationFailed.code == "live_monitoring.reconciliation_failed")
+}
