@@ -1,3 +1,5 @@
+import Foundation
+
 public enum SelectedSessionLiveRefreshState: Equatable, Sendable {
     case idle
     case ignored(previous: SelectedTranscriptReadModel?)
@@ -9,8 +11,14 @@ public enum SelectedSessionLiveRefreshState: Equatable, Sendable {
 public final class SelectedSessionLiveRefreshCoordinator: @unchecked Sendable {
     private let loadSelectedTranscript: LoadSelectedTranscriptUseCase
     private let stateRecorder: (SelectedSessionLiveRefreshState) -> Void
+    private let lock = NSLock()
+    private var recordedState: SelectedSessionLiveRefreshState = .idle
 
-    public private(set) var state: SelectedSessionLiveRefreshState = .idle
+    public var state: SelectedSessionLiveRefreshState {
+        lock.withLock {
+            recordedState
+        }
+    }
 
     public init(
         loadSelectedTranscript: LoadSelectedTranscriptUseCase,
@@ -43,7 +51,9 @@ public final class SelectedSessionLiveRefreshCoordinator: @unchecked Sendable {
 
     @discardableResult
     private func record(_ nextState: SelectedSessionLiveRefreshState) -> SelectedSessionLiveRefreshState {
-        state = nextState
+        lock.withLock {
+            recordedState = nextState
+        }
         stateRecorder(nextState)
         return nextState
     }
