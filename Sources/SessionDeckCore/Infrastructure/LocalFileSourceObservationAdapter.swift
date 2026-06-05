@@ -69,11 +69,22 @@ public final class LocalFileSourceObservationAdapter: LiveSourceChangeObservatio
             guard let source else {
                 return
             }
+            let event = source.data
+            if event.contains(.delete) {
+                eventHandler(.degraded(LiveSourceWatcherDegradedState(
+                    sourceID: target.sourceID,
+                    path: path,
+                    reason: .deletedPath
+                )))
+                source.cancel()
+                return
+            }
+
             eventHandler(.change(LiveSourceChangeEvent(
                 sourceID: target.sourceID,
                 affectedPath: path,
                 sessionID: target.sessionID,
-                kind: Self.changeKind(from: source.data)
+                kind: Self.changeKind(from: event)
             )))
         }
         source.setCancelHandler {
@@ -85,9 +96,6 @@ public final class LocalFileSourceObservationAdapter: LiveSourceChangeObservatio
     }
 
     private static func changeKind(from event: DispatchSource.FileSystemEvent) -> LiveSourceChangeKind {
-        if event.contains(.delete) {
-            return .deleted
-        }
         if event.contains(.rename) {
             return .moved
         }

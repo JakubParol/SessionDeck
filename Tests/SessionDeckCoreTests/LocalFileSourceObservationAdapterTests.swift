@@ -66,6 +66,41 @@ func localFileSourceObserverReportsMissingPaths() throws {
     #expect(degradedState.reason == .missingPath)
 }
 
+@Test("local file source observer reports deleted watched files as degraded states")
+func localFileSourceObserverReportsDeletedWatchedFiles() throws {
+    let fixtureRoot = try makeLiveMonitoringFixtureRoot(name: "deleted-path")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let transcriptURL = fixtureRoot.url.appending(path: "session-123.jsonl")
+    try #"{"type":"session_meta"}"#.write(to: transcriptURL, atomically: true, encoding: .utf8)
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let recorder = LiveObservationRecorder()
+    let adapter = LocalFileSourceObservationAdapter()
+
+    let observation = adapter.observe(
+        targets: [
+            LiveSourceWatchTarget(
+                sourceID: sourceID,
+                path: transcriptURL.path,
+                sessionID: SessionID(rawValue: "session-123")
+            ),
+        ],
+        eventHandler: recorder.record
+    )
+    defer {
+        observation.cancel()
+    }
+
+    try FileManager.default.removeItem(at: transcriptURL)
+
+    let degradedState = try #require(recorder.waitForDegradedState())
+    #expect(degradedState.sourceID == sourceID)
+    #expect(degradedState.path == transcriptURL.standardizedFileURL.path)
+    #expect(degradedState.reason == .deletedPath)
+}
+
 @Test("local file source observer does not mutate watched fixture tree")
 func localFileSourceObserverDoesNotMutateWatchedTree() throws {
     let fixtureRoot = try makeLiveMonitoringFixtureRoot(name: "read-only-safety")
