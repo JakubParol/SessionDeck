@@ -72,10 +72,10 @@ struct AppShellTranscriptDetailView: View {
 
     private var diagnostics: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(state.diagnosticMessages, id: \.self) { message in
-                Label(message, systemImage: "exclamationmark.triangle")
+            ForEach(state.diagnosticRows) { row in
+                Label(row.message, systemImage: diagnosticIcon(for: row.severity))
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(severityColor(row.severity))
             }
         }
     }
@@ -212,6 +212,17 @@ struct AppShellTranscriptDetailView: View {
             return .orange
         case .error:
             return .red
+        }
+    }
+
+    private func diagnosticIcon(for severity: AppShellCatalogRowSeverity) -> String {
+        switch severity {
+        case .healthy, .info:
+            return "info.circle"
+        case .warning:
+            return "exclamationmark.triangle"
+        case .error:
+            return "xmark.octagon"
         }
     }
 

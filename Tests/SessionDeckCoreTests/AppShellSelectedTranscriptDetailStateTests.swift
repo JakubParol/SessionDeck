@@ -117,6 +117,49 @@ func selectedTranscriptDetailStateMapsLoadedReadModel() throws {
     #expect(state.rows.map(\.text) == ["First", "Second"])
     #expect(state.rows.map(\.roleLabel) == ["User", "Assistant"])
     #expect(state.diagnosticMessages == ["Warning line 3: Unknown event was kept as a diagnostic."])
+    #expect(state.diagnosticRows.map(\.severity) == [.warning])
+    #expect(state.diagnosticRows.map(\.message) == state.diagnosticMessages)
+}
+
+@Test("selected transcript detail state distinguishes warning and blocking diagnostics")
+func selectedTranscriptDetailStateDistinguishesWarningAndBlockingDiagnostics() {
+    let sessionID = SessionID(rawValue: "diagnostic-severity-session")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let readModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Diagnostic severity session",
+            segments: [],
+            diagnostics: [
+                TranscriptDecodeDiagnostic(
+                    code: "codex.missing_metadata",
+                    severity: .warning,
+                    message: "Session metadata is incomplete.",
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    allowsDecodingToContinue: true
+                ),
+                TranscriptDecodeDiagnostic(
+                    code: "blocking_failure",
+                    severity: .error,
+                    message: "Readable transcript content is blocked.",
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 2),
+                    allowsDecodingToContinue: false
+                ),
+            ],
+            isPartial: true
+        )
+    )
+
+    let state = AppShellSelectedTranscriptDetailState.loaded(readModel)
+
+    #expect(state.severity == .error)
+    #expect(state.displayMode == .error)
+    #expect(state.diagnosticRows.map(\.severity) == [.warning, .error])
+    #expect(state.diagnosticRows.map(\.message) == [
+        "Warning line 1: Session metadata is incomplete.",
+        "Error line 2: Readable transcript content is blocked.",
+    ])
 }
 
 @Test("selected transcript rows expose stable role styles for conversation rendering")

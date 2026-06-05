@@ -32,6 +32,22 @@ public enum AppShellSelectedTranscriptRefreshStatus: Equatable, Sendable {
     case failed(message: String)
 }
 
+public struct AppShellSelectedTranscriptDiagnosticRow: Equatable, Identifiable, Sendable {
+    public let id: String
+    public let message: String
+    public let severity: AppShellCatalogRowSeverity
+
+    public init(
+        id: String,
+        message: String,
+        severity: AppShellCatalogRowSeverity
+    ) {
+        self.id = id
+        self.message = message
+        self.severity = severity
+    }
+}
+
 public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public let title: String
     public let statusMessage: String
@@ -40,6 +56,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public let metadataRows: [AppShellSelectedTranscriptMetadataRow]
     public let rows: [AppShellTranscriptSegmentRow]
     public let diagnosticMessages: [String]
+    public let diagnosticRows: [AppShellSelectedTranscriptDiagnosticRow]
     public let severity: AppShellCatalogRowSeverity
     public let isLoading: Bool
 
@@ -51,6 +68,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         metadataRows: [AppShellSelectedTranscriptMetadataRow],
         rows: [AppShellTranscriptSegmentRow],
         diagnosticMessages: [String],
+        diagnosticRows: [AppShellSelectedTranscriptDiagnosticRow]? = nil,
         severity: AppShellCatalogRowSeverity,
         isLoading: Bool
     ) {
@@ -61,6 +79,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         self.metadataRows = metadataRows
         self.rows = rows
         self.diagnosticMessages = diagnosticMessages
+        self.diagnosticRows = diagnosticRows ?? Self.diagnosticRows(from: diagnosticMessages)
         self.severity = severity
         self.isLoading = isLoading
     }
@@ -94,6 +113,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         let errorCount = readModel.diagnostics.filter { $0.severity == .error }.count
         let severity = loadedSeverity(errorCount: errorCount, warningCount: warningCount)
 
+        let diagnosticRows = readModel.diagnostics.map(diagnosticRow(for:))
+
         return AppShellSelectedTranscriptDetailState(
             title: titleLabel(for: readModel.title),
             statusMessage: loadedStatusMessage(
@@ -105,7 +126,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             displayMode: displayMode(for: severity),
             metadataRows: metadataRows(for: readModel),
             rows: readModel.segments.map(AppShellTranscriptSegmentRow.make(segment:)),
-            diagnosticMessages: readModel.diagnostics.map(diagnosticMessage(for:)),
+            diagnosticMessages: diagnosticRows.map(\.message),
+            diagnosticRows: diagnosticRows,
             severity: severity,
             isLoading: false
         )
@@ -140,6 +162,13 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                     metadataRows: [],
                     rows: [],
                     diagnosticMessages: ["Refresh error: \(message)"],
+                    diagnosticRows: [
+                        AppShellSelectedTranscriptDiagnosticRow(
+                            id: "refresh-error",
+                            message: "Refresh error: \(message)",
+                            severity: .error
+                        ),
+                    ],
                     severity: .error,
                     isLoading: false
                 )
@@ -225,6 +254,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             metadataRows: metadataRows,
             rows: rows,
             diagnosticMessages: diagnosticMessages ?? self.diagnosticMessages,
+            diagnosticRows: diagnosticMessages.map(Self.diagnosticRows(from:)) ?? diagnosticRows,
             severity: severity ?? self.severity,
             isLoading: isLoading
         )
@@ -336,6 +366,41 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         }
 
         return "\(prefix) line \(lineNumber): \(diagnostic.message)"
+    }
+
+    private static func diagnosticRow(
+        for diagnostic: TranscriptDecodeDiagnostic
+    ) -> AppShellSelectedTranscriptDiagnosticRow {
+        AppShellSelectedTranscriptDiagnosticRow(
+            id: "\(diagnostic.code)-\(diagnostic.source?.lineNumber ?? 0)-\(diagnostic.message)",
+            message: diagnosticMessage(for: diagnostic),
+            severity: rowSeverity(for: diagnostic.severity)
+        )
+    }
+
+    private static func diagnosticRows(
+        from messages: [String]
+    ) -> [AppShellSelectedTranscriptDiagnosticRow] {
+        messages.enumerated().map { index, message in
+            AppShellSelectedTranscriptDiagnosticRow(
+                id: "diagnostic-\(index)",
+                message: message,
+                severity: message.hasPrefix("Error") ? .error : .warning
+            )
+        }
+    }
+
+    private static func rowSeverity(
+        for severity: TranscriptDecodeDiagnosticSeverity
+    ) -> AppShellCatalogRowSeverity {
+        switch severity {
+        case .info:
+            return .info
+        case .warning:
+            return .warning
+        case .error:
+            return .error
+        }
     }
 
     private static func diagnosticSeverityLabel(
