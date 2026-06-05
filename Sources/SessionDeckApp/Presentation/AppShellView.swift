@@ -64,6 +64,8 @@ struct AppShellView: View {
             }
             .font(.body)
 
+            sourceHealthRows
+
             Divider()
 
             readingSurface
@@ -104,6 +106,39 @@ struct AppShellView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    @ViewBuilder
+    private var sourceHealthRows: some View {
+        if viewModel.sourceDiscoverySummary.sourceHealthRows.isEmpty == false {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(viewModel.sourceDiscoverySummary.sourceHealthRows, id: \.id) { row in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: sourceHealthIcon(for: row.severity))
+                            .frame(width: 18)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(row.statusLabel)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(row.title)
+                                    .font(.subheadline)
+                            }
+
+                            Text(row.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Text(row.location)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var sourceCountSummary: String {
         let summary = viewModel.sourceDiscoverySummary
         return "Sources: \(summary.availableSourceCount) available of \(summary.configuredSourceCount) configured."
@@ -132,6 +167,19 @@ struct AppShellView: View {
         }
 
         return "checkmark.circle"
+    }
+
+    private func sourceHealthIcon(for severity: AppShellSourceHealthSeverity) -> String {
+        switch severity {
+        case .healthy:
+            return "checkmark.circle"
+        case .info:
+            return "info.circle"
+        case .warning:
+            return "exclamationmark.triangle"
+        case .error:
+            return "xmark.octagon"
+        }
     }
 
     private var safetySummary: String {
