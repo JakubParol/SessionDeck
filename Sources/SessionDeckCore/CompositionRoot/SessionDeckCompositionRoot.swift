@@ -1,3 +1,5 @@
+import Foundation
+
 public enum SessionDeckCompositionRoot {
     public static func makeApplicationComposition(
         homeDirectoryProvider: any HomeDirectoryProviding = EnvironmentHomeDirectoryProvider(),
@@ -44,6 +46,7 @@ public enum SessionDeckCompositionRoot {
         let reconcileSessionSources = ReconcileSessionSourcesUseCase(
             candidateEnumeration: sourceDiscoveryAdapter
         )
+        let refreshQueue = DispatchQueue(label: "SessionDeck.live-refresh-work")
         let liveRefreshPipeline = LiveRefreshPipelineCoordinator(
             sourceChangeObservation: sourceChangeObservation,
             reconciliation: reconcileSessionSources,
@@ -51,7 +54,9 @@ public enum SessionDeckCompositionRoot {
             debounceInterval: 0.25,
             reconciliationInterval: 30
         ) { _ in
-            _ = try? refreshCatalogSnapshot.refreshSnapshot()
+            refreshQueue.async {
+                _ = try? refreshCatalogSnapshot.refreshSnapshot()
+            }
         }
 
         return SessionDeckApplicationComposition(

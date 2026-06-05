@@ -225,6 +225,16 @@ func compositionRootExposesLiveRefreshPipelineThroughApplicationComposition() th
     ))
 }
 
+@Test("composition root dispatches live refresh work off the caller path")
+func compositionRootDispatchesLiveRefreshWorkOffCallerPath() throws {
+    let compositionRoot = repositoryRoot()
+        .appending(path: "Sources/SessionDeckCore/CompositionRoot/SessionDeckCompositionRoot.swift")
+    let contents = try String(contentsOf: compositionRoot, encoding: .utf8)
+
+    #expect(contents.contains(#"DispatchQueue(label: "SessionDeck.live-refresh-work")"#))
+    #expect(contents.contains("refreshQueue.async"))
+}
+
 private final class LiveObservationRecorder {
     private let lock = NSLock()
     private var events: [LiveSourceObservationEvent] = []
@@ -255,4 +265,11 @@ private final class LiveObservationRecorder {
 
         return nil
     }
+}
+
+private func repositoryRoot() -> URL {
+    URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
 }
