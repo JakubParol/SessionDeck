@@ -27,6 +27,8 @@ func selectedTranscriptToolRowsExposeCollapsedDefaultMetadata() {
         displayLabel: "exec_command",
         metadataSummary: "failed - 54 characters - 1 line",
         expandedText: "large raw output that should stay hidden while collapsed",
+        detailSummary: "Showing 54 of 54 characters",
+        diagnosticMessages: [],
         isCollapsedByDefault: true
     ))
 }

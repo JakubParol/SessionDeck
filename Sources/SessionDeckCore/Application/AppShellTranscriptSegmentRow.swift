@@ -8,17 +8,23 @@ public struct AppShellTranscriptToolPresentation: Equatable, Sendable {
     public let displayLabel: String
     public let metadataSummary: String
     public let expandedText: String
+    public let detailSummary: String
+    public let diagnosticMessages: [String]
     public let isCollapsedByDefault: Bool
 
     public init(
         displayLabel: String,
         metadataSummary: String,
         expandedText: String,
+        detailSummary: String = "",
+        diagnosticMessages: [String] = [],
         isCollapsedByDefault: Bool
     ) {
         self.displayLabel = displayLabel
         self.metadataSummary = metadataSummary
         self.expandedText = expandedText
+        self.detailSummary = detailSummary
+        self.diagnosticMessages = diagnosticMessages
         self.isCollapsedByDefault = isCollapsedByDefault
     }
 }
@@ -98,6 +104,8 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             displayLabel: displayLabel,
             metadataSummary: toolMetadataSummary(for: metadata),
             expandedText: textLabel(for: segment.text),
+            detailSummary: toolDetailSummary(for: segment, metadata: metadata),
+            diagnosticMessages: toolDiagnosticMessages(for: metadata),
             isCollapsedByDefault: true
         )
     }
@@ -138,6 +146,64 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
         }
 
         return parts.joined(separator: " - ")
+    }
+
+    private static func toolDetailSummary(
+        for segment: TranscriptSegment,
+        metadata: TranscriptToolMetadata?
+    ) -> String {
+        guard let metadata else {
+            return "Tool metadata unavailable"
+        }
+
+        guard metadata.bodyAvailability != .omitted else {
+            return "Tool output body unavailable"
+        }
+
+        let displayedCharacterCount = segment.text.count
+        guard let totalCharacterCount = metadata.characterCount else {
+            return "Showing bounded output; total size unknown"
+        }
+
+        return "Showing \(formattedCount(displayedCharacterCount)) of \(formattedCount(totalCharacterCount)) characters"
+    }
+
+    private static func toolDiagnosticMessages(for metadata: TranscriptToolMetadata?) -> [String] {
+        guard let metadata else {
+            return ["Tool metadata unavailable."]
+        }
+
+        var messages: [String] = []
+        switch metadata.bodyAvailability {
+        case .available:
+            break
+        case .omitted:
+            messages.append("Tool output body unavailable.")
+        case .malformed:
+            messages.append("Tool output body malformed.")
+        case .truncated:
+            messages.append("Partial output shown: configured display bound reached.")
+        }
+
+        if metadata.characterCount == nil, metadata.byteCount == nil {
+            messages.append("Output size metadata unavailable.")
+        }
+
+        return messages
+    }
+
+    private static func formattedCount(_ count: Int) -> String {
+        let digits = String(count)
+        var result = ""
+
+        for (offset, character) in digits.reversed().enumerated() {
+            if offset > 0, offset % 3 == 0 {
+                result.append(",")
+            }
+            result.append(character)
+        }
+
+        return String(result.reversed())
     }
 
     private static func bodyAvailabilityLabel(
