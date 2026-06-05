@@ -271,6 +271,42 @@ func selectedTranscriptDetailStateMapsTypedFailures() {
     #expect(unavailable.severity == .warning)
 }
 
+@Test("selected transcript detail state keeps last-known-good rows during failed live refresh")
+func selectedTranscriptDetailStateKeepsLastKnownGoodRowsDuringFailedLiveRefresh() {
+    let sessionID = SessionID(rawValue: "live-refresh-failed")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let previousReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Readable before append",
+            segments: [
+                TranscriptSegment(
+                    id: "stable-tool-output",
+                    kind: .toolOutput(callID: "call-1"),
+                    text: "Expanded output stays readable.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+
+    let state = AppShellSelectedTranscriptDetailState.liveRefresh(
+        .failed(previous: previousReadModel, message: "Malformed appended line.")
+    )
+
+    #expect(state.title == "Readable before append")
+    #expect(state.rows.map(\.id) == ["stable-tool-output"])
+    #expect(state.rows.first?.toolPresentation?.expandedText == "Expanded output stays readable.")
+    #expect(state.refreshStatus == .failed(message: "Malformed appended line."))
+    #expect(state.statusMessage == "Refresh failed: Malformed appended line. Last readable content is still shown.")
+    #expect(state.isLoading == false)
+}
+
 private func selectedTranscriptSession(
     id: SessionID,
     sourceID: SessionSourceID,

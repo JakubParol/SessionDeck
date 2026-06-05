@@ -25,10 +25,18 @@ public enum AppShellSelectedTranscriptDisplayMode: Equatable, Sendable {
     case error
 }
 
+public enum AppShellSelectedTranscriptRefreshStatus: Equatable, Sendable {
+    case idle
+    case refreshing
+    case refreshed
+    case failed(message: String)
+}
+
 public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
     public let title: String
     public let statusMessage: String
     public let displayMode: AppShellSelectedTranscriptDisplayMode
+    public let refreshStatus: AppShellSelectedTranscriptRefreshStatus
     public let metadataRows: [AppShellSelectedTranscriptMetadataRow]
     public let rows: [AppShellTranscriptSegmentRow]
     public let diagnosticMessages: [String]
@@ -39,6 +47,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         title: String,
         statusMessage: String,
         displayMode: AppShellSelectedTranscriptDisplayMode,
+        refreshStatus: AppShellSelectedTranscriptRefreshStatus = .idle,
         metadataRows: [AppShellSelectedTranscriptMetadataRow],
         rows: [AppShellTranscriptSegmentRow],
         diagnosticMessages: [String],
@@ -48,6 +57,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         self.title = title
         self.statusMessage = statusMessage
         self.displayMode = displayMode
+        self.refreshStatus = refreshStatus
         self.metadataRows = metadataRows
         self.rows = rows
         self.diagnosticMessages = diagnosticMessages
@@ -101,6 +111,52 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         )
     }
 
+    public static func liveRefresh(
+        _ refreshState: SelectedSessionLiveRefreshState
+    ) -> AppShellSelectedTranscriptDetailState {
+        switch refreshState {
+        case .idle:
+            return noSelection
+        case let .ignored(previous):
+            return previous.map(loaded) ?? noSelection
+        case let .refreshing(previous):
+            guard let previous else {
+                return loading(sessionTitle: "Selected transcript")
+                    .withRefreshStatus(.refreshing)
+            }
+            return loaded(previous).withRefreshStatus(
+                .refreshing,
+                statusMessage: "Refreshing selected transcript..."
+            )
+        case let .loaded(readModel):
+            return loaded(readModel).withRefreshStatus(
+                .refreshed,
+                statusMessage: "Selected transcript refreshed with latest readable content."
+            )
+        case let .failed(previous, message):
+            guard let previous else {
+                return AppShellSelectedTranscriptDetailState(
+                    title: "Transcript unavailable",
+                    statusMessage: "Refresh failed: \(message)",
+                    displayMode: .error,
+                    refreshStatus: .failed(message: message),
+                    metadataRows: [],
+                    rows: [],
+                    diagnosticMessages: ["Error: \(message)"],
+                    severity: .error,
+                    isLoading: false
+                )
+            }
+            return loaded(previous).withRefreshStatus(
+                .failed(message: message),
+                statusMessage: "Refresh failed: \(message) Last readable content is still shown.",
+                displayMode: .error,
+                severity: .error,
+                diagnosticMessages: loaded(previous).diagnosticMessages + ["Error: \(message)"]
+            )
+        }
+    }
+
     public static func failed(_ error: Error) -> AppShellSelectedTranscriptDetailState {
         let failure = failureDescription(for: error)
         return AppShellSelectedTranscriptDetailState(
@@ -129,6 +185,26 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             diagnosticMessages: [],
             severity: failure.severity,
             isLoading: false
+        )
+    }
+
+    private func withRefreshStatus(
+        _ refreshStatus: AppShellSelectedTranscriptRefreshStatus,
+        statusMessage: String? = nil,
+        displayMode: AppShellSelectedTranscriptDisplayMode? = nil,
+        severity: AppShellCatalogRowSeverity? = nil,
+        diagnosticMessages: [String]? = nil
+    ) -> AppShellSelectedTranscriptDetailState {
+        AppShellSelectedTranscriptDetailState(
+            title: title,
+            statusMessage: statusMessage ?? self.statusMessage,
+            displayMode: displayMode ?? self.displayMode,
+            refreshStatus: refreshStatus,
+            metadataRows: metadataRows,
+            rows: rows,
+            diagnosticMessages: diagnosticMessages ?? self.diagnosticMessages,
+            severity: severity ?? self.severity,
+            isLoading: isLoading
         )
     }
 
