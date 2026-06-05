@@ -150,7 +150,10 @@ public struct ReconcileSessionSourcesUseCase: Sendable {
             )
         }
 
-        let changes = Self.changes(previous: knownCandidates, current: currentCandidates)
+        let scopedKnownCandidates = knownCandidates.filter { snapshot in
+            sourceID == nil || snapshot.sourceID == sourceID
+        }
+        let changes = Self.changes(previous: scopedKnownCandidates, current: currentCandidates)
         return ReconcileSessionSourcesResult(
             sourceID: sourceID,
             trigger: trigger,
@@ -163,8 +166,8 @@ public struct ReconcileSessionSourcesUseCase: Sendable {
         previous: [CandidateSessionSnapshot],
         current: [CandidateSessionSnapshot]
     ) -> [ReconciliationChange] {
-        let previousByIdentity = Dictionary(uniqueKeysWithValues: previous.map { ($0.identity, $0) })
-        let currentByIdentity = Dictionary(uniqueKeysWithValues: current.map { ($0.identity, $0) })
+        let previousByIdentity = Self.snapshotsByIdentity(previous)
+        let currentByIdentity = Self.snapshotsByIdentity(current)
         let identities = Set(previousByIdentity.keys).union(currentByIdentity.keys)
 
         return identities
@@ -192,6 +195,17 @@ public struct ReconcileSessionSourcesUseCase: Sendable {
 
                 return lhs.sortPath < rhs.sortPath
             }
+    }
+
+    private static func snapshotsByIdentity(
+        _ snapshots: [CandidateSessionSnapshot]
+    ) -> [CandidateSessionSnapshotIdentity: CandidateSessionSnapshot] {
+        var snapshotsByIdentity: [CandidateSessionSnapshotIdentity: CandidateSessionSnapshot] = [:]
+        for snapshot in snapshots {
+            snapshotsByIdentity[snapshot.identity] = snapshot
+        }
+
+        return snapshotsByIdentity
     }
 
     private static func monitoringStates(

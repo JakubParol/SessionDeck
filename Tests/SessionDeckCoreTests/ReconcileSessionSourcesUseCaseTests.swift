@@ -76,6 +76,32 @@ func reconciliationDoesNotRequestRefreshForCurrentEmptySource() throws {
     #expect(result.refreshRequest == nil)
 }
 
+@Test("reconciliation scopes known candidates to requested source")
+func reconciliationScopesKnownCandidatesToRequestedSource() throws {
+    let requestedSourceID = SessionSourceID(rawValue: "codex-primary")
+    let otherSourceID = SessionSourceID(rawValue: "codex-secondary")
+    let enumeration = ReconciliationCandidateEnumerationFake()
+    let useCase = ReconcileSessionSourcesUseCase(candidateEnumeration: enumeration)
+
+    let result = try useCase.reconcile(
+        sourceID: requestedSourceID,
+        knownCandidates: [
+            CandidateSessionSnapshot(
+                sourceID: otherSourceID,
+                relativePath: "2026/06/05/other.jsonl",
+                absolutePath: "/tmp/other.jsonl",
+                byteSize: 12,
+                modifiedAt: Date(timeIntervalSince1970: 1_700_000_000)
+            ),
+        ],
+        trigger: .reconciliation
+    )
+
+    #expect(result.changes.isEmpty)
+    #expect(result.monitoringStates == [.current(sourceID: requestedSourceID)])
+    #expect(result.refreshRequest == nil)
+}
+
 @Test("reconciliation maps candidate enumeration failure to degraded monitoring state")
 func reconciliationMapsEnumerationFailureToDegradedState() {
     let sourceID = SessionSourceID(rawValue: "codex-default")
