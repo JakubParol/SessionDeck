@@ -32,9 +32,25 @@ func codexDecoderLeavesSmallCompleteToolOutputUntruncated() throws {
     #expect(metadata.lineCount == 1)
 }
 
+@Test("Codex decoder clamps negative output bounds to empty truncated detail")
+func codexDecoderClampsNegativeOutputBoundsToEmptyTruncatedDetail() throws {
+    let result = try decodeFixture(
+        .boundedReadTruncated,
+        sessionID: "negative-bound-session",
+        maximumToolBodyCharacters: -1
+    )
+    let segment = try #require(result.orderedSegments.first)
+    let metadata = try #require(segment.toolMetadata)
+
+    #expect(segment.text == "")
+    #expect(metadata.bodyAvailability == .truncated)
+    #expect(metadata.characterCount == 619)
+}
+
 private func decodeFixture(
     _ fixtureID: CodexTranscriptFixtureID,
-    sessionID rawSessionID: String
+    sessionID rawSessionID: String,
+    maximumToolBodyCharacters: Int = 240
 ) throws -> TranscriptDecodeResult {
     let sessionID = SessionID(rawValue: rawSessionID)
     let file = CodexTranscriptFile(
@@ -48,7 +64,10 @@ private func decodeFixture(
         fallbackTitle: "Fallback title"
     )
 
-    return try CodexTranscriptDecodingAdapter(files: [file]).loadTranscript(sessionID: sessionID)
+    return try CodexTranscriptDecodingAdapter(
+        files: [file],
+        maximumToolBodyCharacters: maximumToolBodyCharacters
+    ).loadTranscript(sessionID: sessionID)
 }
 
 private func fullOutputCharacterCount() throws -> Int {

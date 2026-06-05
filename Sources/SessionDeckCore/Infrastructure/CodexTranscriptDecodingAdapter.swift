@@ -25,7 +25,7 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
 
     public init(files: [CodexTranscriptFile], maximumToolBodyCharacters: Int = 240) {
         self.filesBySessionID = Dictionary(uniqueKeysWithValues: files.map { ($0.sessionID, $0) })
-        self.maximumToolBodyCharacters = maximumToolBodyCharacters
+        self.maximumToolBodyCharacters = max(0, maximumToolBodyCharacters)
     }
 
     public func loadTranscript(sessionID: SessionID) throws -> TranscriptDecodeResult {
