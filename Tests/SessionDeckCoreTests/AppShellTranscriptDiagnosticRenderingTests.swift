@@ -31,6 +31,22 @@ func selectedTranscriptDiagnosticsShowUnknownEventsAsVisibleUnsupportedRows() th
     #expect(state.rows[1].text == "Unsupported Codex event: future_codex_event")
 }
 
+@Test("selected transcript diagnostics show missing metadata warnings and readable turns")
+func selectedTranscriptDiagnosticsShowMissingMetadataWarningsAndReadableTurns() throws {
+    let state = try selectedTranscriptState(for: .missingMetadata, sessionID: "missing-metadata-detail")
+
+    #expect(state.statusMessage == "Loaded 2 transcript segment(s) with 1 warning(s).")
+    #expect(state.severity == .warning)
+    #expect(state.diagnosticMessages == [
+        "Warning line 1: Session metadata is incomplete; SessionDeck is using safe fallback labels."
+    ])
+    #expect(state.rows.map(\.roleLabel) == ["User", "Assistant"])
+    #expect(state.rows.map(\.text) == [
+        "Exercise missing cwd and project metadata handling.",
+        "Catalog grouping should use a safe fallback when metadata is missing.",
+    ])
+}
+
 @Test("selected transcript diagnostics stay quiet for normal transcripts")
 func selectedTranscriptDiagnosticsStayQuietForNormalTranscripts() throws {
     let state = try selectedTranscriptState(for: .minimalConversationTurns, sessionID: "normal-detail")

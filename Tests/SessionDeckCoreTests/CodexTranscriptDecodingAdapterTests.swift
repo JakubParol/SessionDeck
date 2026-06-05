@@ -29,6 +29,7 @@ func codexTranscriptDecoderPreservesMultiTurnOrderingAndUnsupportedEvents() thro
 
     #expect(result.isPartial)
     #expect(result.diagnostics.map(\.code) == ["codex.unsupported_event"])
+    #expect(result.diagnostics.map(\.category) == [.unknownEventShape])
     #expect(orderedSegments.map(\.kind) == [
         .userMessage,
         .assistantMessage,
@@ -51,6 +52,7 @@ func codexTranscriptDecoderConvertsMalformedLinesIntoDiagnostics() throws {
     #expect(result.isPartial)
     #expect(result.canContinueDecoding)
     #expect(result.diagnostics.map(\.code) == ["codex.malformed_jsonl"])
+    #expect(result.diagnostics.map(\.category) == [.malformedLine])
     #expect(orderedSegments.map(\.kind) == [
         .userMessage,
         .error(code: "codex.malformed_jsonl"),
@@ -83,6 +85,7 @@ func codexTranscriptDecoderPreservesUnknownFixtureEventsAsOrderedDiagnosticSegme
     #expect(result.isPartial)
     #expect(result.canContinueDecoding)
     #expect(result.diagnostics.map(\.code) == ["codex.unsupported_event"])
+    #expect(result.diagnostics.map(\.category) == [.unknownEventShape])
     #expect(diagnostic.severity == .info)
     #expect(diagnostic.source?.lineNumber == 3)
     #expect(diagnostic.message == "A Codex transcript event is not mapped to a readable segment yet.")
@@ -102,8 +105,10 @@ func codexTranscriptDecoderToleratesMissingOptionalMetadataAndTimestamps() throw
     let result = try decodeFixture(.missingMetadata, sessionID: "missing-metadata-session")
 
     #expect(result.title == "Synthetic Missing Metadata Session")
-    #expect(result.isPartial == false)
-    #expect(result.diagnostics.isEmpty)
+    #expect(result.isPartial)
+    #expect(result.canContinueDecoding)
+    #expect(result.diagnostics.map(\.code) == ["codex.missing_metadata"])
+    #expect(result.diagnostics.map(\.category) == [.missingMetadata])
     #expect(result.orderedSegments.map(\.timestampDescription) == [
         "2026-01-01T00:03:01Z",
         nil,
@@ -194,6 +199,7 @@ func codexTranscriptDecoderDegradesOmittedAndUnknownToolPayloadsExplicitly() thr
     #expect(result.isPartial)
     #expect(result.canContinueDecoding)
     #expect(result.diagnostics.map(\.code) == ["codex.unsupported_event"])
+    #expect(result.diagnostics.map(\.category) == [.unknownEventShape])
     #expect(orderedSegments.map(\.kind) == [
         .userMessage,
         .toolCall(name: "synthetic_omitted_output_probe", callID: "call_tool_payload_omitted"),

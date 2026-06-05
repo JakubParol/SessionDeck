@@ -49,6 +49,7 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         var segments: [TranscriptSegment] = []
         var diagnostics: [TranscriptDecodeDiagnostic] = []
         var toolNamesByCallID: [String: String] = [:]
+        var recordedMissingSessionMetadata = false
 
         for (lineIndex, line) in transcriptLines(from: text).enumerated() {
             let lineNumber = lineIndex + 1
@@ -71,6 +72,19 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
 
             if event.type == "session_meta" {
                 title = event.payloadString("title") ?? title
+                if recordedMissingSessionMetadata == false,
+                   missingSessionMetadataKeys(in: event).isEmpty == false {
+                    recordedMissingSessionMetadata = true
+                    diagnostics.append(
+                        TranscriptDecodeDiagnostic(
+                            code: "codex.missing_metadata",
+                            severity: .warning,
+                            message: "Session metadata is incomplete; SessionDeck is using safe fallback labels.",
+                            source: source,
+                            allowsDecodingToContinue: true
+                        )
+                    )
+                }
                 continue
             }
 
@@ -109,6 +123,10 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
 
     private func transcriptLines(from text: String) -> [String] {
         text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+    }
+
+    private func missingSessionMetadataKeys(in event: CodexTranscriptJSONEvent) -> [String] {
+        ["id", "title", "source", "cwd", "project"].filter { event.payload.keys.contains($0) == false }
     }
 
     private func supportedSegment(
