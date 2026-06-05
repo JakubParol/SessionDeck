@@ -169,8 +169,35 @@ public enum TranscriptDecodeDiagnosticSeverity: Equatable, Sendable {
     case error
 }
 
+public enum TranscriptDecodeDiagnosticCategory: Equatable, Sendable {
+    case malformedLine
+    case unknownEventShape
+    case missingMetadata
+    case truncatedOutput
+    case blockingFailure
+    case other(String)
+
+    public init(code: String) {
+        switch code {
+        case "codex.malformed_jsonl":
+            self = .malformedLine
+        case "codex.unsupported_event", "codex.unknown_event", "codex_jsonl.unknown_event", "unknown_event":
+            self = .unknownEventShape
+        case "catalog.missing_metadata", "codex.missing_metadata", "missing_metadata":
+            self = .missingMetadata
+        case "catalog.bounded_read_truncated", "codex.bounded_read_truncated", "truncated_large_output":
+            self = .truncatedOutput
+        case "codex.transcript_unavailable", "codex.transcript_unreadable", "blocking_failure":
+            self = .blockingFailure
+        default:
+            self = .other(code)
+        }
+    }
+}
+
 public struct TranscriptDecodeDiagnostic: Equatable, Sendable {
     public let code: String
+    public let category: TranscriptDecodeDiagnosticCategory
     public let severity: TranscriptDecodeDiagnosticSeverity
     public let message: String
     public let source: TranscriptSegmentSourceReference?
@@ -178,12 +205,14 @@ public struct TranscriptDecodeDiagnostic: Equatable, Sendable {
 
     public init(
         code: String,
+        category: TranscriptDecodeDiagnosticCategory? = nil,
         severity: TranscriptDecodeDiagnosticSeverity,
         message: String,
         source: TranscriptSegmentSourceReference?,
         allowsDecodingToContinue: Bool
     ) {
         self.code = code
+        self.category = category ?? TranscriptDecodeDiagnosticCategory(code: code)
         self.severity = severity
         self.message = message
         self.source = source
