@@ -149,15 +149,18 @@ struct AppShellView: View {
     }
 
     private func refreshSources() {
+        let previousSelectedTranscriptDetail = viewModel.selectedTranscriptDetail
         viewModel = appShellUseCase.refreshingViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: catalogQueryState,
-            selectedSessionID: selectedSessionID
+            selectedSessionID: selectedSessionID,
+            previousSelectedTranscriptDetail: previousSelectedTranscriptDetail
         )
         let refreshedViewModel = appShellUseCase.refreshViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: catalogQueryState,
-            selectedSessionID: selectedSessionID
+            selectedSessionID: selectedSessionID,
+            previousSelectedTranscriptDetail: previousSelectedTranscriptDetail
         )
         apply(refreshedViewModel)
     }

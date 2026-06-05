@@ -124,10 +124,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                 return loading(sessionTitle: "Selected transcript")
                     .withRefreshStatus(.refreshing)
             }
-            return loaded(previous).withRefreshStatus(
-                .refreshing,
-                statusMessage: "Refreshing selected transcript..."
-            )
+            return loaded(previous).refreshingLiveRefresh()
         case let .loaded(readModel):
             return loaded(readModel).withRefreshStatus(
                 .refreshed,
@@ -147,13 +144,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                     isLoading: false
                 )
             }
-            return loaded(previous).withRefreshStatus(
-                .failed(message: message),
-                statusMessage: "Refresh failed: \(message) Last readable content is still shown.",
-                displayMode: .error,
-                severity: .error,
-                diagnosticMessages: loaded(previous).diagnosticMessages + ["Refresh error: \(message)"]
-            )
+            return loaded(previous).failedLiveRefresh(message: message)
         }
     }
 
@@ -200,6 +191,23 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
 
     public func shouldFollowTailAfterRefresh(isUserAtTail: Bool) -> Bool {
         refreshStatus == .refreshed && isUserAtTail
+    }
+
+    public func refreshingLiveRefresh() -> AppShellSelectedTranscriptDetailState {
+        withRefreshStatus(
+            .refreshing,
+            statusMessage: "Refreshing selected transcript..."
+        )
+    }
+
+    public func failedLiveRefresh(message: String) -> AppShellSelectedTranscriptDetailState {
+        withRefreshStatus(
+            .failed(message: message),
+            statusMessage: "Refresh failed: \(message) Last readable content is still shown.",
+            displayMode: .error,
+            severity: .error,
+            diagnosticMessages: diagnosticMessages + ["Refresh error: \(message)"]
+        )
     }
 
     private func withRefreshStatus(
