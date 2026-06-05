@@ -25,33 +25,38 @@ public struct AppShellUseCase: Sendable {
             refreshState: .idle,
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: catalogQuery,
-            selectedSessionID: selectedSessionID
+            selectedSessionID: selectedSessionID,
+            selectedTranscriptRefreshPhase: .none
         )
     }
 
     public func refreshingViewModel(
         selectedNavigationNodeID: String? = nil,
         catalogQuery: AppShellCatalogQueryState = .empty,
-        selectedSessionID: SessionID? = nil
+        selectedSessionID: SessionID? = nil,
+        previousSelectedTranscriptDetail: AppShellSelectedTranscriptDetailState? = nil
     ) -> AppShellViewModel {
         makeViewModel(
             refreshState: .refreshing,
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: catalogQuery,
-            selectedSessionID: selectedSessionID
+            selectedSessionID: selectedSessionID,
+            selectedTranscriptRefreshPhase: .refreshing(previousSelectedTranscriptDetail)
         )
     }
 
     public func refreshViewModel(
         selectedNavigationNodeID: String? = nil,
         catalogQuery: AppShellCatalogQueryState = .empty,
-        selectedSessionID: SessionID? = nil
+        selectedSessionID: SessionID? = nil,
+        previousSelectedTranscriptDetail: AppShellSelectedTranscriptDetailState? = nil
     ) -> AppShellViewModel {
         makeViewModel(
             refreshState: .idle,
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: catalogQuery,
-            selectedSessionID: selectedSessionID
+            selectedSessionID: selectedSessionID,
+            selectedTranscriptRefreshPhase: .completed(previousSelectedTranscriptDetail)
         )
     }
 
@@ -59,7 +64,8 @@ public struct AppShellUseCase: Sendable {
         refreshState: AppShellRefreshState,
         selectedNavigationNodeID: String?,
         catalogQuery: AppShellCatalogQueryState,
-        selectedSessionID: SessionID?
+        selectedSessionID: SessionID?,
+        selectedTranscriptRefreshPhase: SelectedTranscriptRefreshPhase
     ) -> AppShellViewModel {
         let configuration = launchConfigurationProvider.loadConfiguration()
         let discoveryResult = sourceDiscoverySummary()
@@ -83,7 +89,8 @@ public struct AppShellUseCase: Sendable {
             selectedNavigationTitle: catalogResult.selectedNode.title,
             selectedTranscriptDetail: selectedTranscriptDetail(
                 selectedSessionID: selectedSessionID,
-                sessions: catalogResult.scopedSessions
+                sessions: catalogResult.scopedSessions,
+                refreshPhase: selectedTranscriptRefreshPhase
             ),
             refreshState: discoveryResult.refreshState ?? catalogResult.refreshState ?? refreshState,
             safetyPolicy: configuration.safetyPolicy
@@ -159,20 +166,41 @@ public struct AppShellUseCase: Sendable {
 
     private func selectedTranscriptDetail(
         selectedSessionID: SessionID?,
-        sessions: [SessionSummary]
+        sessions: [SessionSummary],
+        refreshPhase: SelectedTranscriptRefreshPhase
     ) -> AppShellSelectedTranscriptDetailState {
+        if case let .refreshing(previous) = refreshPhase,
+           let previous {
+            return previous.refreshingLiveRefresh()
+        }
+
         guard let selectedSessionID else {
             return .noSelection
         }
         guard let selectedSession = sessions.first(where: { $0.id == selectedSessionID }),
               let loadSelectedTranscript
         else {
+            if case let .completed(previous) = refreshPhase,
+               let previous {
+                return previous.failedLiveRefresh(
+                    message: SelectedTranscriptLoadingError.transcriptUnavailable(selectedSessionID).localizedRefreshMessage
+                )
+            }
             return .failed(SelectedTranscriptLoadingError.transcriptUnavailable(selectedSessionID))
         }
 
         do {
-            return .loaded(try loadSelectedTranscript.loadTranscript(for: selectedSession))
+            let readModel = try loadSelectedTranscript.loadTranscript(for: selectedSession)
+            if case .completed(.some) = refreshPhase {
+                return .liveRefresh(.loaded(readModel))
+            }
+            return .loaded(readModel)
         } catch {
+            if case let .completed(previous) = refreshPhase,
+               let previous {
+                let failedState = AppShellSelectedTranscriptDetailState.failed(error, session: selectedSession)
+                return previous.failedLiveRefresh(message: failedState.statusMessage)
+            }
             return .failed(error, session: selectedSession)
         }
     }
@@ -188,5 +216,17 @@ public struct AppShellUseCase: Sendable {
         }
 
         return selectedNode
+    }
+}
+
+private enum SelectedTranscriptRefreshPhase {
+    case none
+    case refreshing(AppShellSelectedTranscriptDetailState?)
+    case completed(AppShellSelectedTranscriptDetailState?)
+}
+
+private extension SelectedTranscriptLoadingError {
+    var localizedRefreshMessage: String {
+        AppShellSelectedTranscriptDetailState.failed(self).statusMessage
     }
 }

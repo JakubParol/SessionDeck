@@ -83,6 +83,66 @@ func appShellUseCaseKeepsSelectedSessionIdentifiableWhenTranscriptLoadingFails()
     ))
 }
 
+@Test("app shell refresh preserves previous selected transcript detail when reload fails")
+func appShellRefreshPreservesPreviousSelectedTranscriptDetailWhenReloadFails() {
+    let session = selectedCatalogSession()
+    let successfulUseCase = AppShellUseCase(
+        launchConfigurationProvider: selectedTranscriptLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: selectedTranscriptCatalogSnapshot(sessions: [session]),
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase(
+            selectedTranscriptLoading: FakeSelectedTranscriptLoadingPort(
+                results: [
+                    session.id: TranscriptDecodeResult(
+                        sessionID: session.id,
+                        title: "Selected transcript",
+                        segments: [
+                            TranscriptSegment(
+                                id: "stable-line",
+                                kind: .assistantMessage,
+                                text: "Readable before append.",
+                                order: TranscriptSegmentOrder(index: 0),
+                                source: TranscriptSegmentSourceReference(
+                                    sourceID: session.sourceID,
+                                    relativePath: "selected.jsonl",
+                                    lineNumber: 1
+                                ),
+                                timestampDescription: nil
+                            ),
+                        ],
+                        diagnostics: [],
+                        isPartial: false
+                    ),
+                ]
+            )
+        )
+    )
+    let failingUseCase = AppShellUseCase(
+        launchConfigurationProvider: selectedTranscriptLaunchConfigurationProvider(),
+        refreshCatalogSnapshot: selectedTranscriptCatalogSnapshot(sessions: [session]),
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase(
+            selectedTranscriptLoading: FakeSelectedTranscriptLoadingPort(
+                errorsBySessionID: [
+                    session.id: SelectedTranscriptLoadingError.transcriptUnreadable(session.id)
+                ]
+            )
+        )
+    )
+
+    let previousViewModel = successfulUseCase.makeViewModel(selectedSessionID: session.id)
+    let refreshedViewModel = failingUseCase.refreshViewModel(
+        selectedSessionID: session.id,
+        previousSelectedTranscriptDetail: previousViewModel.selectedTranscriptDetail
+    )
+
+    #expect(refreshedViewModel.selectedTranscriptDetail.rows.map(\.id) == ["stable-line"])
+    #expect(refreshedViewModel.selectedTranscriptDetail.refreshStatus == .failed(
+        message: "The selected transcript file cannot be read."
+    ))
+    #expect(refreshedViewModel.selectedTranscriptDetail.diagnosticMessages == [
+        "Refresh error: The selected transcript file cannot be read.",
+    ])
+}
+
 private func selectedTranscriptLaunchConfigurationProvider() -> LaunchConfigurationProviding {
     SelectedTranscriptLaunchConfigurationProvider()
 }

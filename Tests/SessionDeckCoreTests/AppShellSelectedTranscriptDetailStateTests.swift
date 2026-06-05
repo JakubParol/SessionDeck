@@ -271,6 +271,208 @@ func selectedTranscriptDetailStateMapsTypedFailures() {
     #expect(unavailable.severity == .warning)
 }
 
+@Test("selected transcript detail state keeps last-known-good rows during failed live refresh")
+func selectedTranscriptDetailStateKeepsLastKnownGoodRowsDuringFailedLiveRefresh() {
+    let sessionID = SessionID(rawValue: "live-refresh-failed")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let previousReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Readable before append",
+            segments: [
+                TranscriptSegment(
+                    id: "stable-tool-output",
+                    kind: .toolOutput(callID: "call-1"),
+                    text: "Expanded output stays readable.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+
+    let state = AppShellSelectedTranscriptDetailState.liveRefresh(
+        .failed(previous: previousReadModel, message: "Malformed appended line.")
+    )
+
+    #expect(state.title == "Readable before append")
+    #expect(state.rows.map(\.id) == ["stable-tool-output"])
+    #expect(state.rows.first?.toolPresentation?.expandedText == "Expanded output stays readable.")
+    #expect(state.refreshStatus == .failed(message: "Malformed appended line."))
+    #expect(state.statusMessage == "Refresh failed: Malformed appended line. Last readable content is still shown.")
+    #expect(state.isLoading == false)
+}
+
+@Test("selected transcript detail state preserves expanded stable tool rows after append refresh")
+func selectedTranscriptDetailStatePreservesExpandedStableToolRowsAfterAppendRefresh() {
+    let sessionID = SessionID(rawValue: "live-refresh-expanded-tool")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let refreshedReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Refreshed transcript",
+            segments: [
+                TranscriptSegment(
+                    id: "stable-tool-output",
+                    kind: .toolOutput(callID: "call-1"),
+                    text: "Existing output.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+                TranscriptSegment(
+                    id: "new-assistant-turn",
+                    kind: .assistantMessage,
+                    text: "New content arrived.",
+                    order: TranscriptSegmentOrder(index: 1),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 2),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+    let refreshedState = AppShellSelectedTranscriptDetailState.liveRefresh(.loaded(refreshedReadModel))
+
+    let preservedExpansion = refreshedState.preservedExpandedToolRowIDs(
+        from: ["stable-tool-output", "stale-tool-output", "new-assistant-turn"]
+    )
+
+    #expect(preservedExpansion == ["stable-tool-output"])
+}
+
+@Test("selected transcript detail state exposes refresh status and conservative follow tail policy")
+func selectedTranscriptDetailStateExposesRefreshStatusAndConservativeFollowTailPolicy() {
+    let sessionID = SessionID(rawValue: "live-refresh-follow-tail")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let previousReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Previous transcript",
+            segments: [
+                TranscriptSegment(
+                    id: "line-1",
+                    kind: .assistantMessage,
+                    text: "Already visible.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+    let refreshedReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Previous transcript",
+            segments: [
+                TranscriptSegment(
+                    id: "line-1",
+                    kind: .assistantMessage,
+                    text: "Already visible.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+                TranscriptSegment(
+                    id: "line-2",
+                    kind: .assistantMessage,
+                    text: "New append.",
+                    order: TranscriptSegmentOrder(index: 1),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 2),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+
+    let refreshingState = AppShellSelectedTranscriptDetailState.liveRefresh(.refreshing(previous: previousReadModel))
+    let refreshedState = AppShellSelectedTranscriptDetailState.liveRefresh(.loaded(refreshedReadModel))
+
+    #expect(refreshingState.rows.map(\.id) == ["line-1"])
+    #expect(refreshingState.refreshStatus == .refreshing)
+    #expect(refreshingState.shouldFollowTailAfterRefresh(isUserAtTail: true) == false)
+    #expect(refreshedState.rows.map(\.id) == ["line-1", "line-2"])
+    #expect(refreshedState.refreshStatus == .refreshed)
+    #expect(refreshedState.shouldFollowTailAfterRefresh(isUserAtTail: true))
+    #expect(refreshedState.shouldFollowTailAfterRefresh(isUserAtTail: false) == false)
+}
+
+@Test("selected transcript detail state surfaces refresh diagnostics and recovers after success")
+func selectedTranscriptDetailStateSurfacesRefreshDiagnosticsAndRecoversAfterSuccess() {
+    let sessionID = SessionID(rawValue: "live-refresh-diagnostics")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let previousReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Recoverable transcript",
+            segments: [
+                TranscriptSegment(
+                    id: "line-1",
+                    kind: .assistantMessage,
+                    text: "Last readable content.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+    let recoveredReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Recoverable transcript",
+            segments: [
+                TranscriptSegment(
+                    id: "line-1",
+                    kind: .assistantMessage,
+                    text: "Last readable content.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+                TranscriptSegment(
+                    id: "line-2",
+                    kind: .assistantMessage,
+                    text: "Recovered append.",
+                    order: TranscriptSegmentOrder(index: 1),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 2),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+
+    let failedState = AppShellSelectedTranscriptDetailState.liveRefresh(
+        .failed(previous: previousReadModel, message: "Unreadable temporary append.")
+    )
+    let recoveredState = AppShellSelectedTranscriptDetailState.liveRefresh(.loaded(recoveredReadModel))
+
+    #expect(failedState.rows.map(\.id) == ["line-1"])
+    #expect(failedState.diagnosticMessages == ["Refresh error: Unreadable temporary append."])
+    #expect(recoveredState.rows.map(\.id) == ["line-1", "line-2"])
+    #expect(recoveredState.diagnosticMessages.isEmpty)
+    #expect(recoveredState.refreshStatus == .refreshed)
+}
+
 private func selectedTranscriptSession(
     id: SessionID,
     sourceID: SessionSourceID,
