@@ -92,11 +92,11 @@ public enum LiveSourceObservationEvent: Equatable, Sendable {
     case degraded(LiveSourceWatcherDegradedState)
 }
 
-public protocol LiveSourceObservation: AnyObject {
+public protocol LiveSourceObservation: AnyObject, Sendable {
     func cancel()
 }
 
-public protocol LiveSourceChangeObservationPort: AnyObject {
+public protocol LiveSourceChangeObservationPort: AnyObject, Sendable {
     func observe(
         targets: [LiveSourceWatchTarget],
         eventHandler: @escaping (LiveSourceObservationEvent) -> Void

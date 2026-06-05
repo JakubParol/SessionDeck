@@ -40,6 +40,7 @@ func presentationDoesNotConstructInfrastructure() throws {
         "DefaultCodexSourceDiscoveryAdapter(",
         "CodexSessionCatalogAdapter(",
         "CodexSelectedTranscriptLoadingAdapter(",
+        "LocalFileSourceObservationAdapter(",
         "PlaceholderSessionCatalogAdapter(",
         "PlaceholderTranscriptLoadingAdapter(",
         "PlaceholderTranscriptDecodingAdapter(",

@@ -40,6 +40,7 @@ public enum SessionDeckCompositionRoot {
         let loadTranscriptSegments = LoadTranscriptSegmentsUseCase(
             transcriptDecoding: PlaceholderTranscriptDecodingAdapter()
         )
+        let sourceChangeObservation = LocalFileSourceObservationAdapter()
 
         return SessionDeckApplicationComposition(
             appShellUseCase: appShellUseCase,
@@ -50,7 +51,8 @@ public enum SessionDeckCompositionRoot {
             refreshCatalogSnapshot: refreshCatalogSnapshot,
             loadTranscriptPreview: loadTranscriptPreview,
             loadTranscriptSegments: loadTranscriptSegments,
-            loadSelectedTranscript: loadSelectedTranscript
+            loadSelectedTranscript: loadSelectedTranscript,
+            sourceChangeObservation: sourceChangeObservation
         )
     }
 

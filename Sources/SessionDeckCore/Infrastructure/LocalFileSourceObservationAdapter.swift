@@ -1,7 +1,7 @@
 import Darwin
 import Foundation
 
-public final class LocalFileSourceObservationAdapter: LiveSourceChangeObservationPort {
+public final class LocalFileSourceObservationAdapter: LiveSourceChangeObservationPort, @unchecked Sendable {
     private let fileManager: FileManager
     private let queue: DispatchQueue
 
@@ -99,7 +99,7 @@ public final class LocalFileSourceObservationAdapter: LiveSourceChangeObservatio
     }
 }
 
-private final class LocalFileSourceObservation: LiveSourceObservation {
+private final class LocalFileSourceObservation: LiveSourceObservation, @unchecked Sendable {
     private let lock = NSLock()
     private var sources: [DispatchSourceFileSystemObject] = []
     private var isCancelled = false
