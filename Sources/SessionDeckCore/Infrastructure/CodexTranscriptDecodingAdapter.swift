@@ -20,10 +20,15 @@ public struct CodexTranscriptFile: Equatable, Sendable {
 }
 
 public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
+    public static let defaultMaximumToolBodyCharacters = 240
+
     private let filesBySessionID: [SessionID: CodexTranscriptFile]
     private let maximumToolBodyCharacters: Int
 
-    public init(files: [CodexTranscriptFile], maximumToolBodyCharacters: Int = 240) {
+    public init(
+        files: [CodexTranscriptFile],
+        maximumToolBodyCharacters: Int = Self.defaultMaximumToolBodyCharacters
+    ) {
         self.filesBySessionID = Dictionary(uniqueKeysWithValues: files.map { ($0.sessionID, $0) })
         self.maximumToolBodyCharacters = max(0, maximumToolBodyCharacters)
     }
