@@ -125,3 +125,26 @@ func waitUntil(_ predicate: () -> Bool) -> Bool {
 
     return false
 }
+
+func relativePipelineFixtureSnapshot(at root: URL) throws -> [String] {
+    guard let enumerator = FileManager.default.enumerator(
+        at: root,
+        includingPropertiesForKeys: [.isRegularFileKey],
+        options: [.skipsHiddenFiles]
+    ) else {
+        return []
+    }
+
+    let rootPath = root.standardizedFileURL.path
+    return try enumerator.compactMap { item in
+        guard let url = item as? URL else {
+            return nil
+        }
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey])
+        guard values.isRegularFile == true else {
+            return nil
+        }
+        return String(url.standardizedFileURL.path.dropFirst(rootPath.count + 1))
+    }
+    .sorted()
+}

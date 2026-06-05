@@ -210,3 +210,41 @@ func pipelineObservesAppendedTempFixtureTranscriptThroughLocalFileWatcher() thro
     ])
     #expect(pipeline.monitoringStates.contains(.refreshRunning(refreshRequests[0])))
 }
+
+@Test("pipeline start and stop leave temp fixture sources unchanged")
+func pipelineStartAndStopLeaveTempFixtureSourcesUnchanged() throws {
+    let fixtureRoot = try FixtureTempRoot(
+        parentDirectory: FileManager.default.temporaryDirectory,
+        name: "SessionDeckLiveRefreshPipeline-read-only-\(UUID().uuidString)",
+        pathGuard: FixturePathGuard(forbiddenHomeDirectories: [FileManager.default.homeDirectoryForCurrentUser])
+    )
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let transcriptURL = fixtureRoot.url.appending(path: "session-123.jsonl")
+    try #"{"type":"session_meta"}"#.write(to: transcriptURL, atomically: true, encoding: .utf8)
+    let before = try relativePipelineFixtureSnapshot(at: fixtureRoot.url)
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let pipeline = LiveRefreshPipelineCoordinator(
+        sourceChangeObservation: LocalFileSourceObservationAdapter(),
+        reconciliation: ReconcileSessionSourcesUseCase(candidateEnumeration: PipelineCandidateEnumerationFake()),
+        timerScheduler: PipelineManualTimerScheduler(),
+        debounceInterval: 0.25,
+        reconciliationInterval: 5
+    ) { _ in }
+
+    pipeline.start(
+        LiveRefreshPipelineConfiguration(
+            watchTargets: [
+                LiveSourceWatchTarget(sourceID: sourceID, path: transcriptURL.path),
+            ],
+            knownCandidates: [],
+            reconciliationSourceID: sourceID
+        )
+    )
+    pipeline.stop()
+
+    let after = try relativePipelineFixtureSnapshot(at: fixtureRoot.url)
+    #expect(after == before)
+}
