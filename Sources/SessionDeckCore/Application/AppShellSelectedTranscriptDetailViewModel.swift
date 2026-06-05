@@ -142,7 +142,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                     refreshStatus: .failed(message: message),
                     metadataRows: [],
                     rows: [],
-                    diagnosticMessages: ["Error: \(message)"],
+                    diagnosticMessages: ["Refresh error: \(message)"],
                     severity: .error,
                     isLoading: false
                 )
@@ -152,7 +152,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                 statusMessage: "Refresh failed: \(message) Last readable content is still shown.",
                 displayMode: .error,
                 severity: .error,
-                diagnosticMessages: loaded(previous).diagnosticMessages + ["Error: \(message)"]
+                diagnosticMessages: loaded(previous).diagnosticMessages + ["Refresh error: \(message)"]
             )
         }
     }
