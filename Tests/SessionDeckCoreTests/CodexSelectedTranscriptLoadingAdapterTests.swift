@@ -57,10 +57,18 @@ func selectedCodexTranscriptAdapterLoadsGeneratedLargeTranscriptWithBoundedOutpu
     #expect(orderedSegments.count == 33)
     #expect(orderedSegments[toolOutputIndex - 1].text == "Synthetic generated assistant event 30")
     #expect(orderedSegments[toolOutputIndex + 1].text == "Synthetic generated assistant event 999")
-    #expect(toolOutput.text.count == 240)
+    #expect(toolOutput.text.count == CodexTranscriptDecodingAdapter.defaultMaximumToolBodyCharacters)
     #expect(toolMetadata.bodyAvailability == .truncated)
     #expect(toolMetadata.characterCount == 20_000)
     #expect(toolMetadata.byteCount == 20_000)
+
+    let row = AppShellTranscriptSegmentRow.make(segment: toolOutput)
+    let toolPresentation = try #require(row.toolPresentation)
+    #expect(row.text == "Tool output")
+    #expect(toolPresentation.isCollapsedByDefault)
+    #expect(toolPresentation.expandedText == toolOutput.text)
+    #expect(toolPresentation.expandedText.count == CodexTranscriptDecodingAdapter.defaultMaximumToolBodyCharacters)
+    #expect(toolPresentation.detailSummary == "Showing 240 of 20,000 characters")
 }
 
 @Test("selected Codex transcript adapter maps missing fixture paths to typed errors")
