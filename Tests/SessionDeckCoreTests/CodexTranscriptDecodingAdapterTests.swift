@@ -105,8 +105,10 @@ func codexTranscriptDecoderToleratesMissingOptionalMetadataAndTimestamps() throw
     let result = try decodeFixture(.missingMetadata, sessionID: "missing-metadata-session")
 
     #expect(result.title == "Synthetic Missing Metadata Session")
-    #expect(result.isPartial == false)
-    #expect(result.diagnostics.isEmpty)
+    #expect(result.isPartial)
+    #expect(result.canContinueDecoding)
+    #expect(result.diagnostics.map(\.code) == ["codex.missing_metadata"])
+    #expect(result.diagnostics.map(\.category) == [.missingMetadata])
     #expect(result.orderedSegments.map(\.timestampDescription) == [
         "2026-01-01T00:03:01Z",
         nil,
