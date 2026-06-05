@@ -21,9 +21,11 @@ public struct CodexTranscriptFile: Equatable, Sendable {
 
 public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
     private let filesBySessionID: [SessionID: CodexTranscriptFile]
+    private let maximumToolBodyCharacters: Int
 
-    public init(files: [CodexTranscriptFile]) {
+    public init(files: [CodexTranscriptFile], maximumToolBodyCharacters: Int = 240) {
         self.filesBySessionID = Dictionary(uniqueKeysWithValues: files.map { ($0.sessionID, $0) })
+        self.maximumToolBodyCharacters = maximumToolBodyCharacters
     }
 
     public func loadTranscript(sessionID: SessionID) throws -> TranscriptDecodeResult {
@@ -206,13 +208,14 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             metadata["status"] = status
         }
         let body = event.toolOutputText
-        let availability = body == nil ? TranscriptToolBodyAvailability.omitted : .available
+        let boundedBody = boundedToolBody(body, maximumCharacters: maximumToolBodyCharacters)
+        let availability = boundedBody.availability
         metadata["body_availability"] = metadataValue(for: availability)
 
         return TranscriptSegment(
             id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
             kind: .toolOutput(callID: event.callID),
-            text: body ?? "Tool output payload unavailable.",
+            text: boundedBody.text ?? "Tool output payload unavailable.",
             order: TranscriptSegmentOrder(index: orderIndex),
             source: source,
             timestampDescription: event.timestamp,
