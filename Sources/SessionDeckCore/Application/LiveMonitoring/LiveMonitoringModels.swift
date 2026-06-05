@@ -6,7 +6,7 @@ public enum LiveSourceChangeKind: Equatable, Sendable {
     case unknown
 }
 
-public enum LiveRefreshIdentity: Equatable, Sendable {
+public enum LiveRefreshIdentity: Equatable, Hashable, Sendable {
     case source(SessionSourceID)
     case session(SessionID, sourceID: SessionSourceID)
     case path(String, sourceID: SessionSourceID?)
