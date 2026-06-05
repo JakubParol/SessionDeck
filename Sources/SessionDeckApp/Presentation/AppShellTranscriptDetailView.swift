@@ -117,6 +117,9 @@ struct AppShellTranscriptDetailView: View {
             RoundedRectangle(cornerRadius: 6)
                 .stroke(Color(nsColor: .separatorColor))
         )
+        .onChange(of: state.rows.map(\.id)) { _, _ in
+            expandedToolRowIDs = state.preservedExpandedToolRowIDs(from: expandedToolRowIDs)
+        }
     }
 
     @ViewBuilder

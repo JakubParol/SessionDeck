@@ -188,6 +188,16 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         )
     }
 
+    public func preservedExpandedToolRowIDs(
+        from expandedRowIDs: Set<String>
+    ) -> Set<String> {
+        let currentToolRowIDs = Set(rows.compactMap { row in
+            row.toolPresentation == nil ? nil : row.id
+        })
+
+        return expandedRowIDs.intersection(currentToolRowIDs)
+    }
+
     private func withRefreshStatus(
         _ refreshStatus: AppShellSelectedTranscriptRefreshStatus,
         statusMessage: String? = nil,

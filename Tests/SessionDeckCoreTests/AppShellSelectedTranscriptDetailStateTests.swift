@@ -307,6 +307,46 @@ func selectedTranscriptDetailStateKeepsLastKnownGoodRowsDuringFailedLiveRefresh(
     #expect(state.isLoading == false)
 }
 
+@Test("selected transcript detail state preserves expanded stable tool rows after append refresh")
+func selectedTranscriptDetailStatePreservesExpandedStableToolRowsAfterAppendRefresh() {
+    let sessionID = SessionID(rawValue: "live-refresh-expanded-tool")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let refreshedReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Refreshed transcript",
+            segments: [
+                TranscriptSegment(
+                    id: "stable-tool-output",
+                    kind: .toolOutput(callID: "call-1"),
+                    text: "Existing output.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 1),
+                    timestampDescription: nil
+                ),
+                TranscriptSegment(
+                    id: "new-assistant-turn",
+                    kind: .assistantMessage,
+                    text: "New content arrived.",
+                    order: TranscriptSegmentOrder(index: 1),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 2),
+                    timestampDescription: nil
+                ),
+            ],
+            diagnostics: [],
+            isPartial: false
+        )
+    )
+    let refreshedState = AppShellSelectedTranscriptDetailState.liveRefresh(.loaded(refreshedReadModel))
+
+    let preservedExpansion = refreshedState.preservedExpandedToolRowIDs(
+        from: ["stable-tool-output", "stale-tool-output", "new-assistant-turn"]
+    )
+
+    #expect(preservedExpansion == ["stable-tool-output"])
+}
+
 private func selectedTranscriptSession(
     id: SessionID,
     sourceID: SessionSourceID,
