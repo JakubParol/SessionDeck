@@ -142,3 +142,16 @@ struct FixedCatalogRefreshClock: CatalogRefreshClock {
         nowDate
     }
 }
+
+final class FakeLiveSourceChangeObservationPort: LiveSourceChangeObservationPort, @unchecked Sendable {
+    func observe(
+        targets: [LiveSourceWatchTarget],
+        eventHandler: @escaping (LiveSourceObservationEvent) -> Void
+    ) -> any LiveSourceObservation {
+        FakeLiveSourceObservation()
+    }
+}
+
+private final class FakeLiveSourceObservation: LiveSourceObservation, @unchecked Sendable {
+    func cancel() {}
+}

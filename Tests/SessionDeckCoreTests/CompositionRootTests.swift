@@ -137,3 +137,78 @@ func compositionRootPassesConfiguredSourceDefinitionsThroughOneBoundary() throws
         "2026/06/03/rollout-2026-06-03T06-01-00-unreadable.jsonl",
     ])
 }
+
+@Test("composition root exposes local file observation through application boundary")
+func compositionRootExposesLocalFileObservationThroughApplicationBoundary() throws {
+    let fixtureRoot = try FixtureTempRoot(
+        parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
+        name: "sessiondeck-composition-live-monitoring-\(UUID().uuidString)",
+        pathGuard: FixturePathGuard(forbiddenHomeDirectories: [FileManager.default.homeDirectoryForCurrentUser])
+    )
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let transcriptURL = fixtureRoot.url.appending(path: "session-123.jsonl")
+    try #"{"type":"session_meta"}"#.write(to: transcriptURL, atomically: true, encoding: .utf8)
+    let recorder = LiveObservationRecorder()
+    let composition = SessionDeckCompositionRoot.makeApplicationComposition(
+        homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: fixtureRoot.url)
+    )
+
+    let observation = composition.sourceChangeObservation.observe(
+        targets: [
+            LiveSourceWatchTarget(
+                sourceID: DefaultCodexSourceDiscoveryAdapter.sourceID,
+                path: transcriptURL.path,
+                sessionID: SessionID(rawValue: "session-123")
+            ),
+        ],
+        eventHandler: recorder.record
+    )
+    defer {
+        observation.cancel()
+    }
+
+    let handle = try FileHandle(forWritingTo: transcriptURL)
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data("\n{\"type\":\"response_item\"}".utf8))
+    try handle.close()
+
+    let event = try #require(recorder.waitForChangeEvent())
+    #expect(event.sourceID == DefaultCodexSourceDiscoveryAdapter.sourceID)
+    #expect(event.sessionID == SessionID(rawValue: "session-123"))
+    #expect(event.kind == .modified)
+}
+
+private final class LiveObservationRecorder {
+    private let lock = NSLock()
+    private var events: [LiveSourceObservationEvent] = []
+
+    func record(_ event: LiveSourceObservationEvent) {
+        lock.withLock {
+            events.append(event)
+        }
+    }
+
+    func waitForChangeEvent() -> LiveSourceChangeEvent? {
+        let deadline = Date().addingTimeInterval(2)
+
+        while Date() < deadline {
+            if let event = lock.withLock({ events.compactMap(changeEvent).first }) {
+                return event
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+
+        return nil
+    }
+
+    private func changeEvent(from event: LiveSourceObservationEvent) -> LiveSourceChangeEvent? {
+        if case let .change(changeEvent) = event {
+            return changeEvent
+        }
+
+        return nil
+    }
+}

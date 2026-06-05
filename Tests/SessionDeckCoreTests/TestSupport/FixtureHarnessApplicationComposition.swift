@@ -58,7 +58,8 @@ extension FixtureHarnessApplicationSmoke {
             loadTranscriptSegments: LoadTranscriptSegmentsUseCase(
                 transcriptDecoding: FakeTranscriptDecodingPort(results: transcriptResults)
             ),
-            loadSelectedTranscript: loadSelectedTranscript
+            loadSelectedTranscript: loadSelectedTranscript,
+            sourceChangeObservation: FakeLiveSourceChangeObservationPort()
         )
     }
 
