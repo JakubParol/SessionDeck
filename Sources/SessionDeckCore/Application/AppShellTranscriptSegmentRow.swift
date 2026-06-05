@@ -160,11 +160,11 @@ public struct AppShellTranscriptSegmentRow: Equatable, Identifiable, Sendable {
             return "Tool output body unavailable"
         }
 
-        let displayedCharacterCount = segment.text.count
         guard let totalCharacterCount = metadata.characterCount else {
             return "Showing bounded output; total size unknown"
         }
 
+        let displayedCharacterCount = min(segment.text.count, totalCharacterCount)
         return "Showing \(formattedCount(displayedCharacterCount)) of \(formattedCount(totalCharacterCount)) characters"
     }
 
