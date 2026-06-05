@@ -31,7 +31,7 @@ func debounceSchedulerCoalescesSameSessionBursts() {
     timer.fireAll()
 
     #expect(emittedRequests == [
-        LiveRefreshRequest(scope: .session(sessionID, sourceID: sourceID), trigger: .sourceChange, eventCount: 3)
+        LiveRefreshRequest(scope: .session(sessionID, sourceID: sourceID), trigger: .debouncedSourceChange, eventCount: 3)
     ])
 }
 
@@ -68,8 +68,8 @@ func debounceSchedulerPreservesDistinctIdentities() {
     timer.fireAll()
 
     #expect(emittedRequests == [
-        LiveRefreshRequest(scope: .path("/tmp/primary.jsonl", sourceID: firstSourceID), trigger: .sourceChange, eventCount: 1),
-        LiveRefreshRequest(scope: .path("/tmp/secondary.jsonl", sourceID: secondSourceID), trigger: .sourceChange, eventCount: 1),
+        LiveRefreshRequest(scope: .path("/tmp/primary.jsonl", sourceID: firstSourceID), trigger: .debouncedSourceChange, eventCount: 1),
+        LiveRefreshRequest(scope: .path("/tmp/secondary.jsonl", sourceID: secondSourceID), trigger: .debouncedSourceChange, eventCount: 1),
     ])
 }
 
