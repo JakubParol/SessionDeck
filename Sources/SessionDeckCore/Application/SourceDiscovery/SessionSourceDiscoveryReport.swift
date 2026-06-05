@@ -26,9 +26,23 @@ public struct CandidateSessionFileDiagnosticRecord: Equatable, Sendable {
     }
 }
 
+public enum SourceHealthState: Equatable, Sendable {
+    case available
+    case missingPath
+    case permissionDenied
+    case unreadable
+    case empty
+    case stale
+    case parseWarning
+    case duplicate
+    case unsupported
+    case disabled
+}
+
 public struct SourceHealthSummary: Equatable, Sendable {
     public let sourceID: SessionSourceID
     public let displayName: String
+    public let state: SourceHealthState
     public let severity: SourceDiagnosticSeverity
     public let diagnosticCode: SessionSourceDiagnosticCode?
     public let candidateDiagnosticCode: CandidateSessionFileDiagnosticCode?
@@ -38,6 +52,7 @@ public struct SourceHealthSummary: Equatable, Sendable {
     public init(
         sourceID: SessionSourceID,
         displayName: String,
+        state: SourceHealthState = .available,
         severity: SourceDiagnosticSeverity,
         diagnosticCode: SessionSourceDiagnosticCode?,
         candidateDiagnosticCode: CandidateSessionFileDiagnosticCode? = nil,
@@ -46,6 +61,7 @@ public struct SourceHealthSummary: Equatable, Sendable {
     ) {
         self.sourceID = sourceID
         self.displayName = displayName
+        self.state = state
         self.severity = severity
         self.diagnosticCode = diagnosticCode
         self.candidateDiagnosticCode = candidateDiagnosticCode
@@ -82,6 +98,7 @@ public struct SessionSourceDiscoveryReport: Equatable, Sendable {
                 return SourceHealthSummary(
                     sourceID: source.id,
                     displayName: source.displayName,
+                    state: healthState(for: diagnostic.code),
                     severity: diagnostic.severity,
                     diagnosticCode: diagnostic.code,
                     message: diagnostic.message,
@@ -93,6 +110,7 @@ public struct SessionSourceDiscoveryReport: Equatable, Sendable {
                 return SourceHealthSummary(
                     sourceID: source.id,
                     displayName: source.displayName,
+                    state: .parseWarning,
                     severity: candidateDiagnostic.diagnostic.severity,
                     diagnosticCode: nil,
                     candidateDiagnosticCode: candidateDiagnostic.diagnostic.code,
@@ -104,11 +122,33 @@ public struct SessionSourceDiscoveryReport: Equatable, Sendable {
             return SourceHealthSummary(
                 sourceID: source.id,
                 displayName: source.displayName,
+                state: .available,
                 severity: .info,
                 diagnosticCode: nil,
                 message: "Source is available with \(source.counts.transcriptFileCount) candidate transcript files.",
                 allowsDiscoveryToContinue: true
             )
+        }
+    }
+
+    private func healthState(for code: SessionSourceDiagnosticCode) -> SourceHealthState {
+        switch code {
+        case .codexSessionsRootMissing:
+            return .missingPath
+        case .codexSessionsRootPermissionDenied:
+            return .permissionDenied
+        case .codexSessionsRootUnreadable:
+            return .unreadable
+        case .codexSessionsRootEmpty:
+            return .empty
+        case .codexSessionsRootStale:
+            return .stale
+        case .sourceRootDuplicate:
+            return .duplicate
+        case .sourceKindUnsupported:
+            return .unsupported
+        case .sourceRootDisabled:
+            return .disabled
         }
     }
 

@@ -104,75 +104,63 @@ public struct AppShellSourceDiscoverySummary: Equatable, Sendable {
     }
 
     private static func sourceHealthRows(report: SessionSourceDiscoveryReport) -> [AppShellSourceHealthRow] {
-        let candidateDiagnosticsBySourceID = Dictionary(grouping: report.candidateDiagnostics, by: \.sourceID)
+        let healthSummaryBySourceID = Dictionary(uniqueKeysWithValues: report.healthSummaries.map { ($0.sourceID, $0) })
         return report.sources.map { source in
-            let candidateDiagnostic = candidateDiagnosticsBySourceID[source.id]?.first?.diagnostic
-            let severity = sourceHealthSeverity(source: source, candidateDiagnostic: candidateDiagnostic)
+            let healthSummary = healthSummaryBySourceID[source.id]
+            let severity = sourceHealthSeverity(healthSummary: healthSummary)
             return AppShellSourceHealthRow(
                 id: source.id.rawValue,
                 title: source.displayName,
                 location: source.locationDescription,
-                statusLabel: sourceHealthStatusLabel(source: source, candidateDiagnostic: candidateDiagnostic),
-                detail: sourceHealthDetail(source: source, candidateDiagnostic: candidateDiagnostic),
+                statusLabel: sourceHealthStatusLabel(state: healthSummary?.state ?? .available),
+                detail: sourceHealthDetail(source: source, healthSummary: healthSummary),
                 severity: severity,
-                isBlocking: source.diagnostic?.allowsDiscoveryToContinue == false
-                    || candidateDiagnostic?.allowsDiscoveryToContinue == false
+                isBlocking: healthSummary?.allowsDiscoveryToContinue == false
             )
         }
     }
 
-    private static func sourceHealthSeverity(
-        source: SessionSourceSummary,
-        candidateDiagnostic: CandidateSessionFileDiagnostic?
-    ) -> AppShellSourceHealthSeverity {
-        if let diagnostic = source.diagnostic {
-            return appSeverity(for: diagnostic.severity)
+    private static func sourceHealthSeverity(healthSummary: SourceHealthSummary?) -> AppShellSourceHealthSeverity {
+        guard let healthSummary else {
+            return .healthy
         }
-        if let candidateDiagnostic {
-            return appSeverity(for: candidateDiagnostic.severity)
+        guard healthSummary.state != .available else {
+            return .healthy
         }
-        return .healthy
+        return appSeverity(for: healthSummary.severity)
     }
 
-    private static func sourceHealthStatusLabel(
-        source: SessionSourceSummary,
-        candidateDiagnostic: CandidateSessionFileDiagnostic?
-    ) -> String {
-        if let code = source.diagnostic?.code {
-            switch code {
-            case .codexSessionsRootMissing:
-                return "Missing path"
-            case .codexSessionsRootPermissionDenied:
-                return "Permission denied"
-            case .codexSessionsRootEmpty:
-                return "Empty"
-            case .codexSessionsRootStale:
-                return "Stale"
-            case .codexSessionsRootUnreadable:
-                return "Unreadable"
-            case .sourceRootDuplicate:
-                return "Duplicate"
-            case .sourceKindUnsupported:
-                return "Unsupported"
-            case .sourceRootDisabled:
-                return "Disabled"
-            }
-        }
-        if candidateDiagnostic != nil {
+    private static func sourceHealthStatusLabel(state: SourceHealthState) -> String {
+        switch state {
+        case .available:
+            return "Available"
+        case .missingPath:
+            return "Missing path"
+        case .permissionDenied:
+            return "Permission denied"
+        case .empty:
+            return "Empty"
+        case .stale:
+            return "Stale"
+        case .parseWarning:
             return "Parse warning"
+        case .unreadable:
+            return "Unreadable"
+        case .duplicate:
+            return "Duplicate"
+        case .unsupported:
+            return "Unsupported"
+        case .disabled:
+            return "Disabled"
         }
-        return "Available"
     }
 
     private static func sourceHealthDetail(
         source: SessionSourceSummary,
-        candidateDiagnostic: CandidateSessionFileDiagnostic?
+        healthSummary: SourceHealthSummary?
     ) -> String {
-        if let message = source.diagnostic?.message {
-            return message
-        }
-        if let message = candidateDiagnostic?.message {
-            return message
+        if let healthSummary, healthSummary.state != .available {
+            return healthSummary.message
         }
         return candidateCountDetail(source.counts)
     }
