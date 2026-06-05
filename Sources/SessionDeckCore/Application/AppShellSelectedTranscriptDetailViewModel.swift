@@ -235,7 +235,14 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             statusMessage: "Refresh failed: \(message) Last readable content is still shown.",
             displayMode: .error,
             severity: .error,
-            diagnosticMessages: diagnosticMessages + ["Refresh error: \(message)"]
+            diagnosticMessages: diagnosticMessages + ["Refresh error: \(message)"],
+            diagnosticRows: diagnosticRows + [
+                AppShellSelectedTranscriptDiagnosticRow(
+                    id: "refresh-error",
+                    message: "Refresh error: \(message)",
+                    severity: .error
+                ),
+            ]
         )
     }
 
@@ -244,7 +251,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         statusMessage: String? = nil,
         displayMode: AppShellSelectedTranscriptDisplayMode? = nil,
         severity: AppShellCatalogRowSeverity? = nil,
-        diagnosticMessages: [String]? = nil
+        diagnosticMessages: [String]? = nil,
+        diagnosticRows: [AppShellSelectedTranscriptDiagnosticRow]? = nil
     ) -> AppShellSelectedTranscriptDetailState {
         AppShellSelectedTranscriptDetailState(
             title: title,
@@ -254,7 +262,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             metadataRows: metadataRows,
             rows: rows,
             diagnosticMessages: diagnosticMessages ?? self.diagnosticMessages,
-            diagnosticRows: diagnosticMessages.map(Self.diagnosticRows(from:)) ?? diagnosticRows,
+            diagnosticRows: diagnosticRows ?? diagnosticMessages.map(Self.diagnosticRows(from:)) ?? self.diagnosticRows,
             severity: severity ?? self.severity,
             isLoading: isLoading
         )

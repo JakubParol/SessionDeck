@@ -516,6 +516,40 @@ func selectedTranscriptDetailStateSurfacesRefreshDiagnosticsAndRecoversAfterSucc
     #expect(recoveredState.refreshStatus == .refreshed)
 }
 
+@Test("selected transcript detail state preserves diagnostic severities during failed live refresh")
+func selectedTranscriptDetailStatePreservesDiagnosticSeveritiesDuringFailedLiveRefresh() {
+    let sessionID = SessionID(rawValue: "live-refresh-preserve-diagnostics")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let previousReadModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Info diagnostic transcript",
+            segments: [],
+            diagnostics: [
+                TranscriptDecodeDiagnostic(
+                    code: "codex.unsupported_event",
+                    severity: .info,
+                    message: "Unsupported event stayed visible.",
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 3),
+                    allowsDecodingToContinue: true
+                ),
+            ],
+            isPartial: true
+        )
+    )
+
+    let failedState = AppShellSelectedTranscriptDetailState.liveRefresh(
+        .failed(previous: previousReadModel, message: "Temporary append failed.")
+    )
+
+    #expect(failedState.diagnosticRows.map(\.severity) == [.info, .error])
+    #expect(failedState.diagnosticRows.map(\.message) == [
+        "Info line 3: Unsupported event stayed visible.",
+        "Refresh error: Temporary append failed.",
+    ])
+}
+
 private func selectedTranscriptSession(
     id: SessionID,
     sourceID: SessionSourceID,
