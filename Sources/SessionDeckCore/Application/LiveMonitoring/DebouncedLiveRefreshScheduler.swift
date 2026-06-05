@@ -60,7 +60,7 @@ public final class DebouncedLiveRefreshScheduler {
         emit(
             LiveRefreshRequest(
                 scope: pendingRefresh.scope,
-                trigger: .sourceChange,
+                trigger: .debouncedSourceChange,
                 eventCount: pendingRefresh.eventCount
             )
         )

@@ -112,8 +112,11 @@ public enum LiveRefreshScope: Equatable, Sendable {
 
 public enum LiveRefreshTrigger: Equatable, Sendable {
     case sourceChange
+    case debouncedSourceChange
     case watcherDegraded
     case manualRefresh
+    case appStartup
+    case reconciliation
 }
 
 public struct LiveRefreshRequest: Equatable, Sendable {
@@ -126,4 +129,52 @@ public struct LiveRefreshRequest: Equatable, Sendable {
         self.trigger = trigger
         self.eventCount = eventCount
     }
+}
+
+public enum LiveMonitoringFailureReason: Equatable, Sendable {
+    case watcherSetupFailed
+    case sourceMissing
+    case permissionDenied
+    case reconciliationFailed
+
+    public var code: String {
+        switch self {
+        case .watcherSetupFailed:
+            return "live_monitoring.watcher_setup_failed"
+        case .sourceMissing:
+            return "live_monitoring.source_missing"
+        case .permissionDenied:
+            return "live_monitoring.permission_denied"
+        case .reconciliationFailed:
+            return "live_monitoring.reconciliation_failed"
+        }
+    }
+}
+
+public struct LiveMonitoringFailure: Equatable, Sendable {
+    public let sourceID: SessionSourceID?
+    public let reason: LiveMonitoringFailureReason
+    public let message: String
+
+    public init(sourceID: SessionSourceID?, reason: LiveMonitoringFailureReason, message: String) {
+        self.sourceID = sourceID
+        self.reason = reason
+        self.message = message
+    }
+}
+
+public enum LiveMonitoringStaleReason: Equatable, Sendable {
+    case missedChangeRecovered
+    case sourceSnapshotMissing
+}
+
+public enum LiveMonitoringState: Equatable, Sendable {
+    case current(sourceID: SessionSourceID?)
+    case watching(sourceID: SessionSourceID?)
+    case refreshPending(LiveRefreshRequest)
+    case refreshRunning(LiveRefreshRequest)
+    case reconciling(sourceID: SessionSourceID?, trigger: LiveRefreshTrigger)
+    case stale(sourceID: SessionSourceID?, reason: LiveMonitoringStaleReason)
+    case degraded(LiveMonitoringFailure)
+    case stopped
 }
