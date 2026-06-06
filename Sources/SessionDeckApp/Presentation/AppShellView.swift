@@ -64,10 +64,8 @@ struct AppShellView: View {
             }
             .font(.body)
 
-            AppShellMonitoringHealthView(summary: viewModel.monitoringHealthSummary)
+            AppShellDiagnosticsSummaryView(summary: viewModel.diagnosticsSummary)
                 .font(.body)
-
-            sourceHealthRows
 
             Divider()
 
