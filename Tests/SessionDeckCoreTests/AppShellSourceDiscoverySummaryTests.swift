@@ -117,6 +117,14 @@ func applicationSourceDiscoverySummaryExposesSourceHealthRows() {
     ])
     #expect(summary.sourceHealthRows.first?.detail == "2 candidate transcripts in 1 bucket.")
     #expect(summary.sourceHealthRows[2].isBlocking)
+    #expect(summary.sourceHealthRows.map(\.diagnosticCode) == [
+        nil,
+        "codex.sessions_root_missing",
+        "codex.sessions_root_permission_denied",
+        "codex.sessions_root_empty",
+        "codex.sessions_root_stale",
+        "codex.candidate_file_unreadable",
+    ])
     #expect(summary.sourceHealthRows.allSatisfy { $0.location.hasPrefix("/tmp/sessiondeck") })
 }
 
