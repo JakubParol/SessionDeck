@@ -223,6 +223,16 @@ func compositionRootExposesLiveRefreshPipelineThroughApplicationComposition() th
     #expect(composition.liveRefreshPipeline.monitoringStates.contains(
         .watching(sourceID: SessionSourceID(rawValue: "codex-configured"))
     ))
+    #expect(composition.appShellUseCase.makeViewModel().monitoringHealthSummary.rows.contains(
+        AppShellMonitoringHealthRow(
+            id: "watcher.codex-configured",
+            title: "Watcher healthy",
+            detail: "Source updates are being watched for codex-configured.",
+            severity: .healthy,
+            diagnosticCode: nil,
+            sourceID: SessionSourceID(rawValue: "codex-configured")
+        )
+    ))
 }
 
 @Test("composition root dispatches live refresh work off the caller path")
