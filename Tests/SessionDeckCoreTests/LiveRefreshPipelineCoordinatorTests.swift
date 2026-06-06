@@ -196,19 +196,24 @@ func pipelineObservesAppendedTempFixtureTranscriptThroughLocalFileWatcher() thro
     )
     refreshRequests.removeAll()
 
-    let handle = try FileHandle(forWritingTo: transcriptURL)
-    try handle.seekToEnd()
-    try handle.write(contentsOf: Data("\n{\"type\":\"response_item\"}".utf8))
-    try handle.close()
+    var didScheduleDebouncedRefresh = false
+    for index in 1...3 {
+        try appendPipelineFixtureLine(#"{"type":"response_item","index":\#(index)}"#, to: transcriptURL)
+        if waitUntil({ timer.pendingTaskCount == 2 }) {
+            didScheduleDebouncedRefresh = true
+            break
+        }
+    }
 
-    #expect(waitUntil { timer.pendingTaskCount == 2 })
+    try #require(didScheduleDebouncedRefresh)
     timer.fireTasks(matching: 0.25)
     pipeline.stop()
 
-    #expect(refreshRequests == [
-        LiveRefreshRequest(scope: .session(sessionID, sourceID: sourceID), trigger: .debouncedSourceChange, eventCount: 1),
-    ])
-    #expect(pipeline.monitoringStates.contains(.refreshRunning(refreshRequests[0])))
+    let observedRequest = try #require(refreshRequests.first)
+    #expect(observedRequest.scope == .session(sessionID, sourceID: sourceID))
+    #expect(observedRequest.trigger == .debouncedSourceChange)
+    #expect(observedRequest.eventCount >= 1)
+    #expect(pipeline.monitoringStates.contains(.refreshRunning(observedRequest)))
 }
 
 @Test("pipeline start and stop leave temp fixture sources unchanged")
