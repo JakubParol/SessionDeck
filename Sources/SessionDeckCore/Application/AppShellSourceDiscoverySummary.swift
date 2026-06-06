@@ -13,6 +13,7 @@ public struct AppShellSourceHealthRow: Equatable, Sendable {
     public let detail: String
     public let severity: AppShellSourceHealthSeverity
     public let isBlocking: Bool
+    public let diagnosticCode: String?
 
     public init(
         id: String,
@@ -21,7 +22,8 @@ public struct AppShellSourceHealthRow: Equatable, Sendable {
         statusLabel: String,
         detail: String,
         severity: AppShellSourceHealthSeverity,
-        isBlocking: Bool
+        isBlocking: Bool,
+        diagnosticCode: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -30,6 +32,7 @@ public struct AppShellSourceHealthRow: Equatable, Sendable {
         self.detail = detail
         self.severity = severity
         self.isBlocking = isBlocking
+        self.diagnosticCode = diagnosticCode
     }
 }
 
@@ -115,9 +118,17 @@ public struct AppShellSourceDiscoverySummary: Equatable, Sendable {
                 statusLabel: sourceHealthStatusLabel(state: healthSummary?.state ?? .available),
                 detail: sourceHealthDetail(source: source, healthSummary: healthSummary),
                 severity: severity,
-                isBlocking: healthSummary?.allowsDiscoveryToContinue == false
+                isBlocking: healthSummary?.allowsDiscoveryToContinue == false,
+                diagnosticCode: sourceHealthDiagnosticCode(healthSummary: healthSummary)
             )
         }
+    }
+
+    private static func sourceHealthDiagnosticCode(healthSummary: SourceHealthSummary?) -> String? {
+        if let diagnosticCode = healthSummary?.diagnosticCode {
+            return diagnosticCode.rawValue
+        }
+        return healthSummary?.candidateDiagnosticCode?.rawValue
     }
 
     private static func sourceHealthSeverity(healthSummary: SourceHealthSummary?) -> AppShellSourceHealthSeverity {
