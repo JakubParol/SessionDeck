@@ -223,6 +223,29 @@ func appShellUseCaseMarksCatalogRefreshFailureState() {
     #expect(viewModel.refreshState == .failed("Catalog refresh failed before rows could be built."))
 }
 
+@Test("app shell use case exposes monitoring health from injected state provider")
+func appShellUseCaseExposesMonitoringHealthFromInjectedStateProvider() {
+    let sourceID = SessionSourceID(rawValue: "codex-live")
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        liveMonitoringStateProvider: {
+            [
+                .watching(sourceID: sourceID),
+                .stale(sourceID: sourceID, reason: .missedChangeRecovered),
+            ]
+        }
+    )
+
+    let viewModel = useCase.makeViewModel()
+
+    #expect(viewModel.monitoringHealthSummary.severity == .warning)
+    #expect(viewModel.monitoringHealthSummary.statusMessage == "Live monitoring is using fallback diagnostics.")
+    #expect(viewModel.monitoringHealthSummary.rows.map(\.title) == [
+        "Reconciliation fallback active",
+        "Watcher healthy",
+    ])
+}
+
 private func fakeLaunchConfigurationProvider() -> FakeLaunchConfigurationProvider {
     FakeLaunchConfigurationProvider(
         configuration: AppShellLaunchConfiguration(

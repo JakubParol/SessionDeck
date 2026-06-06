@@ -3,17 +3,20 @@ public struct AppShellUseCase: Sendable {
     private let discoverSessionSources: DiscoverSessionSourcesUseCase?
     private let refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase?
     private let loadSelectedTranscript: LoadSelectedTranscriptUseCase?
+    private let liveMonitoringStateProvider: @Sendable () -> [LiveMonitoringState]
 
     public init(
         launchConfigurationProvider: any LaunchConfigurationProviding,
         discoverSessionSources: DiscoverSessionSourcesUseCase? = nil,
         refreshCatalogSnapshot: RefreshCatalogSnapshotUseCase? = nil,
-        loadSelectedTranscript: LoadSelectedTranscriptUseCase? = nil
+        loadSelectedTranscript: LoadSelectedTranscriptUseCase? = nil,
+        liveMonitoringStateProvider: @escaping @Sendable () -> [LiveMonitoringState] = { [] }
     ) {
         self.launchConfigurationProvider = launchConfigurationProvider
         self.discoverSessionSources = discoverSessionSources
         self.refreshCatalogSnapshot = refreshCatalogSnapshot
         self.loadSelectedTranscript = loadSelectedTranscript
+        self.liveMonitoringStateProvider = liveMonitoringStateProvider
     }
 
     public func makeViewModel(
@@ -82,6 +85,7 @@ public struct AppShellUseCase: Sendable {
                 ? configuration.configuredSourceCount
                 : discoveryResult.summary.configuredSourceCount,
             sourceDiscoverySummary: discoveryResult.summary,
+            monitoringHealthSummary: AppShellMonitoringHealthSummary.make(states: liveMonitoringStateProvider()),
             catalogSummary: catalogResult.summary,
             catalogQueryControls: catalogResult.queryControls,
             navigationSummary: catalogResult.navigation,
