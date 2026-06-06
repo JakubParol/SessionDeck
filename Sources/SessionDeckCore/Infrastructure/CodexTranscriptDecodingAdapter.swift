@@ -21,16 +21,20 @@ public struct CodexTranscriptFile: Equatable, Sendable {
 
 public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
     public static let defaultMaximumToolBodyCharacters = 240
+    public static let defaultMaximumTranscriptBytes = 2 * 1024 * 1024
 
     private let filesBySessionID: [SessionID: CodexTranscriptFile]
     private let maximumToolBodyCharacters: Int
+    private let maximumTranscriptBytes: Int
 
     public init(
         files: [CodexTranscriptFile],
-        maximumToolBodyCharacters: Int = Self.defaultMaximumToolBodyCharacters
+        maximumToolBodyCharacters: Int = Self.defaultMaximumToolBodyCharacters,
+        maximumTranscriptBytes: Int = Self.defaultMaximumTranscriptBytes
     ) {
         self.filesBySessionID = Dictionary(uniqueKeysWithValues: files.map { ($0.sessionID, $0) })
         self.maximumToolBodyCharacters = max(0, maximumToolBodyCharacters)
+        self.maximumTranscriptBytes = max(0, maximumTranscriptBytes)
     }
 
     public func loadTranscript(sessionID: SessionID) throws -> TranscriptDecodeResult {
@@ -38,20 +42,19 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             throw CodexTranscriptDecodingError.transcriptUnavailable(sessionID)
         }
 
-        let text: String
-        do {
-            text = try String(contentsOf: file.fileURL, encoding: .utf8)
-        } catch {
+        guard let boundedRead = boundedTranscriptData(at: file.fileURL) else {
             throw CodexTranscriptDecodingError.unreadableTranscript(sessionID)
         }
+        let text = String(decoding: boundedRead.data, as: UTF8.self)
 
         var title = file.fallbackTitle
         var segments: [TranscriptSegment] = []
         var diagnostics: [TranscriptDecodeDiagnostic] = []
         var toolNamesByCallID: [String: String] = [:]
         var recordedMissingSessionMetadata = false
+        var recordedUnsupportedEventTypes: Set<String> = []
 
-        for (lineIndex, line) in transcriptLines(from: text).enumerated() {
+        for (lineIndex, line) in transcriptLines(from: text, isBoundedRead: boundedRead.reachedByteLimit).enumerated() {
             let lineNumber = lineIndex + 1
             let source = file.source.withLineNumber(lineNumber)
             guard let event = CodexTranscriptJSONEvent(line: line) else {
@@ -97,19 +100,33 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             ) {
                 segments.append(segment)
             } else if event.type != "turn_context" {
-                segments.append(
-                    unsupportedSegment(from: event, file: file, source: source, orderIndex: segments.count)
-                )
-                diagnostics.append(
-                    TranscriptDecodeDiagnostic(
-                        code: "codex.unsupported_event",
-                        severity: .info,
-                        message: "A Codex transcript event is not mapped to a readable segment yet.",
-                        source: source,
-                        allowsDecodingToContinue: true
+                if recordedUnsupportedEventTypes.insert(event.type).inserted {
+                    segments.append(
+                        unsupportedSegment(from: event, file: file, source: source, orderIndex: segments.count)
                     )
-                )
+                    diagnostics.append(
+                        TranscriptDecodeDiagnostic(
+                            code: "codex.unsupported_event",
+                            severity: .info,
+                            message: "A Codex transcript event is not mapped to a readable segment yet.",
+                            source: source,
+                            allowsDecodingToContinue: true
+                        )
+                    )
+                }
             }
+        }
+
+        if boundedRead.reachedByteLimit {
+            diagnostics.append(
+                TranscriptDecodeDiagnostic(
+                    code: "codex.bounded_read_truncated",
+                    severity: .warning,
+                    message: "SessionDeck loaded a bounded preview of this large transcript to keep the app responsive.",
+                    source: file.source,
+                    allowsDecodingToContinue: true
+                )
+            )
         }
 
         return TranscriptDecodeResult(
@@ -121,8 +138,32 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
         )
     }
 
-    private func transcriptLines(from text: String) -> [String] {
-        text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+    private func boundedTranscriptData(at url: URL) -> CodexTranscriptBoundedRead? {
+        guard maximumTranscriptBytes > 0,
+              let fileHandle = try? FileHandle(forReadingFrom: url)
+        else {
+            return nil
+        }
+        defer {
+            try? fileHandle.close()
+        }
+
+        guard let data = try? fileHandle.read(upToCount: maximumTranscriptBytes) else {
+            return nil
+        }
+        let fileByteSize = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? data.count
+        return CodexTranscriptBoundedRead(
+            data: data,
+            reachedByteLimit: fileByteSize > maximumTranscriptBytes
+        )
+    }
+
+    private func transcriptLines(from text: String, isBoundedRead: Bool) -> [String] {
+        var lines = text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        if isBoundedRead, text.hasSuffix("\n") == false, lines.isEmpty == false {
+            lines.removeLast()
+        }
+        return lines
     }
 
     private func missingSessionMetadataKeys(in event: CodexTranscriptJSONEvent) -> [String] {
@@ -305,4 +346,9 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
 public enum CodexTranscriptDecodingError: Error, Equatable, Sendable {
     case transcriptUnavailable(SessionID)
     case unreadableTranscript(SessionID)
+}
+
+private struct CodexTranscriptBoundedRead {
+    let data: Data
+    let reachedByteLimit: Bool
 }

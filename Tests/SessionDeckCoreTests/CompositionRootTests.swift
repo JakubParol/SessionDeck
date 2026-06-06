@@ -18,7 +18,9 @@ func compositionRootWiresDefaultSourceDiscoveryWithoutPresentationIO() throws {
     )
 
     #expect(composition.appShellViewModel.title == "SessionDeck")
-    #expect(composition.appShellViewModel.configuredSourceCount == 1)
+    #expect(composition.appShellViewModel.sourceDiscoverySummary == .placeholder)
+    #expect(composition.appShellViewModel.catalogSummary == .placeholder)
+    #expect(composition.appShellViewModel.refreshState == .idle)
     #expect(composition.appShellViewModel.safetyPolicy.readsRealAgentStores == true)
     #expect(composition.appShellViewModel.safetyPolicy.permitsNetworkCalls == false)
     #expect(composition.appShellViewModel.safetyPolicy.permitsCommandExecution == false)

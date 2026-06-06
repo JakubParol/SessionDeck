@@ -88,13 +88,40 @@ func appShellUseCaseReportsMissingDefaultSourceWithTempHome() throws {
         homeDirectoryProvider: StaticHomeDirectoryProvider(homeDirectoryURL: fixtureRoot.url)
     )
 
-    let summary = composition.appShellViewModel.sourceDiscoverySummary
+    let summary = composition.appShellUseCase.refreshViewModel().sourceDiscoverySummary
     #expect(summary.configuredSourceCount == 1)
     #expect(summary.availableSourceCount == 0)
     #expect(summary.candidateFileCount == 0)
     #expect(summary.warningCount == 1)
     #expect(summary.errorCount == 0)
     #expect(summary.statusMessage == "Source discovery completed with warnings.")
+}
+
+@Test("composition launch view model does not run source discovery before refresh")
+func compositionLaunchViewModelDoesNotRunSourceDiscoveryBeforeRefresh() {
+    let sourceDiscovery = CountingSourceDiscoveryPort(responses: [
+        [
+            SessionSourceSummary(
+                id: SessionSourceID(rawValue: "codex-launch"),
+                displayName: "Codex launch",
+                kind: .codex,
+                locationDescription: "/tmp/sessiondeck-launch/.codex/sessions",
+                isEnabled: true,
+                availability: .available,
+                counts: SessionSourceCounts(sessionBucketDirectoryCount: 1, transcriptFileCount: 1)
+            ),
+        ],
+    ])
+    let useCase = AppShellUseCase(
+        launchConfigurationProvider: fakeLaunchConfigurationProvider(),
+        discoverSessionSources: DiscoverSessionSourcesUseCase(sourceDiscovery: sourceDiscovery)
+    )
+
+    let launchViewModel = useCase.makeLaunchViewModel()
+
+    #expect(sourceDiscovery.callCount == 0)
+    #expect(launchViewModel.sourceDiscoverySummary == .placeholder)
+    #expect(launchViewModel.catalogSummary == .placeholder)
 }
 
 @Test("refresh view model reruns source discovery through the application use case")

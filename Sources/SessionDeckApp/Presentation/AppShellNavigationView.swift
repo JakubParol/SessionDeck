@@ -77,7 +77,7 @@ struct AppShellNavigationView: View {
         case .permissionDenied:
             return "lock.trianglebadge.exclamationmark"
         case .missingMetadata, .malformedMetadata, .parseWarning:
-            return "doc.badge.exclamationmark"
+            return "exclamationmark.triangle"
         case nil:
             return node.children.isEmpty ? "folder" : "folder.badge.questionmark"
         }

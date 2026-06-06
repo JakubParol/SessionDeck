@@ -52,6 +52,8 @@ public struct AppShellSelectedTranscriptDiagnosticRow: Equatable, Identifiable, 
 }
 
 public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
+    public static let maximumVisibleDiagnosticRows = 6
+
     public let title: String
     public let statusMessage: String
     public let displayMode: AppShellSelectedTranscriptDisplayMode
@@ -116,7 +118,7 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         let errorCount = readModel.diagnostics.filter { $0.severity == .error }.count
         let severity = loadedSeverity(errorCount: errorCount, warningCount: warningCount)
 
-        let diagnosticRows = readModel.diagnostics.map(diagnosticRow(for:))
+        let diagnosticRows = diagnosticRows(for: readModel.diagnostics)
 
         return AppShellSelectedTranscriptDetailState(
             title: titleLabel(for: readModel.title),
@@ -390,6 +392,30 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             severity: rowSeverity(for: diagnostic.severity),
             diagnosticCode: diagnostic.code
         )
+    }
+
+    private static func diagnosticRows(
+        for diagnostics: [TranscriptDecodeDiagnostic]
+    ) -> [AppShellSelectedTranscriptDiagnosticRow] {
+        guard diagnostics.count > maximumVisibleDiagnosticRows else {
+            return diagnostics.map(diagnosticRow(for:))
+        }
+
+        let visibleCount = maximumVisibleDiagnosticRows - 1
+        let visibleRows = diagnostics.prefix(visibleCount).map(diagnosticRow(for:))
+        let remainingCount = diagnostics.count - visibleCount
+        let summarySeverity = diagnostics.contains { $0.severity == .error }
+            ? AppShellCatalogRowSeverity.error
+            : diagnostics.contains { $0.severity == .warning } ? .warning : .info
+
+        return visibleRows + [
+            AppShellSelectedTranscriptDiagnosticRow(
+                id: "diagnostics-summary-\(diagnostics.count)",
+                message: "\(remainingCount) additional transcript diagnostic(s) summarized to keep this view readable.",
+                severity: summarySeverity,
+                diagnosticCode: "transcript.diagnostics_summarized"
+            ),
+        ]
     }
 
     private static func diagnosticRows(

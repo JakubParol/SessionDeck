@@ -162,6 +162,37 @@ func selectedTranscriptDetailStateDistinguishesWarningAndBlockingDiagnostics() {
     ])
 }
 
+@Test("selected transcript detail state summarizes excessive diagnostics")
+func selectedTranscriptDetailStateSummarizesExcessiveDiagnostics() {
+    let sessionID = SessionID(rawValue: "many-diagnostics-session")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let diagnostics = (1...12).map { lineNumber in
+        TranscriptDecodeDiagnostic(
+            code: "codex.unsupported_event",
+            severity: .info,
+            message: "Unsupported event was preserved.",
+            source: transcriptSource(sourceID: sourceID, lineNumber: lineNumber),
+            allowsDecodingToContinue: true
+        )
+    }
+    let readModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(id: sessionID, sourceID: sourceID),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Many diagnostics session",
+            segments: [],
+            diagnostics: diagnostics,
+            isPartial: true
+        )
+    )
+
+    let state = AppShellSelectedTranscriptDetailState.loaded(readModel)
+
+    #expect(state.diagnosticRows.count == AppShellSelectedTranscriptDetailState.maximumVisibleDiagnosticRows)
+    #expect(state.diagnosticRows.last?.diagnosticCode == "transcript.diagnostics_summarized")
+    #expect(state.diagnosticRows.last?.message == "7 additional transcript diagnostic(s) summarized to keep this view readable.")
+}
+
 @Test("selected transcript rows expose stable role styles for conversation rendering")
 func selectedTranscriptRowsExposeRoleStyles() {
     let source = transcriptSource(sourceID: SessionSourceID(rawValue: "fixture"), lineNumber: 1)
