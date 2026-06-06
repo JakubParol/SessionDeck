@@ -18,6 +18,27 @@ func appShellViewRendersApplicationOwnedSourceHealthRows() throws {
     #expect(!source.contains("FileManager.default"))
 }
 
+@Test("app shell renders application-owned monitoring health rows")
+func appShellViewRendersApplicationOwnedMonitoringHealthRows() throws {
+    let appShellSource = try String(
+        contentsOf: repositoryRoot()
+            .appending(path: "Sources/SessionDeckApp/Presentation/AppShellView.swift"),
+        encoding: .utf8
+    )
+    let monitoringSource = try String(
+        contentsOf: repositoryRoot()
+            .appending(path: "Sources/SessionDeckApp/Presentation/AppShellMonitoringHealthView.swift"),
+        encoding: .utf8
+    )
+
+    #expect(appShellSource.contains("AppShellMonitoringHealthView(summary: viewModel.monitoringHealthSummary)"))
+    #expect(monitoringSource.contains("ForEach(summary.rows)"))
+    #expect(monitoringSource.contains("Text(row.title)"))
+    #expect(monitoringSource.contains("Text(row.detail)"))
+    #expect(monitoringSource.contains("Text(diagnosticCode)"))
+    #expect(!monitoringSource.contains("FileManager.default"))
+}
+
 private func repositoryRoot() -> URL {
     URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()

@@ -110,3 +110,74 @@ func monitoringFailuresExposeTypedCodes() {
     #expect(LiveMonitoringFailureReason.permissionDenied.code == "live_monitoring.permission_denied")
     #expect(LiveMonitoringFailureReason.reconciliationFailed.code == "live_monitoring.reconciliation_failed")
 }
+
+@Test("monitoring health summary reports healthy watcher state")
+func monitoringHealthSummaryReportsHealthyWatcherState() {
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let summary = AppShellMonitoringHealthSummary.make(states: [
+        .watching(sourceID: sourceID),
+        .current(sourceID: sourceID),
+    ])
+
+    #expect(summary.severity == .healthy)
+    #expect(summary.statusMessage == "Live monitoring is healthy.")
+    #expect(summary.rows == [
+        AppShellMonitoringHealthRow(
+            id: "watcher.codex-default",
+            title: "Watcher healthy",
+            detail: "Source updates are being watched for codex-default.",
+            severity: .healthy,
+            diagnosticCode: nil,
+            sourceID: sourceID
+        ),
+    ])
+}
+
+@Test("monitoring health summary maps watcher failure to warning diagnostic")
+func monitoringHealthSummaryMapsWatcherFailureToWarningDiagnostic() {
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let summary = AppShellMonitoringHealthSummary.make(states: [
+        .degraded(LiveMonitoringFailure(
+            sourceID: sourceID,
+            reason: .watcherSetupFailed,
+            message: "watcher backend unavailable"
+        )),
+    ])
+
+    #expect(summary.severity == .warning)
+    #expect(summary.statusMessage == "Live monitoring is using fallback diagnostics.")
+    #expect(summary.rows == [
+        AppShellMonitoringHealthRow(
+            id: "degraded-live_monitoring.watcher_setup_failed.codex-default",
+            title: "Watcher unavailable",
+            detail: "watcher backend unavailable",
+            severity: .warning,
+            diagnosticCode: "live_monitoring.watcher_setup_failed",
+            sourceID: sourceID
+        ),
+    ])
+}
+
+@Test("monitoring health summary distinguishes reconciliation fallback from blocking failure")
+func monitoringHealthSummaryDistinguishesReconciliationFallbackFromFailure() {
+    let sourceID = SessionSourceID(rawValue: "codex-default")
+    let fallbackSummary = AppShellMonitoringHealthSummary.make(states: [
+        .stale(sourceID: sourceID, reason: .missedChangeRecovered),
+    ])
+    let failedSummary = AppShellMonitoringHealthSummary.make(states: [
+        .degraded(LiveMonitoringFailure(
+            sourceID: sourceID,
+            reason: .reconciliationFailed,
+            message: "candidate enumeration failed"
+        )),
+    ])
+
+    #expect(fallbackSummary.severity == .warning)
+    #expect(fallbackSummary.rows.map(\.diagnosticCode) == ["live_monitoring.missed_change_recovered"])
+    #expect(fallbackSummary.rows.map(\.title) == ["Reconciliation fallback active"])
+
+    #expect(failedSummary.severity == .error)
+    #expect(failedSummary.statusMessage == "Live monitoring has 1 blocking diagnostic.")
+    #expect(failedSummary.rows.map(\.diagnosticCode) == ["live_monitoring.reconciliation_failed"])
+    #expect(failedSummary.rows.map(\.title) == ["Reconciliation failed"])
+}

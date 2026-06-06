@@ -148,3 +148,10 @@ func relativePipelineFixtureSnapshot(at root: URL) throws -> [String] {
     }
     .sorted()
 }
+
+func appendPipelineFixtureLine(_ line: String, to url: URL) throws {
+    let handle = try FileHandle(forWritingTo: url)
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data("\n\(line)".utf8))
+    try handle.close()
+}

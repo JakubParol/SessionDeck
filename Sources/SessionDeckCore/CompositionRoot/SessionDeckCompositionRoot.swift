@@ -30,12 +30,6 @@ public enum SessionDeckCompositionRoot {
         let loadSelectedTranscript = LoadSelectedTranscriptUseCase(
             selectedTranscriptLoading: CodexSelectedTranscriptLoadingAdapter()
         )
-        let appShellUseCase = AppShellUseCase(
-            launchConfigurationProvider: PlaceholderLaunchConfigurationProvider(),
-            discoverSessionSources: discoverSessionSources,
-            refreshCatalogSnapshot: refreshCatalogSnapshot,
-            loadSelectedTranscript: loadSelectedTranscript
-        )
         let loadTranscriptPreview = LoadTranscriptPreviewUseCase(
             transcriptLoading: PlaceholderTranscriptLoadingAdapter()
         )
@@ -58,6 +52,13 @@ public enum SessionDeckCompositionRoot {
                 _ = try? refreshCatalogSnapshot.refreshSnapshot()
             }
         }
+        let appShellUseCase = AppShellUseCase(
+            launchConfigurationProvider: PlaceholderLaunchConfigurationProvider(),
+            discoverSessionSources: discoverSessionSources,
+            refreshCatalogSnapshot: refreshCatalogSnapshot,
+            loadSelectedTranscript: loadSelectedTranscript,
+            liveMonitoringStateProvider: { liveRefreshPipeline.monitoringStates }
+        )
 
         return SessionDeckApplicationComposition(
             appShellUseCase: appShellUseCase,
