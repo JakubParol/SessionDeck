@@ -47,6 +47,7 @@ public struct AppShellViewModel: Equatable, Sendable {
     public let configuredSourceCount: Int
     public let sourceDiscoverySummary: AppShellSourceDiscoverySummary
     public let monitoringHealthSummary: AppShellMonitoringHealthSummary
+    public let diagnosticsSummary: AppShellDiagnosticsSummary
     public let catalogSummary: AppShellCatalogSummary
     public let catalogQueryControls: AppShellCatalogQueryControls
     public let navigationSummary: AppShellNavigationSummary
@@ -64,6 +65,7 @@ public struct AppShellViewModel: Equatable, Sendable {
         configuredSourceCount: Int,
         sourceDiscoverySummary: AppShellSourceDiscoverySummary = .placeholder,
         monitoringHealthSummary: AppShellMonitoringHealthSummary = .notStarted,
+        diagnosticsSummary: AppShellDiagnosticsSummary = .healthy,
         catalogSummary: AppShellCatalogSummary = .placeholder,
         catalogQueryControls: AppShellCatalogQueryControls = .placeholder,
         navigationSummary: AppShellNavigationSummary = .placeholder,
@@ -80,6 +82,7 @@ public struct AppShellViewModel: Equatable, Sendable {
         self.configuredSourceCount = configuredSourceCount
         self.sourceDiscoverySummary = sourceDiscoverySummary
         self.monitoringHealthSummary = monitoringHealthSummary
+        self.diagnosticsSummary = diagnosticsSummary
         self.catalogSummary = catalogSummary
         self.catalogQueryControls = catalogQueryControls
         self.navigationSummary = navigationSummary

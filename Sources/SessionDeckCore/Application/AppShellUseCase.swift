@@ -76,6 +76,12 @@ public struct AppShellUseCase: Sendable {
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: catalogQuery
         )
+        let monitoringHealthSummary = AppShellMonitoringHealthSummary.make(states: liveMonitoringStateProvider())
+        let selectedTranscriptDetail = selectedTranscriptDetail(
+            selectedSessionID: selectedSessionID,
+            sessions: catalogResult.scopedSessions,
+            refreshPhase: selectedTranscriptRefreshPhase
+        )
 
         return AppShellViewModel(
             title: configuration.title,
@@ -85,17 +91,18 @@ public struct AppShellUseCase: Sendable {
                 ? configuration.configuredSourceCount
                 : discoveryResult.summary.configuredSourceCount,
             sourceDiscoverySummary: discoveryResult.summary,
-            monitoringHealthSummary: AppShellMonitoringHealthSummary.make(states: liveMonitoringStateProvider()),
+            monitoringHealthSummary: monitoringHealthSummary,
+            diagnosticsSummary: AppShellDiagnosticsSummary.make(
+                sourceDiscoverySummary: discoveryResult.summary,
+                monitoringHealthSummary: monitoringHealthSummary,
+                selectedTranscriptDetail: selectedTranscriptDetail
+            ),
             catalogSummary: catalogResult.summary,
             catalogQueryControls: catalogResult.queryControls,
             navigationSummary: catalogResult.navigation,
             selectedNavigationNodeID: catalogResult.selectedNode.id,
             selectedNavigationTitle: catalogResult.selectedNode.title,
-            selectedTranscriptDetail: selectedTranscriptDetail(
-                selectedSessionID: selectedSessionID,
-                sessions: catalogResult.scopedSessions,
-                refreshPhase: selectedTranscriptRefreshPhase
-            ),
+            selectedTranscriptDetail: selectedTranscriptDetail,
             refreshState: discoveryResult.refreshState ?? catalogResult.refreshState ?? refreshState,
             safetyPolicy: configuration.safetyPolicy
         )

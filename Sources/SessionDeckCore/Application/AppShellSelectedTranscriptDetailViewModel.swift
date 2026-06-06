@@ -36,15 +36,18 @@ public struct AppShellSelectedTranscriptDiagnosticRow: Equatable, Identifiable, 
     public let id: String
     public let message: String
     public let severity: AppShellCatalogRowSeverity
+    public let diagnosticCode: String?
 
     public init(
         id: String,
         message: String,
-        severity: AppShellCatalogRowSeverity
+        severity: AppShellCatalogRowSeverity,
+        diagnosticCode: String? = nil
     ) {
         self.id = id
         self.message = message
         self.severity = severity
+        self.diagnosticCode = diagnosticCode
     }
 }
 
@@ -166,7 +169,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                         AppShellSelectedTranscriptDiagnosticRow(
                             id: "refresh-error",
                             message: "Refresh error: \(message)",
-                            severity: .error
+                            severity: .error,
+                            diagnosticCode: "live_refresh.failed"
                         ),
                     ],
                     severity: .error,
@@ -240,7 +244,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                 AppShellSelectedTranscriptDiagnosticRow(
                     id: "refresh-error",
                     message: "Refresh error: \(message)",
-                    severity: .error
+                    severity: .error,
+                    diagnosticCode: "live_refresh.failed"
                 ),
             ]
         )
@@ -382,7 +387,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
         AppShellSelectedTranscriptDiagnosticRow(
             id: "\(diagnostic.code)-\(diagnostic.source?.lineNumber ?? 0)-\(diagnostic.message)",
             message: diagnosticMessage(for: diagnostic),
-            severity: rowSeverity(for: diagnostic.severity)
+            severity: rowSeverity(for: diagnostic.severity),
+            diagnosticCode: diagnostic.code
         )
     }
 
@@ -393,7 +399,8 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
             AppShellSelectedTranscriptDiagnosticRow(
                 id: "diagnostic-\(index)",
                 message: message,
-                severity: message.hasPrefix("Error") ? .error : .warning
+                severity: message.hasPrefix("Error") ? .error : .warning,
+                diagnosticCode: nil
             )
         }
     }
