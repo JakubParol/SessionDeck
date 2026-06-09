@@ -60,7 +60,8 @@ public extension AppShellNavigationSummary {
                             sessionIDs: orderedGroupSessions.map(\.id),
                             children: threadNodes(
                                 sessions: orderedGroupSessions,
-                                idPrefix: "projects.\(groupKey).thread"
+                                threadIDPrefix: "projects.\(groupKey).thread",
+                                rootIDPrefix: "projects.\(groupKey).roots"
                             )
                         ),
                         sessions: groupSessions
@@ -166,7 +167,8 @@ public extension AppShellNavigationSummary {
 
     private static func threadNodes(
         sessions: [SessionSummary],
-        idPrefix: String
+        threadIDPrefix: String,
+        rootIDPrefix: String
     ) -> [AppShellNavigationNode] {
         let orderedSessions = SessionCatalogOrdering.sort(sessions)
         let sessionIDs = Set(orderedSessions.map(\.id))
@@ -180,25 +182,67 @@ public extension AppShellNavigationSummary {
             .mapValues { parentPairs in
                 SessionCatalogOrdering.sort(parentPairs.map(\.session))
             }
-        let threadedSessionIDs = Set(parentPairs.flatMap { [$0.parentID, $0.session.id] })
-        guard threadedSessionIDs.isEmpty == false else {
-            return []
+        let rootThreadSessions = orderedSessions.filter { session in
+            relationshipParentID(for: session, sessionIDs: sessionIDs) == nil
+                && childSessionsByParent[session.id]?.isEmpty == false
+        }
+        let candidateRootSessionBucketSessions = orderedSessions.filter { session in
+            relationshipParentID(for: session, sessionIDs: sessionIDs) == nil
+                && (childSessionsByParent[session.id]?.isEmpty ?? true)
         }
 
-        let threadedSessions = orderedSessions.filter { threadedSessionIDs.contains($0.id) }
-        let rootSessions = threadedSessions.filter {
-            relationshipParentID(for: $0, sessionIDs: sessionIDs) == nil
-        }
-        let safeRootSessions = rootSessions.isEmpty ? threadedSessions : rootSessions
-
-        return safeRootSessions.map { session in
+        let threadNodes = rootThreadSessions.map { session in
             threadNode(
                 session: session,
-                idPrefix: idPrefix,
+                idPrefix: threadIDPrefix,
                 childSessionsByParent: childSessionsByParent,
                 visitedSessionIDs: []
             )
         }
+        let representedSessionIDs = Set(threadNodes.flatMap(\.sessionIDs))
+        let rootSessionBucketIDs = Set(candidateRootSessionBucketSessions.map(\.id))
+        let fallbackRootSessions = orderedSessions.filter { session in
+            representedSessionIDs.contains(session.id) == false
+                && rootSessionBucketIDs.contains(session.id) == false
+        }
+        let rootSessionBucketSessions = candidateRootSessionBucketSessions + fallbackRootSessions
+        let rootBucket = rootSessionsBucketNode(
+            sessions: rootSessionBucketSessions,
+            rootIDPrefix: rootIDPrefix
+        )
+
+        guard let rootBucket else {
+            return threadNodes
+        }
+
+        return threadNodes + [rootBucket]
+    }
+
+    private static func rootSessionsBucketNode(
+        sessions: [SessionSummary],
+        rootIDPrefix: String
+    ) -> AppShellNavigationNode? {
+        guard sessions.isEmpty == false else {
+            return nil
+        }
+
+        let children = sessions.map { session in
+            AppShellNavigationNode(
+                id: "\(rootIDPrefix).\(session.id.rawValue)",
+                title: session.displayTitle,
+                count: 1,
+                sessionIDs: [session.id]
+            )
+        }
+        let sessionIDs = sessions.map(\.id)
+
+        return AppShellNavigationNode(
+            id: rootIDPrefix,
+            title: "Root Sessions",
+            count: sessionIDs.count,
+            sessionIDs: sessionIDs,
+            children: children
+        )
     }
 
     private static func threadNode(

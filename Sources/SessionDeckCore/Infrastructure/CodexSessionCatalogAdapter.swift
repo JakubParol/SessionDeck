@@ -14,6 +14,7 @@ public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, Session
     private let sourceDiscovery: any SourceDiscoveryPort
     private let candidateFileEnumeration: any CandidateSessionFileEnumerationPort
     private let scanLimits: CodexCatalogScanLimits
+    private let scanCache: CodexCatalogScanCache
 
     public init(
         sourceDiscovery: any SourceDiscoveryPort,
@@ -23,6 +24,7 @@ public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, Session
         self.sourceDiscovery = sourceDiscovery
         self.candidateFileEnumeration = candidateFileEnumeration
         self.scanLimits = scanLimits
+        self.scanCache = CodexCatalogScanCache()
     }
 
     public func listSessions(sourceID: SessionSourceID? = nil) throws -> [SessionSummary] {
@@ -50,11 +52,20 @@ public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, Session
         )
     }
 
+    var cachedScanResultCountForTesting: Int {
+        scanCache.count
+    }
+
     private func summary(
         for candidate: CandidateSessionFile,
         sourceLabelsByID: [SessionSourceID: CatalogSourceLabel]
     ) throws -> SessionSummary {
-        let scanResult = CodexCatalogScanner(scanLimits: scanLimits).scan(candidate: candidate)
+        let scanResult = scanCache.scanResult(
+            for: candidate,
+            scanLimits: scanLimits
+        ) {
+            CodexCatalogScanner(scanLimits: scanLimits).scan(candidate: candidate)
+        }
         let sessionID = scanResult.metadata.id ?? fallbackSessionID(for: candidate)
         let sourceLabel = sourceLabelsByID[candidate.sourceID]
             ?? CatalogSourceLabel(sourceID: candidate.sourceID.rawValue, displayName: candidate.sourceID.rawValue, profileName: nil)
@@ -122,5 +133,87 @@ public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, Session
 
     private func epochSeconds(from date: Date) -> Int64 {
         Int64(date.timeIntervalSince1970)
+    }
+}
+
+private final class CodexCatalogScanCache: @unchecked Sendable {
+    private var scanResultsByKey: [CodexCatalogScanCacheKey: CodexCatalogScanResult] = [:]
+    private var latestKeyBySignature: [CodexCatalogScanCacheSignature: CodexCatalogScanCacheKey] = [:]
+    private let lock = NSLock()
+
+    var count: Int {
+        lock.lock()
+        defer {
+            lock.unlock()
+        }
+        return scanResultsByKey.count
+    }
+
+    func scanResult(
+        for candidate: CandidateSessionFile,
+        scanLimits: CodexCatalogScanLimits,
+        load: () -> CodexCatalogScanResult
+    ) -> CodexCatalogScanResult {
+        let key = CodexCatalogScanCacheKey(candidate: candidate, scanLimits: scanLimits)
+        let signature = CodexCatalogScanCacheSignature(candidate: candidate, scanLimits: scanLimits)
+
+        lock.lock()
+        if let cached = scanResultsByKey[key] {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+
+        let loaded = load()
+
+        lock.lock()
+        if let staleKey = latestKeyBySignature[signature], staleKey != key {
+            scanResultsByKey.removeValue(forKey: staleKey)
+        }
+        scanResultsByKey[key] = loaded
+        latestKeyBySignature[signature] = key
+        lock.unlock()
+
+        return loaded
+    }
+}
+
+private struct CodexCatalogScanCacheKey: Hashable, Sendable {
+    let sourceID: SessionSourceID
+    let relativePath: String
+    let absolutePath: String
+    let byteSize: Int64
+    let modifiedAt: Date?
+    let maximumBytes: Int
+    let maximumLines: Int
+    let diagnosticCode: CandidateSessionFileDiagnosticCode?
+    let diagnosticMessage: String?
+
+    init(candidate: CandidateSessionFile, scanLimits: CodexCatalogScanLimits) {
+        self.sourceID = candidate.sourceID
+        self.relativePath = candidate.relativePath
+        self.absolutePath = candidate.absolutePath
+        self.byteSize = candidate.byteSize
+        self.modifiedAt = candidate.modifiedAt
+        self.maximumBytes = scanLimits.maximumBytes
+        self.maximumLines = scanLimits.maximumLines
+        self.diagnosticCode = candidate.diagnostic?.code
+        self.diagnosticMessage = candidate.diagnostic?.message
+    }
+}
+
+private struct CodexCatalogScanCacheSignature: Hashable, Sendable {
+    let sourceID: SessionSourceID
+    let relativePath: String
+    let absolutePath: String
+    let maximumBytes: Int
+    let maximumLines: Int
+
+    init(candidate: CandidateSessionFile, scanLimits: CodexCatalogScanLimits) {
+        self.sourceID = candidate.sourceID
+        self.relativePath = candidate.relativePath
+        self.absolutePath = candidate.absolutePath
+        self.maximumBytes = scanLimits.maximumBytes
+        self.maximumLines = scanLimits.maximumLines
     }
 }

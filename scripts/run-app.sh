@@ -48,3 +48,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 PLIST
 
 /usr/bin/open -n "$BUNDLE_DIR"
+
+if [[ "${SESSIONDECK_SKIP_WINDOW_READINESS:-0}" != "1" ]]; then
+  "$ROOT_DIR/scripts/wait-for-main-window.sh" "$APP_NAME"
+fi
