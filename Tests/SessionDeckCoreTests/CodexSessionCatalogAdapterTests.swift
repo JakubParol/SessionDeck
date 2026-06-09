@@ -255,6 +255,62 @@ func codexCatalogAdapterReusesUnchangedCandidateMetadataDuringRepeatedRefreshes(
     #expect(secondSummary.title == "Cached A")
 }
 
+@Test("Codex catalog adapter replaces stale cache keys for changed candidate metadata")
+func codexCatalogAdapterReplacesStaleCacheKeysForChangedCandidateMetadata() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "metadata-cache-replacement")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-06-09T10:00:00.000Z","type":"session_meta","payload":{"id":"changing-session","title":"Changing A","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+
+        """,
+        source: source,
+        sessionID: "changing-session",
+        placement: .project("SessionDeck"),
+        timestamp: "2026-06-09T10:00:00Z"
+    )
+    let sourceID = defaultCatalogSourceID()
+    let candidateEnumeration = MutableCandidateFileEnumerationPort(
+        candidate: try candidateSessionFile(
+            sourceID: sourceID,
+            transcript: transcript,
+            modifiedAt: Date(timeIntervalSince1970: 1)
+        )
+    )
+    let adapter = CodexSessionCatalogAdapter(
+        sourceDiscovery: FakeSourceDiscoveryPort(
+            sources: [
+                SessionSourceSummary(
+                    id: sourceID,
+                    displayName: "Codex default",
+                    kind: .codex,
+                    locationDescription: source.sessionsRootURL.path,
+                    isEnabled: true
+                ),
+            ]
+        ),
+        candidateFileEnumeration: candidateEnumeration
+    )
+
+    _ = try adapter.listSessions(sourceID: nil)
+    try """
+    {"timestamp":"2026-06-09T10:00:00.000Z","type":"session_meta","payload":{"id":"changing-session","title":"Changing B","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+
+    """.write(to: transcript.url, atomically: true, encoding: .utf8)
+    candidateEnumeration.candidate = try candidateSessionFile(
+        sourceID: sourceID,
+        transcript: transcript,
+        modifiedAt: Date(timeIntervalSince1970: 2)
+    )
+    _ = try adapter.listSessions(sourceID: nil)
+
+    #expect(adapter.cachedScanResultCountForTesting == 1)
+}
+
 @Test("Codex catalog adapter ignores byte-limit truncation after metadata")
 func codexCatalogAdapterIgnoresByteLimitTruncationAfterMetadata() throws {
     let fixtureRoot = try makeCatalogFixtureRoot(name: "large-output")
@@ -491,6 +547,39 @@ private func makeCatalogAdapter(
             ]
         ),
         scanLimits: scanLimits
+    )
+}
+
+private final class MutableCandidateFileEnumerationPort: CandidateSessionFileEnumerationPort, @unchecked Sendable {
+    var candidate: CandidateSessionFile
+
+    init(candidate: CandidateSessionFile) {
+        self.candidate = candidate
+    }
+
+    func enumerateCandidateFiles(sourceID: SessionSourceID?) throws -> [CandidateSessionFile] {
+        guard sourceID == nil || sourceID == candidate.sourceID else {
+            return []
+        }
+
+        return [candidate]
+    }
+}
+
+private func candidateSessionFile(
+    sourceID: SessionSourceID,
+    transcript: TempCodexSessionFile,
+    modifiedAt: Date
+) throws -> CandidateSessionFile {
+    CandidateSessionFile(
+        sourceID: sourceID,
+        relativePath: transcript.url.lastPathComponent,
+        absolutePath: transcript.url.path,
+        byteSize: Int64((try String(contentsOf: transcript.url, encoding: .utf8)).utf8.count),
+        modifiedAt: modifiedAt,
+        confidence: .high,
+        reason: "test",
+        diagnostic: nil
     )
 }
 

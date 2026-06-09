@@ -18,6 +18,7 @@ func runAppScriptWaitsForMainWindowReadiness() throws {
     #expect(readinessScript.contains("wait_for_main_window"))
     #expect(readinessScript.contains("System Events"))
     #expect(readinessScript.contains("readiness_output"))
+    #expect(readinessScript.contains("readiness_output=\"not-ready\""))
     #expect(readinessScript.contains("== \"ready\""))
     #expect(readinessScript.contains("SESSIONDECK_WINDOW_READINESS_TIMEOUT_SECONDS"))
 }

@@ -186,7 +186,7 @@ public extension AppShellNavigationSummary {
             relationshipParentID(for: session, sessionIDs: sessionIDs) == nil
                 && childSessionsByParent[session.id]?.isEmpty == false
         }
-        let rootSessionBucketSessions = orderedSessions.filter { session in
+        let candidateRootSessionBucketSessions = orderedSessions.filter { session in
             relationshipParentID(for: session, sessionIDs: sessionIDs) == nil
                 && (childSessionsByParent[session.id]?.isEmpty ?? true)
         }
@@ -199,6 +199,13 @@ public extension AppShellNavigationSummary {
                 visitedSessionIDs: []
             )
         }
+        let representedSessionIDs = Set(threadNodes.flatMap(\.sessionIDs))
+        let rootSessionBucketIDs = Set(candidateRootSessionBucketSessions.map(\.id))
+        let fallbackRootSessions = orderedSessions.filter { session in
+            representedSessionIDs.contains(session.id) == false
+                && rootSessionBucketIDs.contains(session.id) == false
+        }
+        let rootSessionBucketSessions = candidateRootSessionBucketSessions + fallbackRootSessions
         let rootBucket = rootSessionsBucketNode(
             sessions: rootSessionBucketSessions,
             rootIDPrefix: rootIDPrefix

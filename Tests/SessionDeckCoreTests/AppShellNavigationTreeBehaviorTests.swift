@@ -298,6 +298,49 @@ func navigationTreeGroupsUnrelatedProjectRootsUnderStableBucket() throws {
     ])
 }
 
+@Test("navigation tree keeps cyclic thread metadata visible in the root bucket")
+func navigationTreeKeepsCyclicThreadMetadataVisibleInRootBucket() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-cycle")
+    let sourceLabel = CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex",
+        profileName: nil
+    )
+    let project = CatalogProjectHint(cwdPath: "/Users/kuba/Repos/SessionDeck", displayName: "SessionDeck")
+    let snapshot = navigationSnapshot(
+        sessions: [
+            navigationSession(
+                id: "cycle-a",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 20,
+                parentThreadID: SessionID(rawValue: "cycle-b")
+            ),
+            navigationSession(
+                id: "cycle-b",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 10,
+                parentThreadID: SessionID(rawValue: "cycle-a")
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+    let projectNode = try #require(summary.projectsNode.children.first)
+    let rootBucket = try #require(
+        projectNode.children.first { $0.id == "projects.project./Users/kuba/Repos/SessionDeck.roots" }
+    )
+
+    #expect(projectNode.count == 2)
+    #expect(rootBucket.title == "Root Sessions")
+    #expect(rootBucket.sessionIDs.map(\.rawValue) == ["cycle-a", "cycle-b"])
+}
+
 @Test("navigation tree normalizes source profile nodes with fallbacks and duplicate names")
 func navigationTreeNormalizesSourceProfileNodesWithFallbacksAndDuplicateNames() throws {
     let cliSourceID = SessionSourceID(rawValue: "codex-cli")

@@ -26,7 +26,7 @@ tell application "System Events"
 end tell
 return "not-ready"
 APPLESCRIPT
-)
+) || readiness_output="not-ready"
     if [[ "$readiness_output" == "ready" ]]; then
       echo "SessionDeck window readiness: main window detected for $APP_NAME."
       return 0
