@@ -7,6 +7,7 @@ struct AppShellView: View {
     @State private var selectedNavigationNodeID: String?
     @State private var selectedSessionID: SessionID?
     @State private var catalogQueryState: AppShellCatalogQueryState
+    @State private var hasStartedInitialRefresh = false
 
     init(viewModel: AppShellViewModel, appShellUseCase: AppShellUseCase) {
         self.appShellUseCase = appShellUseCase
@@ -31,6 +32,9 @@ struct AppShellView: View {
         }
         .onChange(of: selectedSessionID) { _, newValue in
             selectSession(newValue)
+        }
+        .task {
+            startInitialRefreshIfNeeded()
         }
     }
 
@@ -152,6 +156,19 @@ struct AppShellView: View {
     }
 
     private func refreshSources() {
+        startRefresh()
+    }
+
+    private func startInitialRefreshIfNeeded() {
+        guard hasStartedInitialRefresh == false else {
+            return
+        }
+
+        hasStartedInitialRefresh = true
+        startRefresh()
+    }
+
+    private func startRefresh() {
         let previousSelectedTranscriptDetail = viewModel.selectedTranscriptDetail
         viewModel = appShellUseCase.refreshingViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
@@ -159,17 +176,26 @@ struct AppShellView: View {
             selectedSessionID: selectedSessionID,
             previousSelectedTranscriptDetail: previousSelectedTranscriptDetail
         )
-        let refreshedViewModel = appShellUseCase.refreshViewModel(
-            selectedNavigationNodeID: selectedNavigationNodeID,
-            catalogQuery: catalogQueryState,
-            selectedSessionID: selectedSessionID,
-            previousSelectedTranscriptDetail: previousSelectedTranscriptDetail
-        )
-        apply(refreshedViewModel)
+        Task {
+            let selectedNavigationNodeID = selectedNavigationNodeID
+            let catalogQueryState = catalogQueryState
+            let selectedSessionID = selectedSessionID
+            let refreshedViewModel = await Task.detached {
+                appShellUseCase.refreshViewModel(
+                    selectedNavigationNodeID: selectedNavigationNodeID,
+                    catalogQuery: catalogQueryState,
+                    selectedSessionID: selectedSessionID,
+                    previousSelectedTranscriptDetail: previousSelectedTranscriptDetail
+                )
+            }.value
+            await MainActor.run {
+                apply(refreshedViewModel)
+            }
+        }
     }
 
     private func selectNavigationNode(_ nodeID: String?) {
-        let selectedViewModel = appShellUseCase.makeViewModel(
+        let selectedViewModel = appShellUseCase.makeCachedViewModel(
             selectedNavigationNodeID: nodeID,
             catalogQuery: catalogQueryState,
             selectedSessionID: selectedSessionID
@@ -178,7 +204,7 @@ struct AppShellView: View {
     }
 
     private func updateCatalogQuery(_ queryState: AppShellCatalogQueryState) {
-        let queriedViewModel = appShellUseCase.makeViewModel(
+        let queriedViewModel = appShellUseCase.makeCachedViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: queryState,
             selectedSessionID: selectedSessionID
@@ -187,7 +213,7 @@ struct AppShellView: View {
     }
 
     private func selectSession(_ sessionID: SessionID?) {
-        let selectedViewModel = appShellUseCase.makeViewModel(
+        let selectedViewModel = appShellUseCase.makeCachedViewModel(
             selectedNavigationNodeID: selectedNavigationNodeID,
             catalogQuery: catalogQueryState,
             selectedSessionID: sessionID

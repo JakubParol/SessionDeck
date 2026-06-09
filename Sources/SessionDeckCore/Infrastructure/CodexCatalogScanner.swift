@@ -42,10 +42,15 @@ struct CodexCatalogScanner: Sendable {
 
             if event.type == "session_meta" {
                 metadata.apply(payload: event.payload)
+            } else if event.type == "turn_context" {
+                metadata.applyContext(payload: event.payload)
+            } else if event.type == "response_item" {
+                metadata.applyInferredRepoRoot(from: event.messageText)
             } else if !isKnownCodexEventType(event.type) {
                 encounteredUnknownEventShape = true
             }
         }
+        metadata.applyInferredRepoRoot(from: content)
 
         let parseStatus = parseStatus(metadata: metadata, encounteredMalformedLine: encounteredMalformedLine)
         return CodexCatalogScanResult(
@@ -173,7 +178,7 @@ struct CodexCatalogScanner: Sendable {
         if encounteredMalformedLine {
             return .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata.")
         }
-        if metadata.id == nil || metadata.title == nil || metadata.project == nil || metadata.cwd == nil {
+        if metadata.id == nil || (metadata.cwd == nil && metadata.project == nil) {
             return .missingMetadata
         }
         return .complete
@@ -262,6 +267,12 @@ struct CodexCatalogMetadata {
     var cwd: String?
     var source: String?
     var modelName: String?
+    var parentThreadID: String?
+    var forkedFromID: String?
+    var threadSource: String?
+    var agentNickname: String?
+    var agentRole: String?
+    var agentPath: String?
 
     mutating func apply(payload: [String: Any]?) {
         guard let payload else {
@@ -274,6 +285,28 @@ struct CodexCatalogMetadata {
         cwd = payload["cwd"] as? String ?? cwd
         source = payload["source"] as? String ?? source
         modelName = payload["model"] as? String ?? payload["model_name"] as? String ?? modelName
+        parentThreadID = payload["parent_thread_id"] as? String ?? parentThreadID
+        forkedFromID = payload["forked_from_id"] as? String ?? forkedFromID
+        threadSource = payload["thread_source"] as? String ?? threadSource
+        agentNickname = payload["agent_nickname"] as? String ?? agentNickname
+        agentRole = payload["agent_role"] as? String ?? agentRole
+        agentPath = payload["agent_path"] as? String ?? agentPath
+    }
+
+    mutating func applyContext(payload: [String: Any]?) {
+        guard let payload else {
+            return
+        }
+
+        cwd = payload["cwd"] as? String ?? cwd
+    }
+
+    mutating func applyInferredRepoRoot(from text: String?) {
+        guard let repoRoot = CodexCatalogRepoRootExtractor.repoRoot(from: text) else {
+            return
+        }
+
+        cwd = repoRoot
     }
 }
 
@@ -286,4 +319,97 @@ private struct CodexCatalogEvent {
     let type: String?
     let timestampEpochSeconds: Int64?
     let payload: [String: Any]?
+}
+
+private extension CodexCatalogEvent {
+    var messageText: String? {
+        guard let payload,
+              payload["type"] as? String == "message"
+        else {
+            return nil
+        }
+
+        if let content = payload["content"] as? String {
+            return content
+        }
+
+        guard let contentItems = payload["content"] as? [[String: Any]] else {
+            return nil
+        }
+
+        let text = contentItems.compactMap { item in
+            item["text"] as? String
+        }.joined(separator: "\n")
+        return text.isEmpty ? nil : text
+    }
+}
+
+private enum CodexCatalogRepoRootExtractor {
+    static func repoRoot(from text: String?) -> String? {
+        guard let text, text.isEmpty == false else {
+            return nil
+        }
+
+        if let explicitRepoRoot = text
+            .split(whereSeparator: \.isNewline)
+            .compactMap({ repoRootLinePath(from: String($0)) })
+            .first {
+            return explicitRepoRoot
+        }
+
+        return xmlWorkspaceRootPath(from: text)
+    }
+
+    private static func repoRootLinePath(from line: String) -> String? {
+        let marker = "Repo root:"
+        guard let markerRange = line.range(of: marker, options: [.caseInsensitive]) else {
+            return nil
+        }
+
+        let candidate = String(line[markerRange.upperBound...])
+        return sanitizedRepoPath(candidate)
+    }
+
+    private static func xmlWorkspaceRootPath(from text: String) -> String? {
+        let pattern = #"<root>([^<]+)</root>"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..<text.endIndex, in: text)),
+              let pathRange = Range(match.range(at: 1), in: text)
+        else {
+            return nil
+        }
+
+        return sanitizedRepoPath(String(text[pathRange]))
+    }
+
+    private static func sanitizedRepoPath(_ rawValue: String) -> String? {
+        let candidate = rawValue.truncated(beforeAnyOf: ["\\n", "\n", "\r", "<"])
+        let trimmed = candidate
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'`"))
+        guard trimmed.hasPrefix("/"),
+              trimmed.contains("/Repos/"),
+              URL(fileURLWithPath: trimmed).lastPathComponent.isEmpty == false
+        else {
+            return nil
+        }
+
+        return trimmed
+    }
+}
+
+private extension String {
+    func truncated(beforeAnyOf delimiters: [String]) -> String {
+        let firstDelimiter = delimiters
+            .compactMap { delimiter in
+                range(of: delimiter)?.lowerBound
+            }
+            .min()
+
+        guard let firstDelimiter else {
+            return self
+        }
+
+        return String(self[..<firstDelimiter])
+    }
 }

@@ -35,12 +35,7 @@ public extension AppShellNavigationSummary {
         let projectSessions = sessions.filter { session in
             ProjectGroupingPolicy.resolve(session: session).kind != .nonProject
         }
-        let children = groupNodes(
-            sessions: projectSessions,
-            idPrefix: "projects",
-            key: { ProjectGroupingPolicy.resolve(session: $0).id },
-            title: { ProjectGroupingPolicy.resolve(session: $0).title }
-        )
+        let children = projectNodes(sessions: projectSessions)
 
         return AppShellNavigationNode(
             id: "projects",
@@ -48,6 +43,29 @@ public extension AppShellNavigationSummary {
             count: projectSessions.count,
             sessionIDs: projectSessions.map(\.id),
             children: children
+        )
+    }
+
+    private static func projectNodes(sessions: [SessionSummary]) -> [AppShellNavigationNode] {
+        AppShellNavigationOrdering.sortNodesByRecency(
+            Dictionary(grouping: sessions, by: { ProjectGroupingPolicy.resolve(session: $0).id })
+                .map { groupKey, groupSessions in
+                    let orderedGroupSessions = SessionCatalogOrdering.sort(groupSessions)
+                    let projectGroup = ProjectGroupingPolicy.resolve(session: orderedGroupSessions[0])
+                    return (
+                        node: AppShellNavigationNode(
+                            id: "projects.\(groupKey)",
+                            title: projectGroup.title,
+                            count: orderedGroupSessions.count,
+                            sessionIDs: orderedGroupSessions.map(\.id),
+                            children: threadNodes(
+                                sessions: orderedGroupSessions,
+                                idPrefix: "projects.\(groupKey).thread"
+                            )
+                        ),
+                        sessions: groupSessions
+                    )
+                }
         )
     }
 
@@ -146,28 +164,91 @@ public extension AppShellNavigationSummary {
         )
     }
 
-    private static func groupNodes(
+    private static func threadNodes(
         sessions: [SessionSummary],
-        idPrefix: String,
-        key: (SessionSummary) -> String,
-        title: (SessionSummary) -> String
+        idPrefix: String
     ) -> [AppShellNavigationNode] {
-        AppShellNavigationOrdering.sortNodesByRecency(
-            Dictionary(grouping: sessions, by: key)
-                .map { groupKey, groupSessions in
-                let orderedGroupSessions = SessionCatalogOrdering.sort(groupSessions)
-                let groupTitle = title(orderedGroupSessions[0])
-                return (
-                    node: AppShellNavigationNode(
-                        id: "\(idPrefix).\(groupKey)",
-                        title: groupTitle,
-                        count: orderedGroupSessions.count,
-                        sessionIDs: orderedGroupSessions.map(\.id)
-                    ),
-                    sessions: groupSessions
-                )
+        let orderedSessions = SessionCatalogOrdering.sort(sessions)
+        let sessionIDs = Set(orderedSessions.map(\.id))
+        let parentPairs: [(parentID: SessionID, session: SessionSummary)] = orderedSessions.compactMap { session in
+            guard let parentID = relationshipParentID(for: session, sessionIDs: sessionIDs) else {
+                return nil
             }
+            return (parentID: parentID, session: session)
+        }
+        let childSessionsByParent = Dictionary(grouping: parentPairs) { $0.parentID }
+            .mapValues { parentPairs in
+                SessionCatalogOrdering.sort(parentPairs.map(\.session))
+            }
+        let threadedSessionIDs = Set(parentPairs.flatMap { [$0.parentID, $0.session.id] })
+        guard threadedSessionIDs.isEmpty == false else {
+            return []
+        }
+
+        let threadedSessions = orderedSessions.filter { threadedSessionIDs.contains($0.id) }
+        let rootSessions = threadedSessions.filter {
+            relationshipParentID(for: $0, sessionIDs: sessionIDs) == nil
+        }
+        let safeRootSessions = rootSessions.isEmpty ? threadedSessions : rootSessions
+
+        return safeRootSessions.map { session in
+            threadNode(
+                session: session,
+                idPrefix: idPrefix,
+                childSessionsByParent: childSessionsByParent,
+                visitedSessionIDs: []
+            )
+        }
+    }
+
+    private static func threadNode(
+        session: SessionSummary,
+        idPrefix: String,
+        childSessionsByParent: [SessionID: [SessionSummary]],
+        visitedSessionIDs: Set<SessionID>
+    ) -> AppShellNavigationNode {
+        guard visitedSessionIDs.contains(session.id) == false else {
+            return AppShellNavigationNode(
+                id: "\(idPrefix).\(session.id.rawValue)",
+                title: session.displayTitle,
+                count: 1,
+                sessionIDs: [session.id]
+            )
+        }
+
+        let nextVisitedSessionIDs = visitedSessionIDs.union([session.id])
+        let children = (childSessionsByParent[session.id] ?? []).map { childSession in
+            threadNode(
+                session: childSession,
+                idPrefix: idPrefix,
+                childSessionsByParent: childSessionsByParent,
+                visitedSessionIDs: nextVisitedSessionIDs
+            )
+        }
+        let sessionIDs = ([session.id] + children.flatMap(\.sessionIDs)).uniqueSessionIDsPreservingOrder()
+
+        return AppShellNavigationNode(
+            id: "\(idPrefix).\(session.id.rawValue)",
+            title: session.displayTitle,
+            count: sessionIDs.count,
+            sessionIDs: sessionIDs,
+            children: children
         )
+    }
+
+    private static func relationshipParentID(
+        for session: SessionSummary,
+        sessionIDs: Set<SessionID>
+    ) -> SessionID? {
+        let parentID = session.metadata.parentThreadID ?? session.metadata.forkedFromID
+        guard let parentID,
+              parentID != session.id,
+              sessionIDs.contains(parentID)
+        else {
+            return nil
+        }
+
+        return parentID
     }
 
     private static func problemCategoriesBySession(
@@ -277,6 +358,11 @@ private extension Array where Element == AppShellNavigationProblemCategory {
 }
 
 private extension Array where Element == SessionID {
+    func uniqueSessionIDsPreservingOrder() -> [SessionID] {
+        var seen: Set<SessionID> = []
+        return filter { seen.insert($0).inserted }
+    }
+
     func uniqueSortedByRawValue() -> [SessionID] {
         var seen: Set<SessionID> = []
         return filter { seen.insert($0).inserted }

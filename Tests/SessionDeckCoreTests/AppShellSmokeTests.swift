@@ -6,9 +6,10 @@ func compositionRootExposesReadOnlySourceDiscoveryState() {
     let viewModel = SessionDeckCompositionRoot.makeAppShellViewModel()
 
     #expect(viewModel.title == "SessionDeck")
-    #expect(viewModel.subtitle == "Local-first session viewer scaffold")
-    #expect(viewModel.statusMessage == "Read-only source discovery is active. Session catalog is not implemented yet.")
-    #expect(viewModel.configuredSourceCount == 1)
+    #expect(viewModel.subtitle == "Local-first session viewer")
+    #expect(viewModel.statusMessage == "Ready to refresh read-only local session sources.")
+    #expect(viewModel.sourceDiscoverySummary == .placeholder)
+    #expect(viewModel.catalogSummary == .placeholder)
     #expect(viewModel.safetyPolicy.readsRealAgentStores == true)
     #expect(viewModel.safetyPolicy.permitsNetworkCalls == false)
     #expect(viewModel.safetyPolicy.permitsCommandExecution == false)

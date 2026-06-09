@@ -51,10 +51,31 @@ public struct CatalogFileSize: Equatable, Sendable {
 public struct CatalogSessionMetadata: Equatable, Sendable {
     public let modelName: String?
     public let agentProfileName: String?
+    public let parentThreadID: SessionID?
+    public let forkedFromID: SessionID?
+    public let threadSource: String?
+    public let agentNickname: String?
+    public let agentRole: String?
+    public let agentPath: String?
 
-    public init(modelName: String?, agentProfileName: String?) {
+    public init(
+        modelName: String?,
+        agentProfileName: String?,
+        parentThreadID: SessionID? = nil,
+        forkedFromID: SessionID? = nil,
+        threadSource: String? = nil,
+        agentNickname: String? = nil,
+        agentRole: String? = nil,
+        agentPath: String? = nil
+    ) {
         self.modelName = modelName
         self.agentProfileName = agentProfileName
+        self.parentThreadID = parentThreadID
+        self.forkedFromID = forkedFromID
+        self.threadSource = threadSource
+        self.agentNickname = agentNickname
+        self.agentRole = agentRole
+        self.agentPath = agentPath
     }
 }
 

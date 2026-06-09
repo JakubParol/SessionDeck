@@ -46,6 +46,179 @@ func codexCatalogAdapterExtractsBoundedMetadataFromCandidateFiles() throws {
     #expect(summary.health.diagnostics.isEmpty)
 }
 
+@Test("Codex catalog adapter derives project grouping from cwd when project metadata is absent")
+func codexCatalogAdapterDerivesProjectGroupingFromCWDWhenProjectMetadataIsAbsent() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "cwd-derived-project")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"session_meta","payload":{"id":"cwd-session","cwd":"/Users/kuba/Repos/VibeYears","source":"codex-cli"}}
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"turn_context","payload":{"cwd":"/Users/kuba/Repos/VibeYears"}}
+        {"timestamp":"2026-04-28T06:04:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Open project session."}]}}
+
+        """,
+        source: source,
+        sessionID: "cwd-session",
+        placement: .project("VibeYears"),
+        timestamp: "2026-04-28T06:04:00Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        scanLimits: CodexCatalogScanLimits(maximumBytes: 512, maximumLines: 8)
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+    let projectGroup = ProjectGroupingPolicy.resolve(session: summary)
+
+    #expect(summary.projectHint == CatalogProjectHint(cwdPath: "/Users/kuba/Repos/VibeYears", displayName: "VibeYears"))
+    #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.isEmpty)
+    #expect(projectGroup.kind == .project)
+    #expect(projectGroup.title == "VibeYears")
+}
+
+@Test("Codex catalog adapter prefers delegated repo root over temporary Codex cwd")
+func codexCatalogAdapterPrefersDelegatedRepoRootOverTemporaryCodexCWD() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "delegated-repo-root")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-06-03T16:50:48.000Z","type":"session_meta","payload":{"id":"delegated-session","cwd":"/Users/kuba/Documents/Codex/2026-06-03/e2e-sdeck-130-full-flow-attempt-1","source":"vscode"}}
+        {"timestamp":"2026-06-03T16:50:50.000Z","type":"turn_context","payload":{"cwd":"/Users/kuba/Documents/Codex/2026-06-03/e2e-sdeck-130-full-flow-attempt-1"}}
+        {"timestamp":"2026-06-03T16:50:51.294Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<codex_delegation>\\n<input>Run full E2E delivery for SessionDeck Story SDECK-130.\\n\\nRepo root: /Users/kuba/Repos/SessionDeck\\nCommand intent: [E2E] SDECK-130\\n</input>\\n</codex_delegation>"}]}}
+
+        """,
+        source: source,
+        sessionID: "delegated-session",
+        placement: .project("e2e-sdeck-130-full-flow-attempt-1"),
+        timestamp: "2026-06-03T16:50:48Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        scanLimits: CodexCatalogScanLimits(maximumBytes: 1_024, maximumLines: 8)
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+    let projectGroup = ProjectGroupingPolicy.resolve(session: summary)
+
+    #expect(summary.projectHint == CatalogProjectHint(cwdPath: "/Users/kuba/Repos/SessionDeck", displayName: "SessionDeck"))
+    #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.isEmpty)
+    #expect(projectGroup.kind == .project)
+    #expect(projectGroup.title == "SessionDeck")
+}
+
+@Test("Codex catalog adapter infers delegated repo root from truncated catalog fragments")
+func codexCatalogAdapterInfersDelegatedRepoRootFromTruncatedCatalogFragments() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "truncated-delegated-repo-root")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let largeDelegation = "<codex_delegation>\\n<input>Run full E2E delivery.\\n\\n"
+        + "Repo root: /Users/kuba/Repos/SessionDeck\\nCommand intent: [E2E] SDECK-130\\n"
+        + String(repeating: "x", count: 4_096)
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-06-03T16:50:48.000Z","type":"session_meta","payload":{"id":"truncated-delegated-session","cwd":"/Users/kuba/Documents/Codex/2026-06-03/e2e-sdeck-130-full-flow-attempt-1","source":"vscode"}}
+        {"timestamp":"2026-06-03T16:50:51.294Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"\(largeDelegation)"}]}}
+
+        """,
+        source: source,
+        sessionID: "truncated-delegated-session",
+        placement: .project("e2e-sdeck-130-full-flow-attempt-1"),
+        timestamp: "2026-06-03T16:50:48Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        scanLimits: CodexCatalogScanLimits(maximumBytes: 1_024, maximumLines: 8)
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.projectHint == CatalogProjectHint(cwdPath: "/Users/kuba/Repos/SessionDeck", displayName: "SessionDeck"))
+    #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.map(\.code) == [.boundedReadTruncated])
+}
+
+@Test("Codex catalog adapter default scan reaches delegated repo root after large prompt preamble")
+func codexCatalogAdapterDefaultScanReachesDelegatedRepoRootAfterLargePromptPreamble() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "default-scan-delegated-repo-root")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let largeDelegation = "<codex_delegation>\\n<input>"
+        + String(repeating: "x", count: 80_000)
+        + "\\n\\nRepo root: /Users/kuba/Repos/SessionDeck\\nCommand intent: [E2E] SDECK-130\\n"
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-06-03T16:50:48.000Z","type":"session_meta","payload":{"id":"default-scan-delegated-session","cwd":"/Users/kuba/Documents/Codex/2026-06-03/e2e-sdeck-130-full-flow-attempt-1","source":"vscode"}}
+        {"timestamp":"2026-06-03T16:50:51.294Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"\(largeDelegation)"}]}}
+
+        """,
+        source: source,
+        sessionID: "default-scan-delegated-session",
+        placement: .project("e2e-sdeck-130-full-flow-attempt-1"),
+        timestamp: "2026-06-03T16:50:48Z"
+    )
+    let adapter = try makeCatalogAdapter(source: source, transcript: transcript)
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.projectHint == CatalogProjectHint(cwdPath: "/Users/kuba/Repos/SessionDeck", displayName: "SessionDeck"))
+    #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.isEmpty)
+}
+
+@Test("Codex catalog adapter extracts upstream thread relationship metadata")
+func codexCatalogAdapterExtractsUpstreamThreadRelationshipMetadata() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "upstream-thread-relationship")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-06-09T10:00:00.000Z","type":"session_meta","payload":{"id":"child-thread","cwd":"/Users/kuba/Repos/SessionDeck","source":"vscode","thread_source":"subagent","parent_thread_id":"parent-thread","forked_from_id":"fork-source","agent_nickname":"Reviewer","agent_role":"review","agent_path":"/Users/kuba/.codex/agents/reviewer.md"}}
+        {"timestamp":"2026-06-09T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Relationship metadata fixture."}]}}
+
+        """,
+        source: source,
+        sessionID: "child-thread",
+        placement: .project("SessionDeck"),
+        timestamp: "2026-06-09T10:00:00Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        scanLimits: CodexCatalogScanLimits(maximumBytes: 1_024, maximumLines: 8)
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.metadata.parentThreadID == SessionID(rawValue: "parent-thread"))
+    #expect(summary.metadata.forkedFromID == SessionID(rawValue: "fork-source"))
+    #expect(summary.metadata.threadSource == "subagent")
+    #expect(summary.metadata.agentNickname == "Reviewer")
+    #expect(summary.metadata.agentRole == "review")
+    #expect(summary.metadata.agentPath == "/Users/kuba/.codex/agents/reviewer.md")
+}
+
 @Test("Codex catalog adapter ignores byte-limit truncation after metadata")
 func codexCatalogAdapterIgnoresByteLimitTruncationAfterMetadata() throws {
     let fixtureRoot = try makeCatalogFixtureRoot(name: "large-output")

@@ -4,8 +4,8 @@ public struct PlaceholderLaunchConfigurationProvider: LaunchConfigurationProvidi
     public func loadConfiguration() -> AppShellLaunchConfiguration {
         AppShellLaunchConfiguration(
             title: "SessionDeck",
-            subtitle: "Local-first session viewer scaffold",
-            statusMessage: "Read-only source discovery is active. Session catalog is not implemented yet.",
+            subtitle: "Local-first session viewer",
+            statusMessage: "Ready to refresh read-only local session sources.",
             configuredSourceCount: 0,
             safetyPolicy: LaunchSafetyPolicy(
                 readsRealAgentStores: true,

@@ -62,7 +62,7 @@ public enum SessionDeckCompositionRoot {
 
         return SessionDeckApplicationComposition(
             appShellUseCase: appShellUseCase,
-            appShellViewModel: appShellUseCase.makeViewModel(),
+            appShellViewModel: appShellUseCase.makeLaunchViewModel(),
             discoverSessionSources: discoverSessionSources,
             enumerateCandidateSessionFiles: enumerateCandidateSessionFiles,
             listSessions: listSessions,

@@ -22,6 +22,29 @@ func codexTranscriptDecoderMapsMinimalConversationTurns() throws {
     #expect(result.orderedSegments.map(\.metadata["role"]) == ["user", "assistant"])
 }
 
+@Test("Codex transcript decoder ignores control events and developer context in current Codex transcripts")
+func codexTranscriptDecoderIgnoresControlEventsAndDeveloperContextInCurrentCodexTranscripts() throws {
+    let result = try decodeTemporaryTranscript(
+        sessionID: "current-codex-shape-session",
+        content: """
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"session_meta","payload":{"id":"current-codex-shape-session","cwd":"/Users/kuba/Repos/VibeYears","source":"codex-cli"}}
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"event_msg","payload":{"type":"task_started","turn_id":"turn-1"}}
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"Internal app instructions."}]}}
+        {"timestamp":"2026-04-28T06:04:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Build the feature."}]}}
+        {"timestamp":"2026-04-28T06:04:02.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total":123}}}
+        {"timestamp":"2026-04-28T06:04:03.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Feature is ready."}]}}
+        """
+    )
+
+    #expect(result.diagnostics.isEmpty)
+    #expect(result.isPartial == false)
+    #expect(result.orderedSegments.map(\.kind) == [.userMessage, .assistantMessage])
+    #expect(result.orderedSegments.map(\.text) == [
+        "Build the feature.",
+        "Feature is ready.",
+    ])
+}
+
 @Test("Codex transcript decoder preserves multi-turn ordering and unsupported event visibility")
 func codexTranscriptDecoderPreservesMultiTurnOrderingAndUnsupportedEvents() throws {
     let result = try decodeFixture(.multiTurnConversation, sessionID: "multi-turn-session")
@@ -249,6 +272,55 @@ func codexTranscriptDecoderPreservesMixedToolOrderingAndSourceMetadata() throws 
     ])
 }
 
+@Test("Codex transcript decoder summarizes repeated unsupported event types")
+func codexTranscriptDecoderSummarizesRepeatedUnsupportedEventTypes() throws {
+    let result = try decodeTemporaryTranscript(
+        sessionID: "repeated-unsupported-session",
+        content: """
+        {"timestamp":"2026-01-01T00:00:00Z","type":"session_meta","payload":{"id":"repeated-unsupported-session","title":"Repeated Unsupported","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+        {"timestamp":"2026-01-01T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Start."}]}}
+        {"timestamp":"2026-01-01T00:00:02Z","type":"future_codex_event","payload":{"value":1}}
+        {"timestamp":"2026-01-01T00:00:03Z","type":"future_codex_event","payload":{"value":2}}
+        {"timestamp":"2026-01-01T00:00:04Z","type":"future_codex_event","payload":{"value":3}}
+        {"timestamp":"2026-01-01T00:00:05Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done."}]}}
+        """
+    )
+
+    #expect(result.diagnostics.map(\.code) == ["codex.unsupported_event"])
+    #expect(result.orderedSegments.map(\.kind) == [
+        .userMessage,
+        .unknown(eventType: "future_codex_event"),
+        .assistantMessage,
+    ])
+    #expect(result.orderedSegments.map(\.source.lineNumber) == [2, 3, 6])
+}
+
+@Test("Codex transcript decoder bounds large selected transcript reads")
+func codexTranscriptDecoderBoundsLargeSelectedTranscriptReads() throws {
+    let prefix = """
+    {"timestamp":"2026-01-01T00:00:00Z","type":"session_meta","payload":{"id":"bounded-selected-session","title":"Bounded Selected","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+    {"timestamp":"2026-01-01T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Load a bounded preview."}]}}
+    {"timestamp":"2026-01-01T00:00:02Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The preview is readable."}]}}
+
+    """
+    let largeTail = String(
+        repeating: #"{"timestamp":"2026-01-01T00:00:03Z","type":"turn_context","payload":{"ignored":"tail"}}"# + "\n",
+        count: 1_000
+    )
+    let result = try decodeTemporaryTranscript(
+        sessionID: "bounded-selected-session",
+        content: prefix + largeTail,
+        maximumTranscriptBytes: prefix.utf8.count + 12
+    )
+
+    #expect(result.orderedSegments.map(\.text) == [
+        "Load a bounded preview.",
+        "The preview is readable.",
+    ])
+    #expect(result.diagnostics.map(\.code) == ["codex.bounded_read_truncated"])
+    #expect(result.isPartial)
+}
+
 @Test("Codex transcript decoder uses path-guarded synthetic fixtures for degraded cases")
 func codexTranscriptDecoderUsesPathGuardedSyntheticFixturesForDegradedCases() throws {
     for fixtureID in [CodexTranscriptFixtureID.malformedLine, .unknownEvent, .missingMetadata] {
@@ -278,6 +350,42 @@ private func decodeFixture(
         fallbackTitle: "Fallback title"
     )
     let decoder = CodexTranscriptDecodingAdapter(files: [file])
+
+    return try decoder.loadTranscript(sessionID: sessionID)
+}
+
+private func decodeTemporaryTranscript(
+    sessionID rawSessionID: String,
+    content: String,
+    maximumTranscriptBytes: Int = CodexTranscriptDecodingAdapter.defaultMaximumTranscriptBytes
+) throws -> TranscriptDecodeResult {
+    let fixtureRoot = try FixtureTempRoot(
+        parentDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
+        name: "sessiondeck-transcript-decoder-\(UUID().uuidString)",
+        pathGuard: FixturePathGuard(forbiddenHomeDirectories: [FileManager.default.homeDirectoryForCurrentUser])
+    )
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+
+    let transcriptURL = fixtureRoot.url.appendingPathComponent("transcript.jsonl", isDirectory: false)
+    try content.write(to: transcriptURL, atomically: true, encoding: .utf8)
+
+    let sessionID = SessionID(rawValue: rawSessionID)
+    let file = CodexTranscriptFile(
+        sessionID: sessionID,
+        fileURL: transcriptURL,
+        source: TranscriptSegmentSourceReference(
+            sourceID: SessionSourceID(rawValue: "codex-temp"),
+            relativePath: "transcript.jsonl",
+            lineNumber: nil
+        ),
+        fallbackTitle: "Temporary transcript"
+    )
+    let decoder = CodexTranscriptDecodingAdapter(
+        files: [file],
+        maximumTranscriptBytes: maximumTranscriptBytes
+    )
 
     return try decoder.loadTranscript(sessionID: sessionID)
 }

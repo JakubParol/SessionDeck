@@ -36,6 +36,29 @@ struct CodexTranscriptJSONEvent {
         }
     }
 
+    var isIgnorableForReadableTranscript: Bool {
+        if type == "turn_context" {
+            return true
+        }
+
+        if type == "event_msg" {
+            return true
+        }
+
+        if payloadType == "reasoning" {
+            return true
+        }
+
+        guard type == "response_item",
+              payloadType == "message"
+        else {
+            return false
+        }
+
+        let role = payload["role"] as? String
+        return role != "user" && role != "assistant"
+    }
+
     var payloadType: String? {
         payload["type"] as? String
     }
