@@ -15,7 +15,8 @@ wait_for_main_window() {
       continue
     fi
 
-    if /usr/bin/osascript >/dev/null 2>&1 <<APPLESCRIPT
+    local readiness_output
+    readiness_output=$(/usr/bin/osascript 2>/dev/null <<APPLESCRIPT
 tell application "System Events"
   if exists process "$APP_NAME" then
     tell process "$APP_NAME"
@@ -25,7 +26,8 @@ tell application "System Events"
 end tell
 return "not-ready"
 APPLESCRIPT
-    then
+)
+    if [[ "$readiness_output" == "ready" ]]; then
       echo "SessionDeck window readiness: main window detected for $APP_NAME."
       return 0
     fi
