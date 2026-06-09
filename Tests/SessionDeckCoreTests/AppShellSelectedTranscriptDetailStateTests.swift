@@ -101,6 +101,8 @@ func selectedTranscriptDetailStateMapsLoadedReadModel() throws {
         "Title",
         "Source",
         "Project",
+        "Thread",
+        "Transcript",
         "Path",
         "Created",
         "Last Activity",
@@ -109,16 +111,69 @@ func selectedTranscriptDetailStateMapsLoadedReadModel() throws {
         "Decoded selected session",
         "Codex fixture / Fixture",
         "SessionDeck",
+        "Root thread",
+        "Partial transcript: 2 segments, 1 warning",
         "/tmp/sessiondeck/selected-session.jsonl",
         "1",
         "2",
     ])
-    #expect(state.metadataRows.allSatisfy { $0.isFallback == false })
+    #expect(state.metadataRows.filter { $0.id != "thread" }.allSatisfy { $0.isFallback == false })
+    #expect(state.metadataRows.first { $0.id == "thread" }?.isFallback == true)
     #expect(state.rows.map(\.text) == ["First", "Second"])
     #expect(state.rows.map(\.roleLabel) == ["User", "Assistant"])
     #expect(state.diagnosticMessages == ["Warning line 3: Unknown event was kept as a diagnostic."])
     #expect(state.diagnosticRows.map(\.severity) == [.warning])
     #expect(state.diagnosticRows.map(\.message) == state.diagnosticMessages)
+}
+
+@Test("selected transcript detail state exposes thread relation and transcript status metadata")
+func selectedTranscriptDetailStateExposesThreadRelationAndTranscriptStatusMetadata() {
+    let sessionID = SessionID(rawValue: "child-session")
+    let sourceID = SessionSourceID(rawValue: "codex-fixture")
+    let readModel = SelectedTranscriptReadModel(
+        session: selectedTranscriptSession(
+            id: sessionID,
+            sourceID: sourceID,
+            metadata: CatalogSessionMetadata(
+                modelName: "gpt-5",
+                agentProfileName: "Naomi",
+                parentThreadID: SessionID(rawValue: "parent-session"),
+                forkedFromID: SessionID(rawValue: "fork-session"),
+                threadSource: "subagent"
+            )
+        ),
+        decodeResult: TranscriptDecodeResult(
+            sessionID: sessionID,
+            title: "Child selected session",
+            segments: [
+                TranscriptSegment(
+                    id: "assistant",
+                    kind: .assistantMessage,
+                    text: "Readable content.",
+                    order: TranscriptSegmentOrder(index: 0),
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 2),
+                    timestampDescription: "10:00"
+                ),
+            ],
+            diagnostics: [
+                TranscriptDecodeDiagnostic(
+                    code: "codex.bounded_read_truncated",
+                    severity: .warning,
+                    message: "Loaded bounded preview.",
+                    source: transcriptSource(sourceID: sourceID, lineNumber: 3),
+                    allowsDecodingToContinue: true
+                ),
+            ],
+            isPartial: true
+        )
+    )
+
+    let state = AppShellSelectedTranscriptDetailState.loaded(readModel)
+
+    #expect(state.metadataRows.map(\.title).contains("Thread"))
+    #expect(state.metadataRows.map(\.title).contains("Transcript"))
+    #expect(state.metadataRows.first { $0.id == "thread" }?.value == "Child of parent-session, forked from fork-session, source subagent")
+    #expect(state.metadataRows.first { $0.id == "transcript-status" }?.value == "Partial transcript: 1 segment, 1 warning")
 }
 
 @Test("selected transcript detail state distinguishes warning and blocking diagnostics")
@@ -320,11 +375,14 @@ func selectedTranscriptDetailStateExposesReadableMetadataFallbacks() {
         "Untitled session",
         "Unknown source",
         "Project unavailable",
+        "Root thread",
+        "Complete transcript: 0 segments",
         "Path unavailable",
         "Created time unavailable",
         "Last activity unavailable",
     ])
-    #expect(state.metadataRows.allSatisfy { $0.isFallback })
+    #expect(state.metadataRows.filter { $0.id != "transcript-status" }.allSatisfy { $0.isFallback })
+    #expect(state.metadataRows.first { $0.id == "transcript-status" }?.isFallback == false)
 }
 
 @Test("selected transcript detail state maps typed loading failures to user-actionable copy")

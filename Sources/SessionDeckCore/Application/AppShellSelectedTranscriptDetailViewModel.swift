@@ -344,6 +344,20 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                 isFallback: readModel.projectHint.cwdPath == nil || readModel.projectHint.displayName.isEmpty
             ),
             AppShellSelectedTranscriptMetadataRow(
+                id: "thread",
+                title: "Thread",
+                value: threadRelationLabel(for: readModel.metadata),
+                isFallback: readModel.metadata.parentThreadID == nil
+                    && readModel.metadata.forkedFromID == nil
+                    && readModel.metadata.threadSource == nil
+            ),
+            AppShellSelectedTranscriptMetadataRow(
+                id: "transcript-status",
+                title: "Transcript",
+                value: transcriptStatusLabel(for: readModel),
+                isFallback: false
+            ),
+            AppShellSelectedTranscriptMetadataRow(
                 id: "path",
                 title: "Path",
                 value: pathLabel(for: readModel.sessionPath),
@@ -368,6 +382,43 @@ public struct AppShellSelectedTranscriptDetailState: Equatable, Sendable {
                 isFallback: readModel.activity.lastActivityEpochSeconds == nil
             ),
         ]
+    }
+
+    private static func threadRelationLabel(for metadata: CatalogSessionMetadata) -> String {
+        var parts: [String] = []
+
+        if let parentThreadID = metadata.parentThreadID {
+            parts.append("Child of \(parentThreadID.rawValue)")
+        }
+        if let forkedFromID = metadata.forkedFromID {
+            parts.append("forked from \(forkedFromID.rawValue)")
+        }
+        if let threadSource = metadata.threadSource, threadSource.isEmpty == false {
+            parts.append("source \(threadSource)")
+        }
+
+        return parts.isEmpty ? "Root thread" : parts.joined(separator: ", ")
+    }
+
+    private static func transcriptStatusLabel(for readModel: SelectedTranscriptReadModel) -> String {
+        let segmentLabel = countLabel(readModel.segments.count, singular: "segment", plural: "segments")
+        let warningCount = readModel.diagnostics.filter { $0.severity == .warning }.count
+        let errorCount = readModel.diagnostics.filter { $0.severity == .error }.count
+
+        var parts = [segmentLabel]
+        if warningCount > 0 {
+            parts.append(countLabel(warningCount, singular: "warning", plural: "warnings"))
+        }
+        if errorCount > 0 {
+            parts.append(countLabel(errorCount, singular: "error", plural: "errors"))
+        }
+
+        let prefix = readModel.isPartial ? "Partial transcript" : "Complete transcript"
+        return "\(prefix): \(parts.joined(separator: ", "))"
+    }
+
+    private static func countLabel(_ count: Int, singular: String, plural: String) -> String {
+        count == 1 ? "1 \(singular)" : "\(count) \(plural)"
     }
 
     private static func sourceLabel(for readModel: SelectedTranscriptReadModel) -> String {
