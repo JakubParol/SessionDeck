@@ -46,6 +46,42 @@ func codexCatalogAdapterExtractsBoundedMetadataFromCandidateFiles() throws {
     #expect(summary.health.diagnostics.isEmpty)
 }
 
+@Test("Codex catalog adapter derives project grouping from cwd when project metadata is absent")
+func codexCatalogAdapterDerivesProjectGroupingFromCWDWhenProjectMetadataIsAbsent() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "cwd-derived-project")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"session_meta","payload":{"id":"cwd-session","cwd":"/Users/kuba/Repos/VibeYears","source":"codex-cli"}}
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"turn_context","payload":{"cwd":"/Users/kuba/Repos/VibeYears"}}
+        {"timestamp":"2026-04-28T06:04:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Open project session."}]}}
+
+        """,
+        source: source,
+        sessionID: "cwd-session",
+        placement: .project("VibeYears"),
+        timestamp: "2026-04-28T06:04:00Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        scanLimits: CodexCatalogScanLimits(maximumBytes: 512, maximumLines: 8)
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+    let projectGroup = ProjectGroupingPolicy.resolve(session: summary)
+
+    #expect(summary.projectHint == CatalogProjectHint(cwdPath: "/Users/kuba/Repos/VibeYears", displayName: "VibeYears"))
+    #expect(summary.health.parseStatus == .complete)
+    #expect(summary.health.diagnostics.isEmpty)
+    #expect(projectGroup.kind == .project)
+    #expect(projectGroup.title == "VibeYears")
+}
+
 @Test("Codex catalog adapter ignores byte-limit truncation after metadata")
 func codexCatalogAdapterIgnoresByteLimitTruncationAfterMetadata() throws {
     let fixtureRoot = try makeCatalogFixtureRoot(name: "large-output")

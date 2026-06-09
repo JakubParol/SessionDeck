@@ -18,6 +18,7 @@ public final class DebouncedLiveRefreshScheduler {
     private let debounceInterval: TimeInterval
     private let timerScheduler: any LiveRefreshTimerScheduling
     private let emit: (LiveRefreshRequest) -> Void
+    private let lock = NSLock()
     private var pendingRefreshes: [LiveRefreshIdentity: PendingRefresh] = [:]
 
     public init(
@@ -32,28 +33,37 @@ public final class DebouncedLiveRefreshScheduler {
 
     public func record(_ event: LiveSourceChangeEvent) {
         let identity = event.identity
-        let nextCount = (pendingRefreshes[identity]?.eventCount ?? 0) + 1
-        pendingRefreshes[identity]?.task.cancel()
+        let previousTask = lock.withLock {
+            let previousTask = pendingRefreshes[identity]?.task
+            let nextCount = (pendingRefreshes[identity]?.eventCount ?? 0) + 1
 
-        let task = timerScheduler.schedule(after: debounceInterval) { [weak self] in
-            self?.emitPendingRefresh(for: identity)
+            let task = timerScheduler.schedule(after: debounceInterval) { [weak self] in
+                self?.emitPendingRefresh(for: identity)
+            }
+            pendingRefreshes[identity] = PendingRefresh(
+                scope: identity.refreshScope,
+                eventCount: nextCount,
+                task: task
+            )
+            return previousTask
         }
-        pendingRefreshes[identity] = PendingRefresh(
-            scope: identity.refreshScope,
-            eventCount: nextCount,
-            task: task
-        )
+        previousTask?.cancel()
     }
 
     public func cancel() {
-        for pendingRefresh in pendingRefreshes.values {
-            pendingRefresh.task.cancel()
+        let tasksToCancel = lock.withLock {
+            let tasks = pendingRefreshes.values.map(\.task)
+            pendingRefreshes.removeAll()
+            return tasks
         }
-        pendingRefreshes.removeAll()
+
+        for task in tasksToCancel {
+            task.cancel()
+        }
     }
 
     private func emitPendingRefresh(for identity: LiveRefreshIdentity) {
-        guard let pendingRefresh = pendingRefreshes.removeValue(forKey: identity) else {
+        guard let pendingRefresh = lock.withLock({ pendingRefreshes.removeValue(forKey: identity) }) else {
             return
         }
 

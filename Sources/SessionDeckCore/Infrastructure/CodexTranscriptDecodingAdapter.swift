@@ -99,7 +99,7 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
                 toolNamesByCallID: &toolNamesByCallID
             ) {
                 segments.append(segment)
-            } else if event.type != "turn_context" {
+            } else if event.isIgnorableForReadableTranscript == false {
                 if recordedUnsupportedEventTypes.insert(event.type).inserted {
                     segments.append(
                         unsupportedSegment(from: event, file: file, source: source, orderIndex: segments.count)
@@ -167,7 +167,14 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
     }
 
     private func missingSessionMetadataKeys(in event: CodexTranscriptJSONEvent) -> [String] {
-        ["id", "title", "source", "cwd", "project"].filter { event.payload.keys.contains($0) == false }
+        var missingKeys: [String] = []
+        if event.payload.keys.contains("id") == false {
+            missingKeys.append("id")
+        }
+        if event.payload.keys.contains("cwd") == false && event.payload.keys.contains("project") == false {
+            missingKeys.append("cwd")
+        }
+        return missingKeys
     }
 
     private func supportedSegment(

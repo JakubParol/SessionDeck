@@ -79,10 +79,31 @@ public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, Session
     }
 
     private func projectHint(for metadata: CodexCatalogMetadata) -> CatalogProjectHint {
-        guard let project = metadata.project, project.isEmpty == false else {
+        if let project = trimmed(metadata.project), project.isEmpty == false {
+            return CatalogProjectHint(cwdPath: metadata.cwd, displayName: project)
+        }
+
+        guard let cwd = trimmed(metadata.cwd),
+              cwd.isEmpty == false,
+              let projectName = projectName(from: cwd)
+        else {
             return .unavailable
         }
-        return CatalogProjectHint(cwdPath: metadata.cwd, displayName: project)
+
+        return CatalogProjectHint(cwdPath: cwd, displayName: projectName)
+    }
+
+    private func projectName(from cwd: String) -> String? {
+        let name = URL(fileURLWithPath: cwd).lastPathComponent
+        return name.isEmpty ? nil : name
+    }
+
+    private func trimmed(_ value: String?) -> String? {
+        guard let value else {
+            return nil
+        }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func fallbackSessionID(for candidate: CandidateSessionFile) -> String {

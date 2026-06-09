@@ -42,6 +42,8 @@ struct CodexCatalogScanner: Sendable {
 
             if event.type == "session_meta" {
                 metadata.apply(payload: event.payload)
+            } else if event.type == "turn_context" {
+                metadata.applyContext(payload: event.payload)
             } else if !isKnownCodexEventType(event.type) {
                 encounteredUnknownEventShape = true
             }
@@ -173,7 +175,7 @@ struct CodexCatalogScanner: Sendable {
         if encounteredMalformedLine {
             return .malformed(reason: "Encountered malformed JSONL while scanning bounded catalog metadata.")
         }
-        if metadata.id == nil || metadata.title == nil || metadata.project == nil || metadata.cwd == nil {
+        if metadata.id == nil || (metadata.cwd == nil && metadata.project == nil) {
             return .missingMetadata
         }
         return .complete
@@ -274,6 +276,14 @@ struct CodexCatalogMetadata {
         cwd = payload["cwd"] as? String ?? cwd
         source = payload["source"] as? String ?? source
         modelName = payload["model"] as? String ?? payload["model_name"] as? String ?? modelName
+    }
+
+    mutating func applyContext(payload: [String: Any]?) {
+        guard let payload else {
+            return
+        }
+
+        cwd = payload["cwd"] as? String ?? cwd
     }
 }
 

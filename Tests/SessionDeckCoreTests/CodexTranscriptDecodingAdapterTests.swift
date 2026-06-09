@@ -22,6 +22,29 @@ func codexTranscriptDecoderMapsMinimalConversationTurns() throws {
     #expect(result.orderedSegments.map(\.metadata["role"]) == ["user", "assistant"])
 }
 
+@Test("Codex transcript decoder ignores control events and developer context in current Codex transcripts")
+func codexTranscriptDecoderIgnoresControlEventsAndDeveloperContextInCurrentCodexTranscripts() throws {
+    let result = try decodeTemporaryTranscript(
+        sessionID: "current-codex-shape-session",
+        content: """
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"session_meta","payload":{"id":"current-codex-shape-session","cwd":"/Users/kuba/Repos/VibeYears","source":"codex-cli"}}
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"event_msg","payload":{"type":"task_started","turn_id":"turn-1"}}
+        {"timestamp":"2026-04-28T06:04:00.903Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"Internal app instructions."}]}}
+        {"timestamp":"2026-04-28T06:04:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Build the feature."}]}}
+        {"timestamp":"2026-04-28T06:04:02.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total":123}}}
+        {"timestamp":"2026-04-28T06:04:03.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Feature is ready."}]}}
+        """
+    )
+
+    #expect(result.diagnostics.isEmpty)
+    #expect(result.isPartial == false)
+    #expect(result.orderedSegments.map(\.kind) == [.userMessage, .assistantMessage])
+    #expect(result.orderedSegments.map(\.text) == [
+        "Build the feature.",
+        "Feature is ready.",
+    ])
+}
+
 @Test("Codex transcript decoder preserves multi-turn ordering and unsupported event visibility")
 func codexTranscriptDecoderPreservesMultiTurnOrderingAndUnsupportedEvents() throws {
     let result = try decodeFixture(.multiTurnConversation, sessionID: "multi-turn-session")
