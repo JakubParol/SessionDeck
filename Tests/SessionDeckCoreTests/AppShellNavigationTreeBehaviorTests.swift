@@ -224,11 +224,78 @@ func navigationTreeNestsRelatedThreadsUnderTheirProjectParent() throws {
     #expect(projectNode.count == 3)
     #expect(projectNode.children.map(\.id) == [
         "projects.project./Users/kuba/Repos/SessionDeck.thread.parent-thread",
+        "projects.project./Users/kuba/Repos/SessionDeck.roots",
     ])
     #expect(parentNode.count == 2)
     #expect(parentNode.sessionIDs.map(\.rawValue) == ["parent-thread", "child-thread"])
     #expect(childNode.id == "projects.project./Users/kuba/Repos/SessionDeck.thread.child-thread")
     #expect(childNode.sessionIDs.map(\.rawValue) == ["child-thread"])
+}
+
+@Test("navigation tree groups unrelated project roots under a stable bucket")
+func navigationTreeGroupsUnrelatedProjectRootsUnderStableBucket() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-root-bucket")
+    let sourceLabel = CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex",
+        profileName: nil
+    )
+    let project = CatalogProjectHint(cwdPath: "/Users/kuba/Repos/SessionDeck", displayName: "SessionDeck")
+    let snapshot = navigationSnapshot(
+        sessions: [
+            navigationSession(
+                id: "child-thread",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 40,
+                parentThreadID: SessionID(rawValue: "parent-thread")
+            ),
+            navigationSession(
+                id: "parent-thread",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 30
+            ),
+            navigationSession(
+                id: "scratch-root",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 20
+            ),
+            navigationSession(
+                id: "daily-root",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 10
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+    let projectNode = try #require(summary.projectsNode.children.first)
+    let rootBucket = try #require(
+        projectNode.children.first { $0.id == "projects.project./Users/kuba/Repos/SessionDeck.roots" }
+    )
+
+    #expect(projectNode.children.map(\.id) == [
+        "projects.project./Users/kuba/Repos/SessionDeck.thread.parent-thread",
+        "projects.project./Users/kuba/Repos/SessionDeck.roots",
+    ])
+    #expect(rootBucket.title == "Root Sessions")
+    #expect(rootBucket.count == 2)
+    #expect(rootBucket.sessionIDs.map(\.rawValue) == ["scratch-root", "daily-root"])
+    #expect(rootBucket.children.map(\.id) == [
+        "projects.project./Users/kuba/Repos/SessionDeck.roots.scratch-root",
+        "projects.project./Users/kuba/Repos/SessionDeck.roots.daily-root",
+    ])
 }
 
 @Test("navigation tree normalizes source profile nodes with fallbacks and duplicate names")
