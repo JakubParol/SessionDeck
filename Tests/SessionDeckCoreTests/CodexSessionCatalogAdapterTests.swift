@@ -184,6 +184,41 @@ func codexCatalogAdapterDefaultScanReachesDelegatedRepoRootAfterLargePromptPream
     #expect(summary.health.diagnostics.isEmpty)
 }
 
+@Test("Codex catalog adapter extracts upstream thread relationship metadata")
+func codexCatalogAdapterExtractsUpstreamThreadRelationshipMetadata() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "upstream-thread-relationship")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-06-09T10:00:00.000Z","type":"session_meta","payload":{"id":"child-thread","cwd":"/Users/kuba/Repos/SessionDeck","source":"vscode","thread_source":"subagent","parent_thread_id":"parent-thread","forked_from_id":"fork-source","agent_nickname":"Reviewer","agent_role":"review","agent_path":"/Users/kuba/.codex/agents/reviewer.md"}}
+        {"timestamp":"2026-06-09T10:00:01.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Relationship metadata fixture."}]}}
+
+        """,
+        source: source,
+        sessionID: "child-thread",
+        placement: .project("SessionDeck"),
+        timestamp: "2026-06-09T10:00:00Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        scanLimits: CodexCatalogScanLimits(maximumBytes: 1_024, maximumLines: 8)
+    )
+
+    let summary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(summary.metadata.parentThreadID == SessionID(rawValue: "parent-thread"))
+    #expect(summary.metadata.forkedFromID == SessionID(rawValue: "fork-source"))
+    #expect(summary.metadata.threadSource == "subagent")
+    #expect(summary.metadata.agentNickname == "Reviewer")
+    #expect(summary.metadata.agentRole == "review")
+    #expect(summary.metadata.agentPath == "/Users/kuba/.codex/agents/reviewer.md")
+}
+
 @Test("Codex catalog adapter ignores byte-limit truncation after metadata")
 func codexCatalogAdapterIgnoresByteLimitTruncationAfterMetadata() throws {
     let fixtureRoot = try makeCatalogFixtureRoot(name: "large-output")

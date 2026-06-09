@@ -267,6 +267,12 @@ struct CodexCatalogMetadata {
     var cwd: String?
     var source: String?
     var modelName: String?
+    var parentThreadID: String?
+    var forkedFromID: String?
+    var threadSource: String?
+    var agentNickname: String?
+    var agentRole: String?
+    var agentPath: String?
 
     mutating func apply(payload: [String: Any]?) {
         guard let payload else {
@@ -279,6 +285,12 @@ struct CodexCatalogMetadata {
         cwd = payload["cwd"] as? String ?? cwd
         source = payload["source"] as? String ?? source
         modelName = payload["model"] as? String ?? payload["model_name"] as? String ?? modelName
+        parentThreadID = payload["parent_thread_id"] as? String ?? parentThreadID
+        forkedFromID = payload["forked_from_id"] as? String ?? forkedFromID
+        threadSource = payload["thread_source"] as? String ?? threadSource
+        agentNickname = payload["agent_nickname"] as? String ?? agentNickname
+        agentRole = payload["agent_role"] as? String ?? agentRole
+        agentPath = payload["agent_path"] as? String ?? agentPath
     }
 
     mutating func applyContext(payload: [String: Any]?) {

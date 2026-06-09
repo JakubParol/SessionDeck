@@ -176,6 +176,61 @@ func navigationTreeKeepsDuplicateProjectDisplayNamesDistinct() {
     #expect(summary.projectsNode.children.map(\.title) == ["Toolbox", "Toolbox"])
 }
 
+@Test("navigation tree nests related threads under their project parent")
+func navigationTreeNestsRelatedThreadsUnderTheirProjectParent() throws {
+    let sourceID = SessionSourceID(rawValue: "codex-relationships")
+    let sourceLabel = CatalogSourceLabel(
+        sourceID: sourceID.rawValue,
+        displayName: "Codex",
+        profileName: nil
+    )
+    let project = CatalogProjectHint(cwdPath: "/Users/kuba/Repos/SessionDeck", displayName: "SessionDeck")
+    let snapshot = navigationSnapshot(
+        sessions: [
+            navigationSession(
+                id: "child-thread",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 30,
+                parentThreadID: SessionID(rawValue: "parent-thread")
+            ),
+            navigationSession(
+                id: "parent-thread",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 20
+            ),
+            navigationSession(
+                id: "root-thread",
+                sourceID: sourceID,
+                sourceLabel: sourceLabel,
+                projectHint: project,
+                profileName: "vscode",
+                lastActivity: 10
+            ),
+        ]
+    )
+
+    let summary = AppShellNavigationSummary.make(snapshot: snapshot)
+    let projectNode = try #require(summary.projectsNode.children.first)
+    let parentNode = try #require(projectNode.children.first { $0.id == "projects.project./Users/kuba/Repos/SessionDeck.thread.parent-thread" })
+    let childNode = try #require(parentNode.children.first)
+
+    #expect(projectNode.title == "SessionDeck")
+    #expect(projectNode.count == 3)
+    #expect(projectNode.children.map(\.id) == [
+        "projects.project./Users/kuba/Repos/SessionDeck.thread.parent-thread",
+    ])
+    #expect(parentNode.count == 2)
+    #expect(parentNode.sessionIDs.map(\.rawValue) == ["parent-thread", "child-thread"])
+    #expect(childNode.id == "projects.project./Users/kuba/Repos/SessionDeck.thread.child-thread")
+    #expect(childNode.sessionIDs.map(\.rawValue) == ["child-thread"])
+}
+
 @Test("navigation tree normalizes source profile nodes with fallbacks and duplicate names")
 func navigationTreeNormalizesSourceProfileNodesWithFallbacksAndDuplicateNames() throws {
     let cliSourceID = SessionSourceID(rawValue: "codex-cli")
@@ -280,6 +335,8 @@ private func navigationSession(
     projectHint: CatalogProjectHint,
     profileName: String?,
     lastActivity: Int64,
+    parentThreadID: SessionID? = nil,
+    forkedFromID: SessionID? = nil,
     fallbackReasons: [CatalogSessionFallbackReason] = [],
     health: CatalogEntryHealth = CatalogEntryHealth(parseStatus: .complete)
 ) -> SessionSummary {
@@ -292,7 +349,12 @@ private func navigationSession(
         sessionPath: "/tmp/sessiondeck/\(id).jsonl",
         activity: CatalogActivityTimestamps(createdAtEpochSeconds: nil, lastActivityEpochSeconds: lastActivity),
         fileSize: CatalogFileSize(byteCount: 128),
-        metadata: CatalogSessionMetadata(modelName: nil, agentProfileName: profileName),
+        metadata: CatalogSessionMetadata(
+            modelName: nil,
+            agentProfileName: profileName,
+            parentThreadID: parentThreadID,
+            forkedFromID: forkedFromID
+        ),
         fallbackReasons: fallbackReasons,
         health: health
     )

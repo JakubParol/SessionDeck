@@ -72,7 +72,13 @@ public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, Session
             fileSize: CatalogFileSize(byteCount: candidate.byteSize),
             metadata: CatalogSessionMetadata(
                 modelName: scanResult.metadata.modelName,
-                agentProfileName: scanResult.metadata.source
+                agentProfileName: scanResult.metadata.source,
+                parentThreadID: parsedSessionID(from: scanResult.metadata.parentThreadID),
+                forkedFromID: parsedSessionID(from: scanResult.metadata.forkedFromID),
+                threadSource: trimmed(scanResult.metadata.threadSource),
+                agentNickname: trimmed(scanResult.metadata.agentNickname),
+                agentRole: trimmed(scanResult.metadata.agentRole),
+                agentPath: trimmed(scanResult.metadata.agentPath)
             ),
             health: CatalogEntryHealth(parseStatus: scanResult.parseStatus, diagnostics: scanResult.diagnostics)
         )
@@ -108,6 +114,10 @@ public struct CodexSessionCatalogAdapter: CatalogMetadataExtractionPort, Session
 
     private func fallbackSessionID(for candidate: CandidateSessionFile) -> String {
         URL(fileURLWithPath: candidate.absolutePath).deletingPathExtension().lastPathComponent
+    }
+
+    private func parsedSessionID(from value: String?) -> SessionID? {
+        trimmed(value).map(SessionID.init(rawValue:))
     }
 
     private func epochSeconds(from date: Date) -> Int64 {

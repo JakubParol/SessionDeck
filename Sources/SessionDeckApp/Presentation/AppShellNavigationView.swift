@@ -45,9 +45,13 @@ struct AppShellNavigationView: View {
     }
 
     private func flattenedChildren(of node: AppShellNavigationNode) -> [NavigationSidebarRow] {
-        node.children.flatMap { childNode in
-            [NavigationSidebarRow(node: childNode, level: 1)]
-                + childNode.children.map { NavigationSidebarRow(node: $0, level: 2) }
+        flattenedRows(nodes: node.children, level: 1)
+    }
+
+    private func flattenedRows(nodes: [AppShellNavigationNode], level: Int) -> [NavigationSidebarRow] {
+        nodes.flatMap { childNode in
+            [NavigationSidebarRow(node: childNode, level: level)]
+                + flattenedRows(nodes: childNode.children, level: level + 1)
         }
     }
 
@@ -79,7 +83,10 @@ struct AppShellNavigationView: View {
         case .missingMetadata, .malformedMetadata, .parseWarning:
             return "exclamationmark.triangle"
         case nil:
-            return node.children.isEmpty ? "folder" : "folder.badge.questionmark"
+            if node.id.contains(".thread.") {
+                return node.children.isEmpty ? "bubble.left" : "bubble.left.and.bubble.right"
+            }
+            return "folder"
         }
     }
 }
