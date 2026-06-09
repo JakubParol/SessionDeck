@@ -4,7 +4,7 @@ public struct CodexCatalogScanLimits: Equatable, Sendable {
     public let maximumBytes: Int
     public let maximumLines: Int
 
-    public init(maximumBytes: Int = 64 * 1024, maximumLines: Int = 128) {
+    public init(maximumBytes: Int = 256 * 1024, maximumLines: Int = 128) {
         self.maximumBytes = maximumBytes
         self.maximumLines = maximumLines
     }
