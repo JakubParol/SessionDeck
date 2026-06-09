@@ -45,6 +45,33 @@ func codexTranscriptDecoderIgnoresControlEventsAndDeveloperContextInCurrentCodex
     ])
 }
 
+@Test("Codex transcript decoder renders current reasoning summaries without surfacing control noise")
+func codexTranscriptDecoderRendersCurrentReasoningSummariesWithoutControlNoise() throws {
+    let result = try decodeTemporaryTranscript(
+        sessionID: "reasoning-summary-session",
+        content: """
+        {"timestamp":"2026-06-09T10:00:00Z","type":"session_meta","payload":{"id":"reasoning-summary-session","title":"Reasoning Summary","cwd":"/Users/kuba/Repos/SessionDeck","source":"codex-cli"}}
+        {"timestamp":"2026-06-09T10:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Explain the refresh behavior."}]}}
+        {"timestamp":"2026-06-09T10:00:02Z","type":"event_msg","payload":{"type":"token_count","info":{"total":2048}}}
+        {"timestamp":"2026-06-09T10:00:03Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Checked cache invalidation and fallback refresh paths."}]}}
+        {"timestamp":"2026-06-09T10:00:04Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Refresh reuses unchanged entries and falls back safely."}]}}
+        """
+    )
+
+    #expect(result.diagnostics.isEmpty)
+    #expect(result.orderedSegments.map(\.kind) == [
+        .userMessage,
+        .metadata(name: "Reasoning"),
+        .assistantMessage,
+    ])
+    #expect(result.orderedSegments.map(\.text) == [
+        "Explain the refresh behavior.",
+        "Reasoning: Checked cache invalidation and fallback refresh paths.",
+        "Refresh reuses unchanged entries and falls back safely.",
+    ])
+    #expect(result.orderedSegments[1].metadata["payload_type"] == "reasoning")
+}
+
 @Test("Codex transcript decoder preserves multi-turn ordering and unsupported event visibility")
 func codexTranscriptDecoderPreservesMultiTurnOrderingAndUnsupportedEvents() throws {
     let result = try decodeFixture(.multiTurnConversation, sessionID: "multi-turn-session")

@@ -203,6 +203,16 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
             )
         }
 
+        if let reasoningSummary = event.reasoningSummaryText {
+            return reasoningSegment(
+                summary: reasoningSummary,
+                event: event,
+                file: file,
+                source: source,
+                orderIndex: orderIndex
+            )
+        }
+
         guard let role = event.supportedMessageRole,
               let text = event.messageText
         else {
@@ -223,6 +233,27 @@ public struct CodexTranscriptDecodingAdapter: TranscriptDecodingPort, Sendable {
                 "line_number": String(source.lineNumber ?? 0),
                 "role": role,
             ]
+        )
+    }
+
+    private func reasoningSegment(
+        summary: String,
+        event: CodexTranscriptJSONEvent,
+        file: CodexTranscriptFile,
+        source: TranscriptSegmentSourceReference,
+        orderIndex: Int
+    ) -> TranscriptSegment {
+        var metadata = baseMetadata(from: event, source: source)
+        metadata["payload_type"] = "reasoning"
+
+        return TranscriptSegment(
+            id: "\(file.sessionID.rawValue)-line-\(source.lineNumber ?? 0)",
+            kind: .metadata(name: "Reasoning"),
+            text: "Reasoning: \(summary)",
+            order: TranscriptSegmentOrder(index: orderIndex),
+            source: source,
+            timestampDescription: event.timestamp,
+            metadata: metadata
         )
     }
 

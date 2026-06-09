@@ -45,14 +45,10 @@ struct CodexTranscriptJSONEvent {
             return true
         }
 
-        if payloadType == "reasoning" {
-            return true
-        }
-
         guard type == "response_item",
               payloadType == "message"
         else {
-            return false
+            return payloadType == "reasoning" && reasoningSummaryText == nil
         }
 
         let role = payload["role"] as? String
@@ -97,6 +93,39 @@ struct CodexTranscriptJSONEvent {
             ?? payloadSummary("error")
             ?? payloadSummary("output")
             ?? payloadSummary("result")
+    }
+
+    var reasoningSummaryText: String? {
+        guard payloadType == "reasoning" else {
+            return nil
+        }
+
+        if let summary = payload["summary"] as? String {
+            return sanitizedText(summary)
+        }
+
+        guard let summaryItems = payload["summary"] as? [[String: Any]] else {
+            return nil
+        }
+
+        let texts = summaryItems.compactMap { item -> String? in
+            guard let text = item["text"] as? String else {
+                return nil
+            }
+
+            switch item["type"] as? String {
+            case "summary_text", "text", nil:
+                return sanitizedText(text)
+            default:
+                return nil
+            }
+        }
+
+        guard texts.isEmpty == false else {
+            return nil
+        }
+
+        return texts.joined(separator: "\n")
     }
 
     func payloadSummary(_ key: String) -> String? {
@@ -163,5 +192,10 @@ struct CodexTranscriptJSONEvent {
 
     func payloadString(_ key: String) -> String? {
         payload[key] as? String
+    }
+
+    private func sanitizedText(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
