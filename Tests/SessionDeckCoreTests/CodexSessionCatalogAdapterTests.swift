@@ -219,6 +219,42 @@ func codexCatalogAdapterExtractsUpstreamThreadRelationshipMetadata() throws {
     #expect(summary.metadata.agentPath == "/Users/kuba/.codex/agents/reviewer.md")
 }
 
+@Test("Codex catalog adapter reuses unchanged candidate metadata during repeated refreshes")
+func codexCatalogAdapterReusesUnchangedCandidateMetadataDuringRepeatedRefreshes() throws {
+    let fixtureRoot = try makeCatalogFixtureRoot(name: "metadata-cache")
+    defer {
+        try? fixtureRoot.cleanup()
+    }
+    let store = TempCodexSessionStore(tempRoot: fixtureRoot)
+    let source = try store.source(label: "Codex default", profile: "default")
+    let transcript = try store.writeTranscript(
+        """
+        {"timestamp":"2026-06-09T10:00:00.000Z","type":"session_meta","payload":{"id":"cached-session","title":"Cached A","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+
+        """,
+        source: source,
+        sessionID: "cached-session",
+        placement: .project("SessionDeck"),
+        timestamp: "2026-06-09T10:00:00Z"
+    )
+    let adapter = try makeCatalogAdapter(
+        source: source,
+        transcript: transcript,
+        modifiedAt: Date(timeIntervalSince1970: 1_770_000_000)
+    )
+
+    let firstSummary = try #require(try adapter.listSessions(sourceID: nil).first)
+    try """
+    {"timestamp":"2026-06-09T10:00:00.000Z","type":"session_meta","payload":{"id":"cached-session","title":"Cached B","cwd":"/tmp/SessionDeck","project":"SessionDeck","source":"codex-cli"}}
+
+    """.write(to: transcript.url, atomically: true, encoding: .utf8)
+
+    let secondSummary = try #require(try adapter.listSessions(sourceID: nil).first)
+
+    #expect(firstSummary.title == "Cached A")
+    #expect(secondSummary.title == "Cached A")
+}
+
 @Test("Codex catalog adapter ignores byte-limit truncation after metadata")
 func codexCatalogAdapterIgnoresByteLimitTruncationAfterMetadata() throws {
     let fixtureRoot = try makeCatalogFixtureRoot(name: "large-output")
