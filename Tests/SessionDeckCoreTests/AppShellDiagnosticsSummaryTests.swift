@@ -45,6 +45,38 @@ func diagnosticsSummaryMapsMissingSourcePathToWarningGuidance() {
     #expect(summary.rows.first?.recoveryGuidance.contains("will not create folders") == true)
 }
 
+@Test("diagnostics summary keeps informational transcript hints out of attention list")
+func diagnosticsSummaryKeepsInformationalTranscriptHintsOutOfAttentionList() {
+    let selectedDetail = AppShellSelectedTranscriptDetailState(
+        title: "Future transcript",
+        statusMessage: "Loaded 3 transcript segment(s) from a partial transcript.",
+        displayMode: .loaded,
+        metadataRows: [],
+        rows: [],
+        diagnosticMessages: ["Info line 3: A Codex transcript event is not mapped to a readable segment yet."],
+        diagnosticRows: [
+            AppShellSelectedTranscriptDiagnosticRow(
+                id: "unsupported-info",
+                message: "Info line 3: A Codex transcript event is not mapped to a readable segment yet.",
+                severity: .info,
+                diagnosticCode: "codex.unsupported_event"
+            ),
+        ],
+        severity: .healthy,
+        isLoading: false
+    )
+
+    let summary = AppShellDiagnosticsSummary.make(
+        sourceDiscoverySummary: .placeholder,
+        monitoringHealthSummary: .notStarted,
+        selectedTranscriptDetail: selectedDetail
+    )
+
+    #expect(summary.severity == .healthy)
+    #expect(summary.statusMessage == "No diagnostics need attention.")
+    #expect(summary.rows.map(\.title) == ["Healthy"])
+}
+
 @Test("diagnostics summary elevates blocking watcher and reconciliation failures")
 func diagnosticsSummaryElevatesBlockingMonitoringFailures() {
     let sourceID = SessionSourceID(rawValue: "codex-live")

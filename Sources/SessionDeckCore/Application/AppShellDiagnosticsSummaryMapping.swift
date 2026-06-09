@@ -59,18 +59,20 @@ extension AppShellDiagnosticsSummary {
     private static func transcriptRows(
         _ detail: AppShellSelectedTranscriptDetailState
     ) -> [AppShellDiagnosticSummaryRow] {
-        let diagnosticRows = detail.diagnosticRows.map { row in
-            AppShellDiagnosticSummaryRow(
-                id: "transcript.\(row.id)",
-                category: transcriptCategory(row),
-                severity: diagnosticSeverity(row.severity),
-                title: transcriptTitle(row),
-                detail: row.message,
-                recoveryGuidance: transcriptRecoveryGuidance(row),
-                diagnosticCode: row.diagnosticCode,
-                scope: AppShellDiagnosticScope(label: detail.title)
-            )
-        }
+        let diagnosticRows = detail.diagnosticRows
+            .filter { $0.severity != .info }
+            .map { row in
+                AppShellDiagnosticSummaryRow(
+                    id: "transcript.\(row.id)",
+                    category: transcriptCategory(row),
+                    severity: diagnosticSeverity(row.severity),
+                    title: transcriptTitle(row),
+                    detail: row.message,
+                    recoveryGuidance: transcriptRecoveryGuidance(row),
+                    diagnosticCode: row.diagnosticCode,
+                    scope: AppShellDiagnosticScope(label: detail.title)
+                )
+            }
 
         guard diagnosticRows.isEmpty,
               detail.displayMode == .warning || detail.displayMode == .error

@@ -164,30 +164,6 @@ public extension AppShellNavigationSummary {
         )
     }
 
-    private static func groupNodes(
-        sessions: [SessionSummary],
-        idPrefix: String,
-        key: (SessionSummary) -> String,
-        title: (SessionSummary) -> String
-    ) -> [AppShellNavigationNode] {
-        AppShellNavigationOrdering.sortNodesByRecency(
-            Dictionary(grouping: sessions, by: key)
-                .map { groupKey, groupSessions in
-                let orderedGroupSessions = SessionCatalogOrdering.sort(groupSessions)
-                let groupTitle = title(orderedGroupSessions[0])
-                return (
-                    node: AppShellNavigationNode(
-                        id: "\(idPrefix).\(groupKey)",
-                        title: groupTitle,
-                        count: orderedGroupSessions.count,
-                        sessionIDs: orderedGroupSessions.map(\.id)
-                    ),
-                    sessions: groupSessions
-                )
-            }
-        )
-    }
-
     private static func threadNodes(
         sessions: [SessionSummary],
         idPrefix: String
